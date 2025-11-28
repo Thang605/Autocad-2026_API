@@ -2,7 +2,34 @@
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup />
   <ItemGroup>
-    <Compile Update="TestForm.cs">
+    <Compile Update="Civil Tool\AlignmentSelectionForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Civil Tool\AssemblySelectionForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Civil Tool\CorridorRePhai_InputForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Civil Tool\CorridorSurfaceForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Civil Tool\MaterialOrderForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Civil Tool\PipeDiameterSelectionForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Civil Tool\SectionViewDesignForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Civil Tool\SubassemblyTargetConfigForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Civil Tool\SurfaceReferenceForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Menu form\TestForm.cs">
       <SubType>Form</SubType>
     </Compile>
   </ItemGroup>

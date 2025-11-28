@@ -1,0 +1,29 @@
+root = true
+
+# All files
+[*]
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# C# source files
+[*.cs]
+charset = utf-8-bom
+end_of_line = crlf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+
+# Project files
+[*.{csproj,vbproj,vcxproj,vcxproj.filters,proj,projitems,shproj}]
+charset = utf-8-bom
+indent_size = 2
+
+# Config files
+[*.{json,xml,yml,yaml}]
+charset = utf-8
+indent_size = 2
+
+# Solution files
+[*.sln]
+charset = utf-8-bom
+end_of_line = crlf
