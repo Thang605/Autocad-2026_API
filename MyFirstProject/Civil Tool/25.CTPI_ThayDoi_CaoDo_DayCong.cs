@@ -319,7 +319,8 @@ namespace Civil3DCsharp
                     {
                         try
                         {
-                            ObjectId modelPartId = (ObjectId)modelPartIdProperty.GetValue(selectedObj);
+                            object? val = modelPartIdProperty.GetValue(selectedObj);
+                            ObjectId modelPartId = val != null ? (ObjectId)val : ObjectId.Null;
                             
                             if (modelPartId != ObjectId.Null)
                             {
@@ -353,7 +354,8 @@ namespace Civil3DCsharp
                         {
                             try
                             {
-                                ObjectId propOid = (ObjectId)prop.GetValue(selectedObj);
+                                object? val = prop.GetValue(selectedObj);
+                                ObjectId propOid = val != null ? (ObjectId)val : ObjectId.Null;
                                 if (propOid != ObjectId.Null)
                                 {
                                     Autodesk.AutoCAD.DatabaseServices.DBObject propObj = tr.GetObject(propOid, OpenMode.ForRead);

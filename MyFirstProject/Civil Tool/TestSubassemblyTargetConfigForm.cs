@@ -147,7 +147,9 @@ namespace Civil3DCsharp
                             A.Ed.WriteMessage("\n\n--- Áp dụng cấu hình vào Baseline Region ---");
                             
                             // No need to upgrade open - already in transaction
+#pragma warning disable CS0618 // Type or member is obsolete
                             targetConfigForm.ApplyTargetConnectionsToBaselineRegion(baselineRegion);
+#pragma warning restore CS0618 // Type or member is obsolete
                             
                             tr.Commit();
                             A.Ed.WriteMessage("\n✅ Đã áp dụng cấu hình thành công!");

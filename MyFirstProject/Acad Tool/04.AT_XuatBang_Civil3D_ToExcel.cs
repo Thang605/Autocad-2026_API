@@ -163,8 +163,8 @@ namespace Civil3DCsharp
 
  int rowCount;
  int colCount;
- try { rowCount = table.Rows.Count; } catch { rowCount = table.NumRows; }
- try { colCount = table.Columns.Count; } catch { colCount = table.NumColumns; }
+                rowCount = table.Rows.Count;
+                colCount = table.Columns.Count;
 
  for (int r =0; r < rowCount; r++)
  {

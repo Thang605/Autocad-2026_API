@@ -1203,7 +1203,7 @@ namespace MyFirstProject.Civil_Tool
             return Name;
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (obj is StyleItem other)
             {

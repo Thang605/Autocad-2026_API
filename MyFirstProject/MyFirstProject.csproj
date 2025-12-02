@@ -4,13 +4,14 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <NoWarn>CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8622;CS8625;CS8619;CS8632;CS0219</NoWarn>
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
 
   <PropertyGroup>
     <UseWindowsForms>true</UseWindowsForms>
-    <AssemblyName>t155r05m.r2h</AssemblyName>
-    <OutputPath>C:\Users\thang\Dropbox\DATA\AI Agent\Autocad 2026_API\MyFirstProject\bin\Debug\</OutputPath>
+    <AssemblyName>Civil3D_Tools</AssemblyName>
+    <OutputPath>bin\Debug\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
 
@@ -73,6 +74,7 @@
   <ItemGroup>
     <PackageReference Include="ClosedXML" Version="0.104.2" />
     <PackageReference Include="ExcelNumberFormat" Version="1.1.0" />
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
     <PackageReference Include="System.IO.Packaging" Version="9.0.0" />
   </ItemGroup>
 </Project>
