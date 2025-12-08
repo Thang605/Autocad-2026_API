@@ -231,6 +231,7 @@ namespace MyFirstProject
             AddMenuItem(subMenuText, "Tạo Mới Text Layout", "AT_TaoMoi_TextLayout ");
             AddMenuItem(subMenuText, "Label From Text", "AT_Label_FromText ");
             AddMenuItem(subMenuText, "Đánh Số Thứ Tự", "AT_DanhSoThuTu ");
+            AddMenuItem(subMenuText, "Copy và Dịch Tiếng Anh", "_CA ");
 
             // Xoay đối tượng
             dynamic subMenuRotate = menu.AddSubMenu(menu.Count + 1, "Xoay đối tượng");
@@ -256,9 +257,8 @@ namespace MyFirstProject
         private static void AddMenuItem(dynamic menu, string label, string macro)
         {
             // AddMenuItem(Index, Label, Macro)
-            // Prepend ^C^C to ensure clean command execution
-            string actualMacro = "^C^C" + macro;
-            menu.AddMenuItem(menu.Count + 1, label, actualMacro);
+            // Chỉ sử dụng lệnh trực tiếp, không cần ^C^C
+            menu.AddMenuItem(menu.Count + 1, label, macro);
         }
 
         private static void AddHeader(dynamic menu, string label)
