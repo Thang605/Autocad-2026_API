@@ -12,45 +12,52 @@ using Autodesk.AutoCAD.Runtime;
 
 [assembly: CommandClass(typeof(NetReload.Commands))]
 
-namespace NetReload {
+namespace NetReload
+{
 
-	public class Commands {
+	public class Commands
+	{
 
-		// NETRELOAD command.
-		[CommandMethod("NRL")]
-		public static void NRL() {
+		// RELOAD command - Hot reload project without Visual Studio.
+		[CommandMethod("RELOAD")]
+		public static void Reload()
+		{
 			Autodesk.AutoCAD.ApplicationServices.Document doc = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
 			Editor ed = doc.Editor;
 
-			try {
+			try
+			{
 				// 1. Determine Project Path
-                // Since this is a standalone reloader, we point it to the main project we want to reload.
-                // You can change this path to reload different projects.
-                string projectDir = @"c:\Dropbox\DATA\AI Agent\Autocad 2026_API\MyFirstProject";
+				// Since this is a standalone reloader, we point it to the main project we want to reload.
+				// You can change this path to reload different projects.
+				string projectDir = @"c:\Dropbox\DATA\AI Agent\Autocad 2026_API\MyFirstProject";
 
-				if (string.IsNullOrEmpty(projectDir) || !Directory.Exists(projectDir)) {
+				if (string.IsNullOrEmpty(projectDir) || !Directory.Exists(projectDir))
+				{
 					ed.WriteMessage($"\nCould not find project directory: {projectDir}. *Cancel*");
 					return;
 				}
 
 				string csprojFile = Directory.GetFiles(projectDir, "*.csproj").FirstOrDefault();
-				if (string.IsNullOrEmpty(csprojFile)) {
+				if (string.IsNullOrEmpty(csprojFile))
+				{
 					ed.WriteMessage("\nCould not find .csproj file. *Cancel*");
 					return;
 				}
 
 				string projectName = Path.GetFileNameWithoutExtension(csprojFile);
-				
+
 				// Generate unique assembly name to avoid "Assembly already loaded" error
 				string randomName = Path.GetRandomFileName().Replace(".", "");
 				string uniqueAssemblyName = $"{projectName}_{randomName}";
-				
+
 				ed.WriteMessage($"\nReloading project: {projectName} (New Assembly: {uniqueAssemblyName})...");
 
 				// 2. Run dotnet build with unique AssemblyName
-				string configuration = "Debug"; 
+				string configuration = "Debug";
 
-				ProcessStartInfo psi = new ProcessStartInfo {
+				ProcessStartInfo psi = new ProcessStartInfo
+				{
 					FileName = "dotnet",
 					Arguments = $"build -c {configuration} /p:AssemblyName={uniqueAssemblyName}",
 					WorkingDirectory = projectDir,
@@ -60,14 +67,17 @@ namespace NetReload {
 					CreateNoWindow = true
 				};
 
-				using (Process process = Process.Start(psi)) {
+				using (Process process = Process.Start(psi))
+				{
 					StringBuilder outputBuilder = new StringBuilder();
 					StringBuilder errorBuilder = new StringBuilder();
 
-					process.OutputDataReceived += (sender, args) => {
+					process.OutputDataReceived += (sender, args) =>
+					{
 						if (args.Data != null) outputBuilder.AppendLine(args.Data);
 					};
-					process.ErrorDataReceived += (sender, args) => {
+					process.ErrorDataReceived += (sender, args) =>
+					{
 						if (args.Data != null) errorBuilder.AppendLine(args.Data);
 					};
 
@@ -75,11 +85,12 @@ namespace NetReload {
 					process.BeginErrorReadLine();
 
 					process.WaitForExit();
-					
+
 					string output = outputBuilder.ToString();
 					string error = errorBuilder.ToString();
 
-					if (process.ExitCode != 0) {
+					if (process.ExitCode != 0)
+					{
 						ed.WriteMessage($"\nBuild Failed:\n{output}\n{error}");
 						return;
 					}
@@ -92,16 +103,18 @@ namespace NetReload {
 					.OrderByDescending(f => f.LastWriteTime)
 					.ToList();
 
-				if (dllFiles.Count == 0) {
+				if (dllFiles.Count == 0)
+				{
 					ed.WriteMessage($"\nCould not find built DLL ({uniqueAssemblyName}.dll). *Cancel*");
 					return;
 				}
 
 				FileInfo sourceDll = dllFiles.First();
-				
+
 				// 4. Copy to NetReload directory (inside the target project's bin)
 				string netReloadDir = Path.Combine(projectDir, "bin", "NetReload");
-				if (!Directory.Exists(netReloadDir)) {
+				if (!Directory.Exists(netReloadDir))
+				{
 					Directory.CreateDirectory(netReloadDir);
 				}
 
@@ -109,23 +122,28 @@ namespace NetReload {
 				string destPdbPath = Path.ChangeExtension(destDllPath, "pdb");
 
 				File.Copy(sourceDll.FullName, destDllPath, true);
-				
+
 				string sourcePdb = Path.ChangeExtension(sourceDll.FullName, "pdb");
-				if (File.Exists(sourcePdb)) {
+				if (File.Exists(sourcePdb))
+				{
 					File.Copy(sourcePdb, destPdbPath, true);
 				}
 
 				// Clean up the artifact from bin
-				try {
+				try
+				{
 					File.Delete(sourceDll.FullName);
 					if (File.Exists(sourcePdb)) File.Delete(sourcePdb);
-				} catch { /* Ignore cleanup errors */ }
+				}
+				catch { /* Ignore cleanup errors */ }
 
 				// 5. Load the new DLL
 				Assembly.LoadFrom(destDllPath);
 				ed.WriteMessage($"\nNETRELOAD complete. Loaded: {uniqueAssemblyName}.dll");
 
-			} catch (System.Exception ex) {
+			}
+			catch (System.Exception ex)
+			{
 				ed.WriteMessage($"\nError: {ex.Message}");
 			}
 		}

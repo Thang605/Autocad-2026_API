@@ -11,7 +11,7 @@
   <PropertyGroup>
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>Civil3D_Tools</AssemblyName>
-    <OutputPath>bin\Debug\</OutputPath>
+    <OutputPath>bin\$(Configuration)\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
 

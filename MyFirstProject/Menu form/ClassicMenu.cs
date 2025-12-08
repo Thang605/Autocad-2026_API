@@ -10,29 +10,10 @@ namespace MyFirstProject
 {
     public class ClassicMenu
     {
-        [CommandMethod("CreateAllMenus")]
-        public static void CreateAllMenus()
-        {
-            CreatePhuocToolMenu();
-            CreateCivilToolMenu();
-            CreateAcadToolMenu();
-        }
-
-        [CommandMethod("CreatePhuocToolMenu")]
-        public static void CreatePhuocToolMenu()
-        {
-            CreateMenuGeneric("Phước_Tool", BuildPhuocToolStructure);
-        }
-
-        [CommandMethod("CreateCivilToolMenu")]
-        public static void CreateCivilToolMenu()
+        [CommandMethod("SHOW_MENU")]
+        public static void ShowMenu()
         {
             CreateMenuGeneric("Civil tool", BuildCivilToolStructure);
-        }
-
-        [CommandMethod("CreateAcadToolMenu")]
-        public static void CreateAcadToolMenu()
-        {
             CreateMenuGeneric("Acad tool", BuildAcadToolStructure);
         }
 
@@ -93,79 +74,7 @@ namespace MyFirstProject
             }
         }
 
-        private static void BuildPhuocToolStructure(dynamic menu)
-        {
-            // 01. TIỆN ÍCH HẠ TẦNG - GIAO THÔNG
-            dynamic subMenu01 = menu.AddSubMenu(menu.Count + 1, "01. TIỆN ÍCH HẠ TẦNG - GIAO THÔNG");
-            
-            // --- Bình đồ tuyến ---
-            AddHeader(subMenu01, "------ Bình đồ tuyến ------");
-            AddMenuItem(subMenu01, "IPD - Phun điểm từ file CSV vào Cad", "IPD ");
-            AddMenuItem(subMenu01, "PSC - Phát sinh cọc trên tuyến", "PSC ");
-            AddMenuItem(subMenu01, "TTTN - Nhặt số liệu trắc ngang từ bình đồ", "TTTN ");
-            AddMenuItem(subMenu01, "GLT - Ghi lý trình trên tuyến", "GLT ");
-            AddMenuItem(subMenu01, "DLAYT - Đổi layer cao độ tại cọc trên tim tuyến", "DLAYT ");
-            AddMenuItem(subMenu01, "NTD - Tạo file ntd trong Nova", "NTD ");
-            AddMenuItem(subMenu01, "RTV - Xoay Text, Viewport trong Model - Layout", "RTV ");
-            AddMenuItem(subMenu01, "RKI - Tạo Viewport theo đường cong Polyline", "RKI ");
-            AddMenuItem(subMenu01, "TKI - Tạo khung in bình đồ", "TKI ");
-            AddMenuItem(subMenu01, "Video - Hướng dẫn tạo khung bình đồ - TKI", "Video_TKI ");
-            AddMenuItem(subMenu01, "GKBD - Khép khung bình đồ (do AJS phát triển - 150k/máy)", "GKBD ");
 
-            // --- Trắc dọc tuyến ---
-            AddHeader(subMenu01, "------ Trắc dọc tuyến ------");
-            AddMenuItem(subMenu01, "VETD - Vẽ Trắc Dọc tuyến", "VETD ");
-
-            // --- Trắc ngang tuyến ---
-            AddHeader(subMenu01, "------ Trắc ngang tuyến ------");
-            AddMenuItem(subMenu01, "VETN - Vẽ Trắc Ngang tuyến", "VETN ");
-            AddMenuItem(subMenu01, "TCS - Thiết lập thông số", "TCS ");
-            AddMenuItem(subMenu01, "TCD - Tính cao độ trắc ngang", "TCD ");
-            AddMenuItem(subMenu01, "CNCD - Cập nhật cao độ trắc ngang", "CNCD ");
-
-            // --- Bảng thông số nút giao ---
-            AddHeader(subMenu01, "------ Bảng thông số nút giao ------");
-            AddMenuItem(subMenu01, "Knut - Khai báo cao chữ bảng thông số", "Knut ");
-            AddMenuItem(subMenu01, "Gnut - Vẽ bảng thông số T-P-K nút giao", "Gnut ");
-
-            // --- Đánh Ký hiệu bản vẽ - DMBV ---
-            AddHeader(subMenu01, "------ Đánh Ký hiệu bản vẽ - DMBV ------");
-            AddMenuItem(subMenu01, "KhoaBV - Khoá bản vẽ", "KhoaBV ");
-            AddMenuItem(subMenu01, "DBVN - Đóng nhanh các bản vẽ đang mở", "DBVN ");
-            AddMenuItem(subMenu01, "DMBV - Danh mục bản vẽ LHB", "DMBV ");
-            AddMenuItem(subMenu01, "Video - DMBV - Đánh danh mục bản vẽ LHB", "Video_DMBV ");
-            AddMenuItem(subMenu01, "ATOC - Danh mục bản vẽ (do AJS phát triển - 150k/máy)", "ATOC ");
-
-            // --- Google Map - Cad ---
-            AddHeader(subMenu01, "------ Google Map - Cad ------");
-            AddMenuItem(subMenu01, "IRT - Chuyển ảnh Google Map vào Cad", "IRT ");
-            AddMenuItem(subMenu01, "IRT1 - Hiện đối tượng lên trên ảnh", "IRT1 ");
-            AddMenuItem(subMenu01, "VIT - Đổi Sang tiếng việt IRT", "VIT ");
-
-            // --- In ấn ---
-            AddHeader(subMenu01, "------ In ấn ------");
-            AddMenuItem(subMenu01, "QQP - In bản vẽ nhanh", "QQP ");
-            AddMenuItem(subMenu01, "MPL - In hàng loạt", "MPL ");
-            AddMenuItem(subMenu01, "IBV - In nhanh bản vẽ LHB", "IBV ");
-            AddMenuItem(subMenu01, "Video - IBV - In hàng loạt bản vẽ LHB", "Video_IBV ");
-            AddMenuItem(subMenu01, "D2P - In nhanh (do AJS phát triển - 150k/máy)", "D2P ");
-            AddMenuItem(subMenu01, "XuatVP - Xuất ViewPort", "XuatVP ");
-            AddMenuItem(subMenu01, "Xuattn - Xuất TN vào ViewPort", "Xuattn ");
-            AddMenuItem(subMenu01, "DDH - Hỗ trợ Bình đồ - Trắc ngang - In ấn", "DDH ");
-
-            // Placeholders
-            menu.AddSubMenu(menu.Count + 1, "02. TIỆN ÍCH KHẢO SÁT ĐỊA HÌNH");
-            menu.AddSubMenu(menu.Count + 1, "03. TIỆN ÍCH TRẮC ĐỊA BÁC (N.T. DUÂN)");
-            menu.AddSubMenu(menu.Count + 1, "04. TIỆN ÍCH SAN NỀN BÁC (HOAN HML2.5.1)");
-            menu.AddSubMenu(menu.Count + 1, "05. TIỆN ÍCH N.Đ.LÝ HÙNG (LHB_TOOL)");
-            menu.AddSubMenu(menu.Count + 1, "06. TIỆN ÍCH ĐIỆN BÁC (NHẤT NGUYÊN)");
-            menu.AddSubMenu(menu.Count + 1, "07. TIỆN ÍCH BÁC 3DUY (GROUP 1)");
-            menu.AddSubMenu(menu.Count + 1, "08. TIỆN ÍCH BÁC 3DUY (GROUP 2)");
-            menu.AddSubMenu(menu.Count + 1, "09. TIỆN ÍCH DIM - TỌA ĐỘ - FONT");
-            menu.AddSubMenu(menu.Count + 1, "10. TIỆN ÍCH TEXT - LAYER - HATCH");
-            menu.AddSubMenu(menu.Count + 1, "11. TIỆN ÍCH BLOCK - D/TÍCH - C/ DÀI");
-            menu.AddSubMenu(menu.Count + 1, "12. TIỆN ÍCH VẼ NHANH");
-        }
 
         private static void BuildCivilToolStructure(dynamic menu)
         {
@@ -301,7 +210,7 @@ namespace MyFirstProject
 
         private static void BuildAcadToolStructure(dynamic menu)
         {
-             // Tổng độ dài
+            // Tổng độ dài
             dynamic subMenuLen = menu.AddSubMenu(menu.Count + 1, "Tổng độ dài");
             AddMenuItem(subMenuLen, "Tổng Độ Dài (Full)", "AT_TongDoDai_Full ");
             AddMenuItem(subMenuLen, "Tổng Độ Dài (Replace)", "AT_TongDoDai_Replace ");
@@ -357,7 +266,7 @@ namespace MyFirstProject
             // Add a disabled item to act as a header
             // Use a valid macro even if disabled
             var item = menu.AddMenuItem(menu.Count + 1, label, "^C^C");
-            item.Enable = false; 
+            item.Enable = false;
         }
     }
 }
