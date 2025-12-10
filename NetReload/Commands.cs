@@ -18,6 +18,13 @@ namespace NetReload
 	public class Commands
 	{
 
+		// NRL command - Short alias for RELOAD
+		[CommandMethod("NRL")]
+		public static void Nrl()
+		{
+			Reload();
+		}
+
 		// RELOAD command - Hot reload project without Visual Studio.
 		[CommandMethod("RELOAD")]
 		public static void Reload()
