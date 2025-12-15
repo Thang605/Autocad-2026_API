@@ -333,5 +333,293 @@ namespace Civil3DCsharp
 
             return name;
         }
+
+        /// <summary>
+        /// Lệnh AT_XrefAttachToOverlay - Chuyển đổi tất cả xref từ Attach sang Overlay trong file hiện tại
+        /// </summary>
+        [CommandMethod("AT_XrefAttachToOverlay")]
+        public static void AT_XrefAttachToOverlay()
+        {
+            Document doc = Application.DocumentManager.MdiActiveDocument;
+            Database db = doc.Database;
+            Editor ed = doc.Editor;
+
+            try
+            {
+                int convertedCount = 0;
+                int alreadyOverlayCount = 0;
+                int failCount = 0;
+
+                using (Transaction tr = db.TransactionManager.StartTransaction())
+                {
+                    BlockTable bt = tr.GetObject(db.BlockTableId, OpenMode.ForRead) as BlockTable;
+
+                    foreach (ObjectId btrId in bt)
+                    {
+                        try
+                        {
+                            BlockTableRecord btr = tr.GetObject(btrId, OpenMode.ForRead) as BlockTableRecord;
+                            
+                            // Kiểm tra xem có phải là xref không
+                            if (btr != null && btr.IsFromExternalReference)
+                            {
+                                if (btr.IsFromOverlayReference)
+                                {
+                                    // Đã là overlay
+                                    alreadyOverlayCount++;
+                                    ed.WriteMessage($"\n  • {btr.Name}: Đã là Overlay");
+                                }
+                                else
+                                {
+                                    // Là attach, chuyển sang overlay
+                                    btr.UpgradeOpen();
+                                    btr.IsFromOverlayReference = true;
+                                    convertedCount++;
+                                    ed.WriteMessage($"\n  ✓ {btr.Name}: Đã chuyển từ Attach -> Overlay");
+                                }
+                            }
+                        }
+                        catch (System.Exception ex)
+                        {
+                            failCount++;
+                            ed.WriteMessage($"\n  ! Lỗi: {ex.Message}");
+                        }
+                    }
+
+                    tr.Commit();
+                }
+
+                // Thông báo kết quả
+                ed.WriteMessage($"\n\n=== KẾT QUẢ ===");
+                ed.WriteMessage($"\nĐã chuyển đổi: {convertedCount} xref");
+                ed.WriteMessage($"\nĐã là Overlay: {alreadyOverlayCount} xref");
+                if (failCount > 0)
+                    ed.WriteMessage($"\nThất bại: {failCount} xref");
+            }
+            catch (System.Exception ex)
+            {
+                ed.WriteMessage($"\nLỗi: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Lệnh AT_XrefAttachToOverlayFile - Chuyển đổi tất cả xref từ Attach sang Overlay trong file được chỉ định
+        /// </summary>
+        [CommandMethod("AT_XrefAttachToOverlayFile")]
+        public static void AT_XrefAttachToOverlayFile()
+        {
+            Document doc = Application.DocumentManager.MdiActiveDocument;
+            Editor ed = doc.Editor;
+
+            try
+            {
+                // Mở hộp thoại chọn file DWG
+                string selectedFile = SelectDwgFile();
+                if (string.IsNullOrEmpty(selectedFile))
+                {
+                    ed.WriteMessage("\nĐã hủy lệnh.");
+                    return;
+                }
+
+                ed.WriteMessage($"\nĐang xử lý file: {Path.GetFileName(selectedFile)}");
+
+                int convertedCount = 0;
+                int alreadyOverlayCount = 0;
+                int failCount = 0;
+
+                // Tạo file tạm trong thư mục TEMP của hệ thống (tránh sync Dropbox/OneDrive)
+                string tempFile = Path.Combine(Path.GetTempPath(), 
+                    "AutoCAD_XrefConvert_" + Path.GetFileNameWithoutExtension(selectedFile) + "_" + DateTime.Now.Ticks + ".dwg");
+
+                // Mở file database riêng biệt (không phải file hiện tại)
+                using (Database targetDb = new Database(false, true))
+                {
+                    targetDb.ReadDwgFile(selectedFile, FileOpenMode.OpenForReadAndAllShare, true, null);
+
+                    // Kiểm tra đơn vị bản vẽ - UnitsValue.Meters = 6
+                    if (targetDb.Insunits != UnitsValue.Meters)
+                    {
+                        string unitName = targetDb.Insunits.ToString();
+                        ed.WriteMessage($"\n⚠ CẢNH BÁO: Đơn vị bản vẽ là '{unitName}', không phải 'Meters'!");
+                        ed.WriteMessage($"\n  Đơn vị hiện tại: {unitName} (InsUnits = {(int)targetDb.Insunits})");
+                    }
+                    else
+                    {
+                        ed.WriteMessage($"\n✓ Đơn vị bản vẽ: Meters");
+                    }
+
+                    using (Transaction tr = targetDb.TransactionManager.StartTransaction())
+                    {
+                        BlockTable bt = tr.GetObject(targetDb.BlockTableId, OpenMode.ForRead) as BlockTable;
+
+                        foreach (ObjectId btrId in bt)
+                        {
+                            try
+                            {
+                                BlockTableRecord btr = tr.GetObject(btrId, OpenMode.ForRead) as BlockTableRecord;
+                                
+                                // Kiểm tra xem có phải là xref không
+                                if (btr != null && btr.IsFromExternalReference)
+                                {
+                                    if (btr.IsFromOverlayReference)
+                                    {
+                                        // Đã là overlay
+                                        alreadyOverlayCount++;
+                                        ed.WriteMessage($"\n  • {btr.Name}: Đã là Overlay");
+                                    }
+                                    else
+                                    {
+                                        // Là attach, chuyển sang overlay
+                                        btr.UpgradeOpen();
+                                        btr.IsFromOverlayReference = true;
+                                        convertedCount++;
+                                        ed.WriteMessage($"\n  ✓ {btr.Name}: Đã chuyển từ Attach -> Overlay");
+                                    }
+                                }
+                            }
+                            catch (System.Exception ex)
+                            {
+                                failCount++;
+                                ed.WriteMessage($"\n  ! Lỗi: {ex.Message}");
+                            }
+                        }
+
+                        tr.Commit();
+                    }
+
+                    // Đóng input stream trước khi lưu
+                    targetDb.CloseInput(true);
+
+                    // Lưu file tạm vào thư mục TEMP
+                    ed.WriteMessage($"\n\nĐang lưu file...");
+                    targetDb.SaveAs(tempFile, DwgVersion.Current);
+                    ed.WriteMessage($"\n  ✓ Đã lưu vào file tạm");
+                }
+
+                // Sau khi Database đã dispose, copy file tạm đè lên file gốc
+                ed.WriteMessage($"\n  Đang copy về vị trí gốc...");
+                bool copySuccess = false;
+                int maxRetries = 3;
+                
+                for (int retry = 0; retry < maxRetries && !copySuccess; retry++)
+                {
+                    try
+                    {
+                        if (retry > 0)
+                        {
+                            ed.WriteMessage($"\n  Thử lại lần {retry + 1}...");
+                            System.Threading.Thread.Sleep(1000); // Đợi 1 giây trước khi thử lại
+                        }
+                        
+                        // Sử dụng File.Copy thay vì File.Move (hoạt động tốt hơn giữa các ổ đĩa)
+                        File.Copy(tempFile, selectedFile, true);
+                        copySuccess = true;
+                        
+                        // Xóa file tạm sau khi copy thành công
+                        try { File.Delete(tempFile); } catch { }
+                    }
+                    catch (System.Exception)
+                    {
+                        if (retry == maxRetries - 1)
+                        {
+                            // Nếu không thể đè file gốc, giữ lại file tạm và thông báo
+                            ed.WriteMessage($"\n\n⚠ Không thể ghi đè file gốc (file có thể đang mở hoặc bị khóa)");
+                            ed.WriteMessage($"\nFile đã được lưu tại: {tempFile}");
+                            ed.WriteMessage($"\nBạn có thể copy thủ công file này để thay thế file gốc.");
+                            
+                            // Thông báo kết quả
+                            ed.WriteMessage($"\n\n=== KẾT QUẢ ===");
+                            ed.WriteMessage($"\nĐã chuyển đổi: {convertedCount} xref");
+                            ed.WriteMessage($"\nĐã là Overlay: {alreadyOverlayCount} xref");
+                            if (failCount > 0)
+                                ed.WriteMessage($"\nThất bại: {failCount} xref");
+                            return;
+                        }
+                    }
+                }
+
+                // Thông báo kết quả
+                ed.WriteMessage($"\n\n=== KẾT QUẢ ===");
+                ed.WriteMessage($"\nFile: {Path.GetFileName(selectedFile)}");
+                ed.WriteMessage($"\nĐã chuyển đổi: {convertedCount} xref");
+                ed.WriteMessage($"\nĐã là Overlay: {alreadyOverlayCount} xref");
+                if (failCount > 0)
+                    ed.WriteMessage($"\nThất bại: {failCount} xref");
+                ed.WriteMessage($"\nĐã lưu file thành công!");
+
+                // Xref file đã xử lý vào bản vẽ hiện hành
+                ed.WriteMessage($"\n\nĐang tạo Xref Overlay vào bản vẽ hiện hành...");
+                try
+                {
+                    Database db = doc.Database;
+                    using (Transaction tr = db.TransactionManager.StartTransaction())
+                    {
+                        BlockTable bt = tr.GetObject(db.BlockTableId, OpenMode.ForRead) as BlockTable;
+                        BlockTableRecord modelSpace = tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForWrite) as BlockTableRecord;
+
+                        // Tạo tên xref từ tên file
+                        string xrefName = Path.GetFileNameWithoutExtension(selectedFile);
+                        xrefName = GetUniqueXrefName(bt, xrefName);
+
+                        // Tạo Xref Overlay
+                        ObjectId xrefId = db.OverlayXref(selectedFile, xrefName);
+
+                        if (xrefId.IsValid)
+                        {
+                            // Tạo BlockReference tại điểm 0,0,0
+                            using (BlockReference xrefRef = new BlockReference(Point3d.Origin, xrefId))
+                            {
+                                modelSpace.AppendEntity(xrefRef);
+                                tr.AddNewlyCreatedDBObject(xrefRef, true);
+                            }
+                            ed.WriteMessage($"\n  ✓ Đã tạo Xref Overlay: {xrefName}");
+                        }
+                        else
+                        {
+                            ed.WriteMessage($"\n  ! Không thể tạo Xref cho file đã xử lý");
+                        }
+
+                        tr.Commit();
+                    }
+                }
+                catch (System.Exception xrefEx)
+                {
+                    ed.WriteMessage($"\n  ! Lỗi khi tạo Xref: {xrefEx.Message}");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                ed.WriteMessage($"\nLỗi: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Mở hộp thoại chọn file DWG
+        /// </summary>
+        private static string SelectDwgFile()
+        {
+            using (OpenFileDialog openDialog = new OpenFileDialog())
+            {
+                openDialog.Title = "Chọn file DWG cần chuyển đổi Xref";
+                openDialog.Filter = "AutoCAD Drawing (*.dwg)|*.dwg";
+                openDialog.FilterIndex = 1;
+                openDialog.RestoreDirectory = true;
+
+                // Mặc định là thư mục của file hiện tại
+                Document doc = Application.DocumentManager.MdiActiveDocument;
+                if (doc != null && !string.IsNullOrEmpty(doc.Database.Filename))
+                {
+                    string currentDir = Path.GetDirectoryName(doc.Database.Filename);
+                    if (!string.IsNullOrEmpty(currentDir))
+                        openDialog.InitialDirectory = currentDir;
+                }
+
+                if (openDialog.ShowDialog() == DialogResult.OK)
+                {
+                    return openDialog.FileName;
+                }
+            }
+            return string.Empty;
+        }
     }
 }
