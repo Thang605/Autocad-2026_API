@@ -1,0 +1,12 @@
+﻿  Determining projects to restore...
+  Restored C:\Dropbox\DATA\AI Agent\Autocad 2026_API\MyFirstProject\MyFirstProject.csproj (in 1.39 sec).
+C:\Dropbox\DATA\AI Agent\Autocad 2026_API\MyFirstProject\Civil Tool\27.CT_TaoDuong_ConnectedAlignment_NutGiao.cs(24,31): warning CS0414: The field 'CT_TaoDuong_ConnectedAlignment_NutGiao_Commands._lastOverlap' is assigned but its value is never used [C:\Dropbox\DATA\AI Agent\Autocad 2026_API\MyFirstProject\MyFirstProject.csproj]
+  MyFirstProject -> C:\Dropbox\DATA\AI Agent\Autocad 2026_API\MyFirstProject\bin\Debug\Civil3D_Tools.dll
+
+Build succeeded.
+
+C:\Dropbox\DATA\AI Agent\Autocad 2026_API\MyFirstProject\Civil Tool\27.CT_TaoDuong_ConnectedAlignment_NutGiao.cs(24,31): warning CS0414: The field 'CT_TaoDuong_ConnectedAlignment_NutGiao_Commands._lastOverlap' is assigned but its value is never used [C:\Dropbox\DATA\AI Agent\Autocad 2026_API\MyFirstProject\MyFirstProject.csproj]
+    1 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:04.52

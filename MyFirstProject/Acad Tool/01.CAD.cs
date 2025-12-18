@@ -551,59 +551,7 @@ namespace Civil3DCsharp
                 ans = UserInput.GStopWithESC();
             }
         }
-        
-        [CommandMethod("AT_XoayDoiTuong_TheoViewport")]
-        public static void ET_XoayDoiTuong_TheoViewport()
-        {
-            // start transantion
-            using Transaction tr = A.Db.TransactionManager.StartTransaction();
-            try
-            {
-                UserInput UI = new();
-                UtilitiesCAD CAD = new();
-                UtilitiesC3D C3D = new();
-                //start here
-                // Open the Block table for read
-                BlockTable? acBlkTbl;
-                acBlkTbl = tr.GetObject(A.Db.BlockTableId, OpenMode.ForRead) as BlockTable;
 
-                // Open the Block table record Model space for write
-                BlockTableRecord? acBlkTblRec;
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
-                acBlkTblRec = tr.GetObject(acBlkTbl[BlockTableRecord.ModelSpace], OpenMode.ForWrite) as BlockTableRecord;
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
-
-                // get current viewport
-                ViewTableRecord acView = A.Ed.GetCurrentView();
-                Double angleAcView = acView.ViewTwist;
-
-                ObjectIdCollection noteIdColl = UserInput.GSelectionSet("\n Chọn các note label cần xoay theo viewport:");
-                foreach (ObjectId noteId in noteIdColl)
-                {
-                    var noteLabel = tr.GetObject(noteId, OpenMode.ForWrite);
-                    if (noteLabel is DBText text)
-                        text.Rotation = 3.14159 - angleAcView + 3.14159;
-                    else if (noteLabel is MText text1)
-                        text1.Rotation = 3.14159 - angleAcView + 3.14159;
-                    else if (noteLabel is NoteLabel label)
-                        label.RotationAngle = 3.14159 - angleAcView;
-                    else if (noteLabel is BlockReference reference)
-                        reference.Rotation = 3.14159 - angleAcView + 3.14159;
-                }
-
-
-
-                // Add each offset object
-                //acBlkTblRec.AppendEntity(acEnt);
-                //tr.AddNewlyCreatedDBObject(acEnt, true);
-
-                tr.Commit();
-            }
-            catch (Autodesk.AutoCAD.Runtime.Exception e)
-            {
-                A.Ed.WriteMessage(e.Message);
-            }
-        }
 
         [CommandMethod("AT_XoayDoiTuong_Theo2Diem")]
         public static void AT_XoayDoiTuong_Theo2Diem()

@@ -240,6 +240,8 @@ namespace MyFirstProject
 
             // Layout
             dynamic subMenuLayout = menu.AddSubMenu(menu.Count + 1, "Layout");
+            AddMenuItem(subMenuLayout, "Bố Trí ViewPort Theo Hình", "AT_BoTri_ViewPort_TheoHinh ");
+            AddMenuItem(subMenuLayout, "Bố Trí ViewPort Theo Hình (V2)", "AT_BoTri_ViewPort_TheoHinh_V2 ");
             AddMenuItem(subMenuLayout, "Dim Layout 2", "AT_DimLayout2 ");
             AddMenuItem(subMenuLayout, "Dim Layout", "AT_DimLayout ");
             AddMenuItem(subMenuLayout, "Block Layout", "AT_BlockLayout ");
