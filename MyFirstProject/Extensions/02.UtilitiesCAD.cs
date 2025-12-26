@@ -332,6 +332,10 @@ namespace MyFirstProject.Extensions
                 acPoly.AddVertexAt(i, new Point2d(easting, northing), 0, 0, 0);
             }
             acPoly.Closed = false;
+            
+            // Set layer to Defpoints (không in được)
+            acPoly.Layer = "Defpoints";
+            
             // Add the new object to the block table record and the transaction
             acBlkTblRec.AppendEntity(acPoly);
             tr.AddNewlyCreatedDBObject(acPoly, true);
