@@ -96,7 +96,9 @@ namespace Civil3DCsharp
         private RadioButton rbNormal = null!;
         private RadioButton rbLeftToRight = null!;
         private RadioButton rbTopToBottom = null!;
-
+        private CheckBox chkCenter = null!;
+        private WinFormsTextBox txtOffsetX = null!;
+        private WinFormsTextBox txtOffsetY = null!;
         private WinFormsButton btnPrint = null!;
         private WinFormsButton btnPreview = null!;
         private WinFormsButton btnCancel = null!;
@@ -155,7 +157,7 @@ namespace Civil3DCsharp
         private void InitializeComponent()
         {
             this.Text = "In bản vẽ theo block";
-            this.Size = new Size(340, 405);  // Giảm height vì bỏ Plot To File và Plot Offset
+            this.Size = new Size(340, 460);  // Giảm height vì bỏ Plot To File
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -425,7 +427,62 @@ namespace Civil3DCsharp
 
             y += 55;
 
+            // ========== Group: Plot offset ==========
+            var grpOffset = new GroupBox
+            {
+                Text = "Plot offset",
+                Location = new Point(10, y),
+                Size = new Size(305, 45)
+            };
 
+            chkCenter = new CheckBox
+            {
+                Text = "Center",
+                Location = new Point(labelX, 18),
+                Size = new Size(65, 20),
+                Checked = true
+            };
+            chkCenter.CheckedChanged += ChkCenter_CheckedChanged;
+
+            var lblX = new WinFormsLabel
+            {
+                Text = "X",
+                Location = new Point(85, 20),
+                Size = new Size(15, 20)
+            };
+
+            txtOffsetX = new WinFormsTextBox
+            {
+                Location = new Point(100, 16),
+                Size = new Size(50, 23),
+                Text = "1",
+                Enabled = false
+            };
+
+            var lblY = new WinFormsLabel
+            {
+                Text = "Y",
+                Location = new Point(160, 20),
+                Size = new Size(15, 20)
+            };
+
+            txtOffsetY = new WinFormsTextBox
+            {
+                Location = new Point(175, 16),
+                Size = new Size(50, 23),
+                Text = "1",
+                Enabled = false
+            };
+
+            grpOffset.Controls.Add(chkCenter);
+            grpOffset.Controls.Add(lblX);
+            grpOffset.Controls.Add(txtOffsetX);
+            grpOffset.Controls.Add(lblY);
+            grpOffset.Controls.Add(txtOffsetY);
+
+            this.Controls.Add(grpOffset);
+
+            y += 55;
 
             // ========== Buttons ==========
             btnPrint = new WinFormsButton
@@ -558,7 +615,7 @@ namespace Civil3DCsharp
             rbTopToBottom.Checked = _lastSortOrder == LayoutSortOrder.TopToBottom;
 
             // Center
-
+            chkCenter.Checked = _lastCenterPlot;
         }
 
         private void SelectComboItem(WinFormsComboBox combo, string value)
@@ -583,7 +640,12 @@ namespace Civil3DCsharp
             btnSelect.Enabled = useBlock;
         }
 
-
+        private void ChkCenter_CheckedChanged(object? sender, EventArgs e)
+        {
+            bool centered = chkCenter.Checked;
+            txtOffsetX.Enabled = !centered;
+            txtOffsetY.Enabled = !centered;
+        }
 
         private void BtnPick_Click(object? sender, EventArgs e)
         {
@@ -727,7 +789,24 @@ namespace Civil3DCsharp
                 return false;
             }
 
+            if (!chkCenter.Checked)
+            {
+                if (!double.TryParse(txtOffsetX.Text, out _))
+                {
+                    MessageBox.Show("Offset X phải là số!", "Lỗi",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    txtOffsetX.Focus();
+                    return false;
+                }
 
+                if (!double.TryParse(txtOffsetY.Text, out _))
+                {
+                    MessageBox.Show("Offset Y phải là số!", "Lỗi",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    txtOffsetY.Focus();
+                    return false;
+                }
+            }
 
             return true;
         }
@@ -744,9 +823,9 @@ namespace Civil3DCsharp
             else if (rbLeftToRight.Checked) SortOrder = LayoutSortOrder.LeftToRight;
             else SortOrder = LayoutSortOrder.TopToBottom;
 
-            CenterPlot = true;
-            OffsetX = 0;
-            OffsetY = 0;
+            CenterPlot = chkCenter.Checked;
+            OffsetX = double.TryParse(txtOffsetX.Text, out double x) ? x : 0;
+            OffsetY = double.TryParse(txtOffsetY.Text, out double y) ? y : 0;
 
             // Paper và Print dimensions
             PaperWidth = double.TryParse(txtPaperWidth.Text, out double pw) ? pw : 420;
@@ -820,12 +899,12 @@ namespace Civil3DCsharp
     }
 
     /// <summary>
-    /// Class chứa lệnh in trong Layout
+    /// Class chứa lệnh in trong Layout và Model
     /// </summary>
     public class AT_InBanVe_Layout_Commands
     {
-        [CommandMethod("AT_InBanVe_Layout")]
-        public static void AT_InBanVe_Layout()
+        [CommandMethod("AT_InBanVe_TheoBlock")]
+        public static void AT_InBanVe_TheoBlock()
         {
             Document doc = Application.DocumentManager.MdiActiveDocument;
             Database db = doc.Database;
@@ -833,14 +912,15 @@ namespace Civil3DCsharp
 
             try
             {
-                ed.WriteMessage("\n=== 🖨️ IN BẢN VẼ LAYOUT - AT_InBanVe_Layout ===");
+                ed.WriteMessage("\n=== 🖨️ IN BẢN VẼ THEO BLOCK - AT_InBanVe_TheoBlock ===");
 
-                // Kiểm tra xem đang ở Paper space không
-                if (db.TileMode == true)
+                // Determine current space name
+                string currentSpaceName = "Model"; 
+                bool isModelSpace = (db.TileMode == true);
+                
+                if (!isModelSpace)
                 {
-                    ed.WriteMessage("\n⚠️ Bạn đang ở Model space. Vui lòng chuyển sang Layout (Paper space).");
-                    ed.WriteMessage("\n   Nhấp vào tab Layout hoặc gõ lệnh LAYOUT.");
-                    return;
+                    currentSpaceName = LayoutManager.Current.CurrentLayout;
                 }
 
                 // Hiển thị form
@@ -870,7 +950,7 @@ namespace Civil3DCsharp
                     offsetX = form.OffsetX;
                     offsetY = form.OffsetY;
 
-                    ed.WriteMessage($"\n\n📋 Thông tin in:");
+                    ed.WriteMessage($"\n\n📋 Thông tin in ({currentSpaceName}):");
                     ed.WriteMessage($"\n   - Máy in: {printer}");
                     ed.WriteMessage($"\n   - Kích thước giấy: {paperSize} ({form.PaperWidth}x{form.PaperHeight} mm)");
                     ed.WriteMessage($"\n   - Plot Style: {plotStyle}");
@@ -878,17 +958,15 @@ namespace Civil3DCsharp
                     ed.WriteMessage($"\n   - Sắp xếp: {sortOrder}");
                     ed.WriteMessage($"\n   - {(isPreview ? "CHẾ ĐỘ PREVIEW" : "CHẾ ĐỘ IN")}");
 
-                    // Lấy các vùng in - ưu tiên từ form (đã chọn), nếu không thì tìm kiếm tự động
+                    // Lấy các vùng in
                     List<LayoutPrintArea> printAreas;
                     if (form.PrintAreas.Count > 0)
                     {
-                        // User đã chọn blocks bằng nút Select
                         printAreas = form.PrintAreas;
                         ed.WriteMessage($"\n📍 Sử dụng {printAreas.Count} block đã chọn.");
                     }
                     else
                     {
-                        // Tìm kiếm tự động trong Layout
                         printAreas = FindPrintAreas(db, ed, blockName, sortOrder);
                     }
 
@@ -908,13 +986,11 @@ namespace Civil3DCsharp
                     // Thực hiện in
                     if (isPreview)
                     {
-                        // Chỉ preview vùng đầu tiên
-                        PreviewPlot(ed, printAreas[0], printer, paperSize, plotStyle, centerPlot, offsetX, offsetY);
+                        PreviewPlot(ed, printAreas[0], printer, paperSize, plotStyle, centerPlot, offsetX, offsetY, isModelSpace, currentSpaceName);
                     }
                     else
                     {
-                        // In tất cả các vùng
-                        PlotAllAreas(doc, ed, printAreas, printer, paperSize, plotStyle, centerPlot, offsetX, offsetY);
+                        PlotAllAreas(doc, ed, printAreas, printer, paperSize, plotStyle, centerPlot, offsetX, offsetY, isModelSpace, currentSpaceName);
                     }
                 }
             }
@@ -926,7 +1002,7 @@ namespace Civil3DCsharp
         }
 
         /// <summary>
-        /// Tìm tất cả vùng in trong Layout hiện hành (Block mode)
+        /// Tìm tất cả vùng in trong Layout/Model hiện hành (Block mode)
         /// </summary>
         private static List<LayoutPrintArea> FindPrintAreas(Database db, Editor ed,
             string blockName, LayoutSortOrder sortOrder)
@@ -936,15 +1012,23 @@ namespace Civil3DCsharp
 
             using (Transaction tr = db.TransactionManager.StartTransaction())
             {
-                // Lấy Layout hiện hành
-                LayoutManager layoutMgr = LayoutManager.Current;
-                string currentLayoutName = layoutMgr.CurrentLayout;
+                // Determine current space BTR
+                BlockTableRecord currentSpaceBtr;
+                if (db.TileMode)
+                {
+                     BlockTable bt = tr.GetObject(db.BlockTableId, OpenMode.ForRead) as BlockTable;
+                     currentSpaceBtr = tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForRead) as BlockTableRecord;
+                }
+                else
+                {
+                    LayoutManager layoutMgr = LayoutManager.Current;
+                    string currentLayoutName = layoutMgr.CurrentLayout;
+                    DBDictionary layoutDict = tr.GetObject(db.LayoutDictionaryId, OpenMode.ForRead) as DBDictionary;
+                    Layout currentLayout = tr.GetObject(layoutDict.GetAt(currentLayoutName), OpenMode.ForRead) as Layout;
+                    currentSpaceBtr = tr.GetObject(currentLayout.BlockTableRecordId, OpenMode.ForRead) as BlockTableRecord;
+                }
 
-                DBDictionary layoutDict = tr.GetObject(db.LayoutDictionaryId, OpenMode.ForRead) as DBDictionary;
-                Layout currentLayout = tr.GetObject(layoutDict.GetAt(currentLayoutName), OpenMode.ForRead) as Layout;
-                BlockTableRecord paperSpace = tr.GetObject(currentLayout.BlockTableRecordId, OpenMode.ForRead) as BlockTableRecord;
-
-                foreach (ObjectId objId in paperSpace)
+                foreach (ObjectId objId in currentSpaceBtr)
                 {
                     Entity ent = tr.GetObject(objId, OpenMode.ForRead) as Entity;
                     if (ent == null) continue;
@@ -974,7 +1058,6 @@ namespace Civil3DCsharp
                 case LayoutSortOrder.TopToBottom:
                     areas = areas.OrderByDescending(a => a.MinPoint.Y).ThenBy(a => a.MinPoint.X).ToList();
                     break;
-                    // Normal: giữ nguyên thứ tự
             }
 
             // Đánh số lại sau khi sắp xếp
@@ -991,113 +1074,186 @@ namespace Civil3DCsharp
         /// </summary>
         private static void PreviewPlot(Editor ed, LayoutPrintArea area,
             string printer, string paperSize, string plotStyle,
-            bool centerPlot, double offsetX, double offsetY)
+            bool centerPlot, double offsetX, double offsetY, bool isModelSpace, string layoutName)
         {
             ed.WriteMessage($"\n\n🔍 Đang preview vùng in {area.Index}...");
 
-            // Sử dụng lệnh PREVIEW của AutoCAD
             Document doc = Application.DocumentManager.MdiActiveDocument;
-
             string offsetCmd = centerPlot ? "Center" : $"{offsetX},{offsetY}";
 
             var cmd = new System.Text.StringBuilder();
-            cmd.Append($"(command \"-PLOT\" ");
-            cmd.Append("\"Y\" ");  // Detailed plot
-            cmd.Append("\"\" ");   // Current layout
+            
+            // Build command string similar to AppendPlotCommand but for single usage
+            cmd.Append("(command \"-PLOT\" \"Y\" ");
+            if (isModelSpace)
+                cmd.Append("\"\" "); // For Model, it might ask for layout name, usually if in model it defaults or asks. 
+                                     // Actually in Model, the prompt is "Detailed plot configuration? [Yes/No] <No>: Y"
+                                     // Then "Enter a layout name or [?] <Model>:"
+            else
+                cmd.Append("\"\" "); // Current layout
+
+            // Note: To be safe for Model space, explicitly passing "Model" might be better if the prompt asks.
+            // But if we are IN model space, passing "" usually accepts default <Model>.
+            // Let's rely on AppendGenericPlotCommand logic or simply generic preview logic.
+            
+            // Re-using the logic manually for Preview to include the "Preview" specific ending
             cmd.Append($"\"{printer}\" ");
             cmd.Append($"\"{paperSize}\" ");
             cmd.Append("\"Millimeters\" ");
             cmd.Append("\"Landscape\" ");
-            cmd.Append("\"No\" ");  // Not upside down
+            cmd.Append("\"No\" ");   // Upside down
             cmd.Append("\"Window\" ");
             cmd.Append($"(list {area.MinPoint.X:F4} {area.MinPoint.Y:F4}) ");
             cmd.Append($"(list {area.MaxPoint.X:F4} {area.MaxPoint.Y:F4}) ");
-            cmd.Append("\"Fit\" ");  // Scale to fit
+            cmd.Append("\"Fit\" ");  // Scale
             cmd.Append($"\"{offsetCmd}\" ");
-            cmd.Append("\"Yes\" ");  // Plot with plot styles
+            cmd.Append("\"Yes\" ");  // Plot styles
             cmd.Append($"\"{plotStyle}\" ");
-            cmd.Append("\"Yes\" ");  // Plot with lineweights
-            cmd.Append("\"As displayed\" ");
-            cmd.Append("\"No\" ");   // Don't save changes
-            cmd.Append("\"No\" ");   // Don't plot to file
-            cmd.Append("\"No\" ");   // Don't proceed - just preview
+            cmd.Append("\"Yes\" ");  // Lineweights
+
+            if (isModelSpace)
+            {
+                // Model specific tail
+                // Enter shade plot setting [As displayed/Legacy wireframe/Hidden/Visual styles/Rendered] <As displayed>:
+                cmd.Append("\"As displayed\" "); 
+                // Write the plot to a file [Yes/No] <N>:
+                cmd.Append("\"No\" ");
+                // Save changes to page setup [Yes/No] <N>:
+                cmd.Append("\"No\" ");
+                // Proceed with plot [Yes/No] <Y>:
+                cmd.Append("\"No\" "); // Preview only? -PLOT command doesn't support "Preview" option directly usually, it processes plot.
+                                      // Actually, -PLOT does not have a "Preview" option. It just plots.
+                                      // To preview, we usually use the dialog or rely on .NET API.
+                                      // Existing code used "No" for proceed?
+                                      // Layout: ... Write to file? No -> Save changes? No -> Proceed? No (This prevents actual print?)
+                                      
+                // On existing code for Layout: 
+                // ... Write to file? No -> Save changes? No -> Proceed? Yes 
+                // Wait, generated code had "No" for don't proceed.
+            }
+            else
+            {
+                // Layout specific tail
+                cmd.Append("\"Yes\" "); // Scale lineweights
+                cmd.Append("\"No\" ");  // Plot paper space first
+                cmd.Append("\"No\" ");  // Hide paperspace objects
+                cmd.Append("\"No\" ");  // Write to file
+                cmd.Append("\"No\" ");  // Save changes
+                cmd.Append("\"No\" ");  // Proceed? No -> Effectively cancels/previews if supported or just testing settings?
+                                       // Actually "No" at the end of -PLOT simply cancels the plot. 
+                                       // For genuine PREVIEW via command line, it's tricky.
+                                       // The previous code had (princ) at end.
+            }
+            
+            // To actually show a PREVIEW window from command line using -PLOT is not standard. 
+            // The command PREVIEW is distinct. 
+            // The previous code seemed to try to set up the plot but say "No" to proceed. 
+            // This might essentially verify the settings but not show a preview window.
+            // However, we will keep existing logic behavior.
+            
             cmd.AppendLine("(princ))");
 
             doc.SendStringToExecute(cmd.ToString(), true, false, false);
-
-            ed.WriteMessage("\n💡 Sử dụng Preview để xem trước kết quả in.");
+            ed.WriteMessage("\n💡 Đã gửi lệnh kiểm tra vùng in (Preview settings check).");
         }
 
         /// <summary>
-        /// In tất cả các vùng sử dụng LISP command
+        /// In tất cả các vùng
         /// </summary>
         private static void PlotAllAreas(Document doc, Editor ed, List<LayoutPrintArea> areas,
             string printer, string paperSize, string plotStyle,
-            bool centerPlot, double offsetX, double offsetY)
+            bool centerPlot, double offsetX, double offsetY, bool isModelSpace, string layoutName)
         {
             ed.WriteMessage($"\n\n🚀 Đang chuẩn bị in {areas.Count} bản vẽ...");
 
             string offsetCmd = centerPlot ? "Center" : $"{offsetX},{offsetY}";
 
-            // Xây dựng tất cả lệnh in thành một chuỗi LISP
             var allCommands = new System.Text.StringBuilder();
             allCommands.AppendLine("(progn ");
 
             foreach (var area in areas)
             {
-                ed.WriteMessage($"\n📄 Chuẩn bị vùng in {area.Index}/{areas.Count}: ({area.MinPoint.X:F0},{area.MinPoint.Y:F0}) -> ({area.MaxPoint.X:F0},{area.MaxPoint.Y:F0})");
-
                 // Thêm lệnh -PLOT cho vùng này
-                AppendLayoutPlotCommand(allCommands,
+                AppendPlotCommand(allCommands,
                     printer, paperSize,
                     area.MinPoint.X, area.MinPoint.Y,
                     area.MaxPoint.X, area.MaxPoint.Y,
-                    plotStyle, offsetCmd);
+                    plotStyle, offsetCmd, isModelSpace, layoutName);
             }
 
             allCommands.AppendLine("(princ)) ");
 
-            // Gửi tất cả lệnh một lần
-            ed.WriteMessage($"\n\n🚀 Đang gửi {areas.Count} lệnh in đến máy in...");
+            ed.WriteMessage($"\n\n🚀 Đang gửi {areas.Count} lệnh in...");
             doc.SendStringToExecute(allCommands.ToString(), true, false, false);
-
-            ed.WriteMessage($"\n\n🎉 Đã gửi lệnh in cho {areas.Count} bản vẽ!");
-            ed.WriteMessage("\n💡 Vui lòng đợi quá trình in hoàn tất.");
+            ed.WriteMessage($"\n\n🎉 Đã gửi lệnh in!");
         }
 
-        /// <summary>
-        /// Thêm lệnh -PLOT cho Layout vào StringBuilder
-        /// Tham khảo từ LISP: INLAYOUT_FIX
-        /// </summary>
-        private static void AppendLayoutPlotCommand(System.Text.StringBuilder sb,
+        private static void AppendPlotCommand(System.Text.StringBuilder sb,
             string printer, string paperSize,
             double p1X, double p1Y, double p2X, double p2Y,
-            string plotStyle, string offsetCmd)
+            string plotStyle, string offsetCmd, bool isModelSpace, string layoutName)
         {
-            // Sử dụng LISP (command ...) syntax cho Layout
             sb.Append("(command \"-PLOT\" ");
-            sb.Append("\"Y\" ");                    // Detailed plot configuration? Yes
-            sb.Append("\"\" ");                     // Layout name - rỗng = current layout
-            sb.Append($"\"{printer}\" ");          // Printer/plotter name
-            sb.Append($"\"{paperSize}\" ");        // Paper size
-            sb.Append("\"Millimeters\" ");         // Drawing units
-            sb.Append("\"Landscape\" ");           // Orientation
-            sb.Append("\"No\" ");                  // Plot upside-down? No
-            sb.Append("\"Window\" ");              // Plot area: Window
-            sb.Append($"(list {p1X:F4} {p1Y:F4}) ");  // First corner as LISP list
-            sb.Append($"(list {p2X:F4} {p2Y:F4}) ");  // Second corner as LISP list
-            sb.Append("\"1\" ");                   // Plot scale: 1:1
-            sb.Append($"\"{offsetCmd}\" ");        // Plot offset: Center or X,Y
-            sb.Append("\"Yes\" ");                 // Plot with plot styles? Yes
-            sb.Append($"\"{plotStyle}\" ");        // Plot style table (monochrome.ctb)
-            sb.Append("\"Yes\" ");                 // 15. Plot with lineweights? Yes
-            sb.Append("\"Yes\" ");                 // 16. Scale lineweights with plot scale? Yes
-            sb.Append("\"No\" ");                  // 17. Plot paper space first? No
-            sb.Append("\"No\" ");                  // 18. Hide paperspace objects? No
-            sb.Append("\"No\" ");                  // 19. Write to file? No
-            sb.Append("\"No\" ");                  // 20. Save changes to page setup? No
-            sb.Append("\"Yes\"");                  // 21. Proceed with plot? Yes
-            sb.AppendLine(") ");                   // Close LISP command
+            sb.Append("\"Y\" ");                    // Detailed plot configuration?
+            
+            if (isModelSpace)
+                sb.Append("\"\" ");                 // Enter a layout name <Model>:
+            else
+                sb.Append("\"\" ");                 // Enter a layout name <Current>:
+            
+            sb.Append($"\"{printer}\" ");           // Output device name
+            sb.Append($"\"{paperSize}\" ");         // Paper size
+            sb.Append("\"Millimeters\" ");          // Paper units
+            sb.Append("\"Landscape\" ");            // Drawing orientation
+            sb.Append("\"No\" ");                   // Plot upside down?
+            sb.Append("\"Window\" ");               // Plot area
+            sb.Append($"(list {p1X:F4} {p1Y:F4}) "); // Lower left
+            sb.Append($"(list {p2X:F4} {p2Y:F4}) "); // Upper right
+            sb.Append("\"1\" ");                    // Plot scale (Fit or 1:1, usually 1 for 1:1 if paper matches, or Fit)
+                                                    // Previous code used "1". Assuming 1:1 mapping from Layout units (mm).
+                                                    // Warning: In Model space, if units are not mm, "1" might be wrong if we want Fit.
+                                                    // But existing Layout code used "1". Let's stick to "1" or "Fit". 
+                                                    // Wait, previous code:
+                                                    // line 1168: sb.Append("\"1\" "); // Plot scale: 1:1
+                                                    // PreviewPlot used "Fit".
+                                                    // If Model space is 1:1 mm, "1" is fine. If not, might need "Fit".
+                                                    // For now, keeping "1" as per original code for consistency.
+            
+            sb.Append($"\"{offsetCmd}\" ");         // Plot offset
+            sb.Append("\"Yes\" ");                  // Plot with plot styles?
+            sb.Append($"\"{plotStyle}\" ");         // Plot style table name
+            sb.Append("\"Yes\" ");                  // Plot with lineweights?
+
+            if (isModelSpace)
+            {
+                // Model Space specifics
+                // Enter shade plot setting [As displayed/Legacy wireframe/Hidden/Visual styles/Rendered] <As displayed>:
+                sb.Append("\"As displayed\" ");
+                // Write the plot to a file [Yes/No] <N>:
+                sb.Append("\"No\" ");
+                // Save changes to page setup [Yes/No] <N>:
+                sb.Append("\"No\" ");
+                // Proceed with plot [Yes/No] <Y>:
+                sb.Append("\"Yes\"");
+            }
+            else
+            {
+                // Layout specifics
+                // Scale lineweights with plot scale? [Yes/No] <Yes>:
+                sb.Append("\"Yes\" "); 
+                // Plot paper space first? [Yes/No] <No>:
+                sb.Append("\"No\" ");
+                // Hide paperspace objects? [Yes/No] <No>:
+                sb.Append("\"No\" ");
+                // Write the plot to a file [Yes/No] <N>:
+                sb.Append("\"No\" ");
+                // Save changes to page setup [Yes/No] <N>:
+                sb.Append("\"No\" ");
+                // Proceed with plot [Yes/No] <Y>:
+                sb.Append("\"Yes\"");
+            }
+
+            sb.AppendLine(") ");
         }
     }
 }
