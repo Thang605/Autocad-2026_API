@@ -96,9 +96,7 @@ namespace Civil3DCsharp
         private RadioButton rbNormal = null!;
         private RadioButton rbLeftToRight = null!;
         private RadioButton rbTopToBottom = null!;
-        private CheckBox chkCenter = null!;
-        private WinFormsTextBox txtOffsetX = null!;
-        private WinFormsTextBox txtOffsetY = null!;
+
         private WinFormsButton btnPrint = null!;
         private WinFormsButton btnPreview = null!;
         private WinFormsButton btnCancel = null!;
@@ -156,8 +154,8 @@ namespace Civil3DCsharp
 
         private void InitializeComponent()
         {
-            this.Text = "TPL-IN-MP - nguyentuyen86";
-            this.Size = new Size(340, 460);  // Giảm height vì bỏ Plot To File
+            this.Text = "In bản vẽ theo block";
+            this.Size = new Size(340, 405);  // Giảm height vì bỏ Plot To File và Plot Offset
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -427,62 +425,7 @@ namespace Civil3DCsharp
 
             y += 55;
 
-            // ========== Group: Plot offset ==========
-            var grpOffset = new GroupBox
-            {
-                Text = "Plot offset",
-                Location = new Point(10, y),
-                Size = new Size(305, 45)
-            };
 
-            chkCenter = new CheckBox
-            {
-                Text = "Center",
-                Location = new Point(labelX, 18),
-                Size = new Size(65, 20),
-                Checked = true
-            };
-            chkCenter.CheckedChanged += ChkCenter_CheckedChanged;
-
-            var lblX = new WinFormsLabel
-            {
-                Text = "X",
-                Location = new Point(85, 20),
-                Size = new Size(15, 20)
-            };
-
-            txtOffsetX = new WinFormsTextBox
-            {
-                Location = new Point(100, 16),
-                Size = new Size(50, 23),
-                Text = "1",
-                Enabled = false
-            };
-
-            var lblY = new WinFormsLabel
-            {
-                Text = "Y",
-                Location = new Point(160, 20),
-                Size = new Size(15, 20)
-            };
-
-            txtOffsetY = new WinFormsTextBox
-            {
-                Location = new Point(175, 16),
-                Size = new Size(50, 23),
-                Text = "1",
-                Enabled = false
-            };
-
-            grpOffset.Controls.Add(chkCenter);
-            grpOffset.Controls.Add(lblX);
-            grpOffset.Controls.Add(txtOffsetX);
-            grpOffset.Controls.Add(lblY);
-            grpOffset.Controls.Add(txtOffsetY);
-
-            this.Controls.Add(grpOffset);
-
-            y += 55;
 
             // ========== Buttons ==========
             btnPrint = new WinFormsButton
@@ -615,7 +558,7 @@ namespace Civil3DCsharp
             rbTopToBottom.Checked = _lastSortOrder == LayoutSortOrder.TopToBottom;
 
             // Center
-            chkCenter.Checked = _lastCenterPlot;
+
         }
 
         private void SelectComboItem(WinFormsComboBox combo, string value)
@@ -640,12 +583,7 @@ namespace Civil3DCsharp
             btnSelect.Enabled = useBlock;
         }
 
-        private void ChkCenter_CheckedChanged(object? sender, EventArgs e)
-        {
-            bool centered = chkCenter.Checked;
-            txtOffsetX.Enabled = !centered;
-            txtOffsetY.Enabled = !centered;
-        }
+
 
         private void BtnPick_Click(object? sender, EventArgs e)
         {
@@ -789,24 +727,7 @@ namespace Civil3DCsharp
                 return false;
             }
 
-            if (!chkCenter.Checked)
-            {
-                if (!double.TryParse(txtOffsetX.Text, out _))
-                {
-                    MessageBox.Show("Offset X phải là số!", "Lỗi",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    txtOffsetX.Focus();
-                    return false;
-                }
 
-                if (!double.TryParse(txtOffsetY.Text, out _))
-                {
-                    MessageBox.Show("Offset Y phải là số!", "Lỗi",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    txtOffsetY.Focus();
-                    return false;
-                }
-            }
 
             return true;
         }
@@ -823,9 +744,9 @@ namespace Civil3DCsharp
             else if (rbLeftToRight.Checked) SortOrder = LayoutSortOrder.LeftToRight;
             else SortOrder = LayoutSortOrder.TopToBottom;
 
-            CenterPlot = chkCenter.Checked;
-            OffsetX = double.TryParse(txtOffsetX.Text, out double x) ? x : 0;
-            OffsetY = double.TryParse(txtOffsetY.Text, out double y) ? y : 0;
+            CenterPlot = true;
+            OffsetX = 0;
+            OffsetY = 0;
 
             // Paper và Print dimensions
             PaperWidth = double.TryParse(txtPaperWidth.Text, out double pw) ? pw : 420;
