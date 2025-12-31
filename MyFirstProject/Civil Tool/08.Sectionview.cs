@@ -995,23 +995,27 @@ namespace Civil3DCsharp
         [CommandMethod("CTSV_fit_KhungIn")]
         public static void CTSVFitKhungIn()
         {
+            // Hiển thị form để nhập thông số
+            MyFirstProject.Civil_Tool.FitKhungInForm form = new();
+            if (form.ShowDialog() != System.Windows.Forms.DialogResult.OK || !form.FormAccepted)
+            {
+                A.Ed.WriteMessage("\nLệnh đã bị hủy.");
+                return;
+            }
+
+            // Lấy giá trị từ form
+            double moRongKhungDungTren = form.MoRongDungTren;
+            double moRongKhungDungDuoi = form.MoRongDungDuoi;
+            double moRongKhungNgangTrai = form.MoRongNgangTrai;
+            double moRongKhungNgangPhai = form.MoRongNgangPhai;
+            string codeSection = form.CodeSection;
+
             // start transantion CTSV_DanhCap
             using Transaction tr = A.Db.TransactionManager.StartTransaction();
             try
             {
-                UserInput UI = new();
-                UtilitiesCAD CAD = new();
-                UtilitiesC3D C3D = new();
-
                 //start here
                 ObjectIdCollection sectionViewIdColl = UserInput.GSelectionSetWithType("Chọn các sectionview cần fit khung in: \n", "AECC_GRAPH_SECTION_VIEW");
-                double moRongKhungDungTren = UserInput.GDouble("Nhập mở rộng khung đứng trên:");
-                double moRongKhungDungDuoi = UserInput.GDouble("Nhập mở rộng khung đứng dưới:");
-                double moRongKhungNgangTrai = UserInput.GDouble("Nhập mở rộng khung ngang trai:");
-                double moRongKhungNgangPhai = UserInput.GDouble("Nhập mở rộng khung ngang phai:");
-#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
-                String codeSection = UserInput.GString("Nhập code section (top, datum):");
-#pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
                 SectionView? sectionView = tr.GetObject(sectionViewIdColl[0], OpenMode.ForWrite) as SectionView;
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
                 ObjectId sampleLineId = sectionView.SampleLineId;
@@ -1082,24 +1086,38 @@ namespace Civil3DCsharp
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
                     ObjectId sectionTnId = sampleLine1.GetSectionId(sectionSource_TOP_Id);
 #pragma warning restore CS8602 // Dereference of a possibly null reference.
+                    
+                    // Kiểm tra nếu sectionTnId không hợp lệ (section không tồn tại cho source này)
+                    if (sectionTnId.IsNull || !sectionTnId.IsValid)
+                    {
+                        A.Ed.WriteMessage($"\nCảnh báo: Section không tìm thấy cho SectionView tại station {sampleLine1?.Station}");
+                        continue;
+                    }
+
                     Section? section = tr.GetObject(sectionTnId, OpenMode.ForWrite) as Section;
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
-                    SectionPointCollection sectionPoints = section.SectionPoints;
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
-                    /*
-                    //get sectionview location
-                    double X = sectionView1.Location.X;
-                    double Y = sectionView1.Location.Y;
-                    sectionView1.IsElevationRangeAutomatic = false;
-                    double Z = sectionView1.ElevationMin;
-                    double Z1 = sectionView1.ElevationMax;
-                    sectionView1.IsElevationRangeAutomatic = true;
-                    */
-                    //get min max
-                    ymin = Math.Round(section.MinmumElevation - moRongKhungDungDuoi, 0);
-                    xmin = Math.Round(section.LeftOffset - moRongKhungNgangTrai, 0);
-                    ymax = Math.Round(section.MaximumElevation + moRongKhungDungTren, 0);
-                    xmax = Math.Round(section.RightOffset + moRongKhungNgangPhai, 0);
+                    
+                    // Kiểm tra section null
+                    if (section == null)
+                    {
+                        A.Ed.WriteMessage($"\nCảnh báo: Không thể đọc Section cho SectionView tại station {sampleLine1?.Station}");
+                        continue;
+                    }
+                    
+                    // Sử dụng try-catch để xử lý trường hợp Section không hỗ trợ MinmumElevation
+                    try
+                    {
+                        //get min max
+                        ymin = Math.Round(section.MinmumElevation - moRongKhungDungDuoi, 0);
+                        xmin = Math.Round(section.LeftOffset - moRongKhungNgangTrai, 0);
+                        ymax = Math.Round(section.MaximumElevation + moRongKhungDungTren, 0);
+                        xmax = Math.Round(section.RightOffset + moRongKhungNgangPhai, 0);
+                    }
+                    catch (System.InvalidOperationException)
+                    {
+                        // Section không hỗ trợ các thuộc tính Elevation/Offset
+                        A.Ed.WriteMessage($"\nCảnh báo: Section tại station {sampleLine1?.Station} không hỗ trợ lấy thông tin Elevation. Bỏ qua...");
+                        continue;
+                    }
 
                     //set sectionview
 
@@ -1212,24 +1230,38 @@ namespace Civil3DCsharp
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
                     ObjectId sectionTnId = sampleLine1.GetSectionId(sectionSource_TOP_Id);
 #pragma warning restore CS8602 // Dereference of a possibly null reference.
+                    
+                    // Kiểm tra nếu sectionTnId không hợp lệ (section không tồn tại cho source này)
+                    if (sectionTnId.IsNull || !sectionTnId.IsValid)
+                    {
+                        A.Ed.WriteMessage($"\nCảnh báo: Section không tìm thấy cho SectionView tại station {sampleLine1?.Station}");
+                        continue;
+                    }
+
                     Section? section = tr.GetObject(sectionTnId, OpenMode.ForWrite) as Section;
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
-                    SectionPointCollection sectionPoints = section.SectionPoints;
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
-                    /*
-                    //get sectionview location
-                    double X = sectionView1.Location.X;
-                    double Y = sectionView1.Location.Y;
-                    sectionView1.IsElevationRangeAutomatic = false;
-                    double Z = sectionView1.ElevationMin;
-                    double Z1 = sectionView1.ElevationMax;
-                    sectionView1.IsElevationRangeAutomatic = true;
-                    */
-                    //get min max
-                    ymin = Math.Round(section.MinmumElevation - moRongKhungDung, 0);
-                    xmin = Math.Round(section.LeftOffset - moRongKhungNgang, 0);
-                    ymax = Math.Round(section.MaximumElevation + moRongKhungDung, 0);
-                    xmax = Math.Round(section.RightOffset + moRongKhungNgang, 0);
+                    
+                    // Kiểm tra section null
+                    if (section == null)
+                    {
+                        A.Ed.WriteMessage($"\nCảnh báo: Không thể đọc Section cho SectionView tại station {sampleLine1?.Station}");
+                        continue;
+                    }
+                    
+                    // Sử dụng try-catch để xử lý trường hợp Section không hỗ trợ MinmumElevation
+                    try
+                    {
+                        //get min max
+                        ymin = Math.Round(section.MinmumElevation - moRongKhungDung, 0);
+                        xmin = Math.Round(section.LeftOffset - moRongKhungNgang, 0);
+                        ymax = Math.Round(section.MaximumElevation + moRongKhungDung, 0);
+                        xmax = Math.Round(section.RightOffset + moRongKhungNgang, 0);
+                    }
+                    catch (System.InvalidOperationException)
+                    {
+                        // Section không hỗ trợ các thuộc tính Elevation/Offset
+                        A.Ed.WriteMessage($"\nCảnh báo: Section tại station {sampleLine1?.Station} không hỗ trợ lấy thông tin Elevation. Bỏ qua...");
+                        continue;
+                    }
 
                     //set sectionview
 
@@ -1342,25 +1374,38 @@ namespace Civil3DCsharp
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
                     ObjectId sectionTnId = sampleLine1.GetSectionId(sectionSource_TOP_Id);
 #pragma warning restore CS8602 // Dereference of a possibly null reference.
-                    Section? section = tr.GetObject(sectionTnId, OpenMode.ForWrite) as Section;
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
-                    SectionPointCollection sectionPoints = section.SectionPoints;
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
-                    /*
-                    //get sectionview location
-                    double X = sectionView1.Location.X;
-                    double Y = sectionView1.Location.Y;
-                    sectionView1.IsElevationRangeAutomatic = false;
-                    double Z = sectionView1.ElevationMin;
-                    double Z1 = sectionView1.ElevationMax;
-                    sectionView1.IsElevationRangeAutomatic = true;
-                    */
-                    //get min max
-                    ymin = Math.Round(section.MinmumElevation - moRongKhungDung, 0);
-                    xmin = Math.Round(section.LeftOffset - moRongKhungNgang, 0);
-                    ymax = Math.Round(section.MaximumElevation + moRongKhungDung, 0);
-                    xmax = Math.Round(section.RightOffset + moRongKhungNgang, 0);
+                    
+                    // Kiểm tra nếu sectionTnId không hợp lệ (section không tồn tại cho source này)
+                    if (sectionTnId.IsNull || !sectionTnId.IsValid)
+                    {
+                        A.Ed.WriteMessage($"\nCảnh báo: Section không tìm thấy cho SectionView tại station {sampleLine1?.Station}");
+                        continue;
+                    }
 
+                    Section? section = tr.GetObject(sectionTnId, OpenMode.ForWrite) as Section;
+                    
+                    // Kiểm tra section null
+                    if (section == null)
+                    {
+                        A.Ed.WriteMessage($"\nCảnh báo: Không thể đọc Section cho SectionView tại station {sampleLine1?.Station}");
+                        continue;
+                    }
+                    
+                    // Sử dụng try-catch để xử lý trường hợp Section không hỗ trợ MinmumElevation
+                    try
+                    {
+                        //get min max
+                        ymin = Math.Round(section.MinmumElevation - moRongKhungDung, 0);
+                        xmin = Math.Round(section.LeftOffset - moRongKhungNgang, 0);
+                        ymax = Math.Round(section.MaximumElevation + moRongKhungDung, 0);
+                        xmax = Math.Round(section.RightOffset + moRongKhungNgang, 0);
+                    }
+                    catch (System.InvalidOperationException)
+                    {
+                        // Section không hỗ trợ các thuộc tính Elevation/Offset
+                        A.Ed.WriteMessage($"\nCảnh báo: Section tại station {sampleLine1?.Station} không hỗ trợ lấy thông tin Elevation. Bỏ qua...");
+                        continue;
+                    }
 
                     //set sectionview
 
