@@ -53,7 +53,8 @@ namespace Civil3DCsharp.HelpSystem
                     "3. Chọn vị trí đặt text kết quả",
                     "4. Lệnh sẽ tạo text hiển thị tổng độ dài"
                 },
-                Notes = new[] { "Hỗ trợ: Line, Polyline, Arc, Circle, Ellipse" }
+                Notes = new[] { "Hỗ trợ: Line, Polyline, Arc, Circle, Ellipse" },
+                VideoLink = "https://www.youtube.com/watch?v=cxYrzVMN6jA"
             });
 
             AddCommand(new CommandInfo
@@ -102,7 +103,8 @@ namespace Civil3DCsharp.HelpSystem
                     "1. Gõ lệnh ET_TongDienTich_Full",
                     "2. Chọn các đối tượng Polyline kín, Circle, Hatch...",
                     "3. Chọn vị trí đặt text kết quả"
-                }
+                },
+                VideoLink = "https://www.youtube.com/watch?v=A-uXXBDvB-U"
             });
 
             AddCommand(new CommandInfo
@@ -134,7 +136,16 @@ namespace Civil3DCsharp.HelpSystem
                 Name = "AT_TextLink",
                 Category = "CAD - Text",
                 Description = "Liên kết nội dung giữa các text",
-                Usage = "AT_TextLink"
+                Usage = "AT_TextLink",
+                VideoLink = "https://www.youtube.com/watch?v=7l32FEa8uF4"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "AT_DanhSoThuTu",
+                Category = "CAD - Text",
+                Description = "Đánh số thứ tự (AT)",
+                Usage = "AT_DanhSoThuTu"
             });
 
             AddCommand(new CommandInfo
@@ -264,6 +275,30 @@ namespace Civil3DCsharp.HelpSystem
                 Usage = "AT_annotive_scale_currentOnly"
             });
 
+            AddCommand(new CommandInfo
+            {
+                Name = "AT_DimLayout",
+                Category = "CAD - Layout",
+                Description = "Chuyển Dimension từ Model sang Layout (AT)",
+                Usage = "AT_DimLayout"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "AT_DimLayout2",
+                Category = "CAD - Layout",
+                Description = "Chuyển Dimension từ Model sang Layout (AT v2)",
+                Usage = "AT_DimLayout2"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "AT_BlockLayout",
+                Category = "CAD - Layout",
+                Description = "Chuyển Block từ Model sang Layout (AT)",
+                Usage = "AT_BlockLayout"
+            });
+
             // 02. AT_Solid_frompolyline.cs
             AddCommand(new CommandInfo
             {
@@ -280,6 +315,14 @@ namespace Civil3DCsharp.HelpSystem
                 VideoLink = "https://www.youtube.com/watch?v=_VSCzOUSj6E"
             });
 
+            AddCommand(new CommandInfo
+            {
+                Name = "AT_Surface_frompolyline",
+                Category = "CAD - 3D",
+                Description = "Tạo Surface từ Polyline",
+                Usage = "AT_Surface_frompolyline"
+            });
+
             // 03. Command_XUATBANG_ToaDoPolyline.cs
             AddCommand(new CommandInfo
             {
@@ -293,6 +336,14 @@ namespace Civil3DCsharp.HelpSystem
                     "3. Chọn vị trí lưu file Excel",
                     "4. File Excel sẽ chứa bảng tọa độ X, Y của các đỉnh"
                 }
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "XUATBANG_ToaDoPolyline",
+                Category = "CAD - Export",
+                Description = "Xuất bảng tọa độ Polyline (Alias)",
+                Usage = "XUATBANG_ToaDoPolyline"
             });
 
             // 04. AT_XuatBang_Civil3D_ToExcel.cs
@@ -402,13 +453,63 @@ namespace Civil3DCsharp.HelpSystem
                 Usage = "AT_XuatXref"
             });
 
+            AddCommand(new CommandInfo
+            {
+                Name = "AT_XrefToBlock",
+                Category = "CAD - Xref",
+                Description = "Chuyển Xref thành Block",
+                Usage = "AT_XrefToBlock"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "AT_XrefAll",
+                Category = "CAD - Xref",
+                Description = "Xử lý tất cả Xref",
+                Usage = "AT_XrefAll"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "AT_XrefAllOverlay",
+                Category = "CAD - Xref",
+                Description = "Chuyển tất cả Xref sang dạng Overlay",
+                Usage = "AT_XrefAllOverlay"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "AT_XrefAttachToOverlay",
+                Category = "CAD - Xref",
+                Description = "Chuyển Attach Xref sang Overlay",
+                Usage = "AT_XrefAttachToOverlay"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "AT_XrefAttachToOverlayFile",
+                Category = "CAD - Xref",
+                Description = "Chuyển Attach Xref sang Overlay cho file",
+                Usage = "AT_XrefAttachToOverlayFile"
+            });
+
             // 11. AT_XoayDoiTuong_TheoViewport.cs
             AddCommand(new CommandInfo
             {
                 Name = "AT_XoayDoiTuong_TheoViewport",
                 Category = "CAD - Viewport",
                 Description = "Xoay đối tượng theo góc của Viewport",
-                Usage = "AT_XoayDoiTuong_TheoViewport"
+                Usage = "AT_XoayDoiTuong_TheoViewport",
+                VideoLink = "https://www.youtube.com/watch?v=vsFLwxpqxgY"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "AT_XoayDoiTuong_TheoViewport_V2",
+                Category = "CAD - Viewport",
+                Description = "Xoay đối tượng theo Viewport (V2)",
+                Usage = "AT_XoayDoiTuong_TheoViewport_V2",
+                VideoLink = "https://www.youtube.com/watch?v=vsFLwxpqxgY"
             });
 
             // 12. AT_BoTri_ViewPort_TheoHinh.cs
@@ -422,7 +523,17 @@ namespace Civil3DCsharp.HelpSystem
                     "1. Gõ lệnh AT_BoTri_ViewPort_TheoHinh",
                     "2. Chọn vùng chứa các hình cần tạo viewport",
                     "3. Các viewport sẽ được tạo tự động"
-                }
+                },
+                VideoLink = "https://www.youtube.com/watch?v=Zhh56engsA4"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "AT_BoTri_ViewPort_TheoHinh_V2",
+                Category = "CAD - Viewport",
+                Description = "Bố trí Viewport theo hình (V2)",
+                Usage = "AT_BoTri_ViewPort_TheoHinh_V2",
+                VideoLink = "https://www.youtube.com/watch?v=Zhh56engsA4"
             });
 
             // 13. AT_Xoay_ViewPortHienHanh_Theo2Diem.cs
@@ -432,6 +543,22 @@ namespace Civil3DCsharp.HelpSystem
                 Category = "CAD - Viewport",
                 Description = "Xoay Viewport hiện hành theo hướng 2 điểm",
                 Usage = "AT_Xoay_ViewPortHienHanh_Theo2Diem"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "AT_Xoay_ViewPortHienHanh_TheoGoc",
+                Category = "CAD - Viewport",
+                Description = "Xoay Viewport hiện hành theo góc nhập vào",
+                Usage = "AT_Xoay_ViewPortHienHanh_TheoGoc"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "AT_Xoay_ViewPortHienHanh_Reset",
+                Category = "CAD - Viewport",
+                Description = "Reset góc xoay của Viewport về 0",
+                Usage = "AT_Xoay_ViewPortHienHanh_Reset"
             });
 
             // 14. AT_TaoBlock_TungDoiTuong.cs
@@ -517,6 +644,21 @@ namespace Civil3DCsharp.HelpSystem
 
             AddCommand(new CommandInfo
             {
+                Name = "CTC_AddAllSection",
+                Category = "Civil - Corridor",
+                Description = "Thêm tất cả các mặt cắt từ Sample Line vào Corridor",
+                Usage = "CTC_AddAllSection",
+                Steps = new[] {
+                    "1. Gõ lệnh CTC_AddAllSection",
+                    "2. Chọn Corridor cần thêm mặt cắt",
+                    "3. Chọn Sample Line Group (nếu có nhiều hơn 1)",
+                    "4. Các mặt cắt sẽ được thêm vào Corridor"
+                },
+                VideoLink = "https://www.youtube.com/watch?v=NzBqjV85VHg"
+            });
+
+            AddCommand(new CommandInfo
+            {
                 Name = "CTC_TaoCorridor_ChoTuyenDuong",
                 Category = "Civil - Corridor",
                 Description = "Tạo Corridor cho tuyến đường từ Alignment và Profile",
@@ -547,6 +689,14 @@ namespace Civil3DCsharp.HelpSystem
                 Usage = "CTPa_ParcelInfo"
             });
 
+            AddCommand(new CommandInfo
+            {
+                Name = "CTPA_TaoParcel_CacLoaiNha",
+                Category = "Civil - Parcel",
+                Description = "Tạo Parcel các loại nhà",
+                Usage = "CTPA_TaoParcel_CacLoaiNha"
+            });
+
             // 04. Pipe and Structures
             AddCommand(new CommandInfo
             {
@@ -570,6 +720,40 @@ namespace Civil3DCsharp.HelpSystem
                 }
             });
 
+            AddCommand(new CommandInfo
+            {
+                Name = "CTPI_ThayDoi_DuongKinhCong",
+                Category = "Civil - Pipe",
+                Description = "Thay đổi đường kính cống",
+                Usage = "CTPI_ThayDoi_DuongKinhCong",
+                VideoLink = "https://www.youtube.com/watch?v=tExUFI8Mlh0"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTPI_ThayDoi_DoanDocCong",
+                Category = "Civil - Pipe",
+                Description = "Thay đổi độ dốc cống",
+                Usage = "CTPI_ThayDoi_DoanDocCong",
+                VideoLink = "https://www.youtube.com/watch?v=Zm-yFVAO83M"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTPI_BangCaoDo_TuNhienHoThu",
+                Category = "Civil - Pipe",
+                Description = "Bảng cao độ tự nhiên hố thu",
+                Usage = "CTPI_BangCaoDo_TuNhienHoThu"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTPI_XoayHoThu_Theo2diem",
+                Category = "Civil - Pipe",
+                Description = "Xoay hố thu theo 2 điểm",
+                Usage = "CTPI_XoayHoThu_Theo2diem"
+            });
+
             // 05. Point
             AddCommand(new CommandInfo
             {
@@ -579,6 +763,49 @@ namespace Civil3DCsharp.HelpSystem
                 Usage = "CTPo_DoiTen_CogoPoint_fromAlignment"
             });
 
+            AddCommand(new CommandInfo
+            {
+                Name = "CTPO_TaoCogoPoint_CaoDo_FromSurface",
+                Category = "Civil - Point",
+                Description = "Tạo CoGo Point có cao độ từ Surface",
+                Usage = "CTPO_TaoCogoPoint_CaoDo_FromSurface",
+                VideoLink = "https://www.youtube.com/watch?v=yqwLRoXL5RY"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTPO_TaoCogoPoint_CaoDo_Elevationspot",
+                Category = "Civil - Point",
+                Description = "Tạo CoGo Point từ Elevation Spot",
+                Usage = "CTPO_TaoCogoPoint_CaoDo_Elevationspot",
+                VideoLink = "https://www.youtube.com/watch?v=ia35j6oc4Xc"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTPO_UpdateAllPointGroup",
+                Category = "Civil - Point",
+                Description = "Cập nhật tất cả Point Group",
+                Usage = "CTPO_UpdateAllPointGroup",
+                VideoLink = "https://www.youtube.com/watch?v=2e3iSSih2SU"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTPO_CreateCogopointFromText",
+                Category = "Civil - Point",
+                Description = "Tạo CoGo Point từ Text",
+                Usage = "CTPO_CreateCogopointFromText"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTPO_An_CogoPoint",
+                Category = "Civil - Point",
+                Description = "Ẩn CoGo Point",
+                Usage = "CTPO_An_CogoPoint"
+            });
+
             // 06. Profile and ProfileView
             AddCommand(new CommandInfo
             {
@@ -586,6 +813,47 @@ namespace Civil3DCsharp.HelpSystem
                 Category = "Civil - Profile",
                 Description = "Thay đổi Profile Band trong ProfileView",
                 Usage = "CTP_ThayDoi_profile_Band"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTP_VeTracDoc_TuNhien",
+                Category = "Civil - Profile",
+                Description = "Vẽ trắc dọc tự nhiên",
+                Usage = "CTP_VeTracDoc_TuNhien"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTP_VeTracDoc_TuNhien_TatCaTuyen",
+                Category = "Civil - Profile",
+                Description = "Vẽ trắc dọc tự nhiên cho tất cả tuyến",
+                Usage = "CTP_VeTracDoc_TuNhien_TatCaTuyen"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTP_Fix_DuongTuNhien_TheoCoc",
+                Category = "Civil - Profile",
+                Description = "Fix đường tự nhiên theo cọc",
+                Usage = "CTP_Fix_DuongTuNhien_TheoCoc"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTP_GanNhanNutGiao_LenTracDoc",
+                Category = "Civil - Profile",
+                Description = "Gán nhãn nút giao lên trắc dọc",
+                Usage = "CTP_GanNhanNutGiao_LenTracDoc",
+                VideoLink = "https://www.youtube.com/watch?v=FmJyKQh8bcE"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTP_TaoCogoPointTuPVI",
+                Category = "Civil - Profile",
+                Description = "Tạo CoGo Point từ PVI",
+                Usage = "CTP_TaoCogoPointTuPVI"
             });
 
             // 07. Sampleline
@@ -600,7 +868,8 @@ namespace Civil3DCsharp.HelpSystem
                     "2. Chọn Sample Line Group",
                     "3. Nhập quy tắc đặt tên",
                     "4. Tên các cọc sẽ được cập nhật"
-                }
+                },
+                VideoLink = "https://www.youtube.com/watch?v=WuBHic9YSKo"
             });
 
             AddCommand(new CommandInfo
@@ -624,7 +893,8 @@ namespace Civil3DCsharp.HelpSystem
                 Name = "CTS_TaoBang_ToaDoCoc",
                 Category = "Civil - Sampleline",
                 Description = "Tạo bảng tọa độ các cọc",
-                Usage = "CTS_TaoBang_ToaDoCoc"
+                Usage = "CTS_TaoBang_ToaDoCoc",
+                VideoLink = "https://www.youtube.com/watch?v=mCoLFwdNBJo"
             });
 
             AddCommand(new CommandInfo
@@ -659,13 +929,121 @@ namespace Civil3DCsharp.HelpSystem
                 Usage = "AT_UPdate2Table"
             });
 
+            AddCommand(new CommandInfo
+            {
+                Name = "CTS_ChenCoc_TrenTracDoc",
+                Category = "Civil - Sampleline",
+                Description = "Chèn cọc trên trắc dọc",
+                Usage = "CTS_ChenCoc_TrenTracDoc"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTS_CHENCOC_TRENTRACNGANG",
+                Category = "Civil - Sampleline",
+                Description = "Chèn cọc trên trắc ngang",
+                Usage = "CTS_CHENCOC_TRENTRACNGANG",
+                VideoLink = "https://www.youtube.com/watch?v=A_nAw6-xNTY"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTS_DoiTenCoc_fromCogoPoint",
+                Category = "Civil - Sampleline",
+                Description = "Đổi tên cọc từ CoGo Point",
+                Usage = "CTS_DoiTenCoc_fromCogoPoint",
+                VideoLink = "https://www.youtube.com/watch?v=w9qcsAJq5Zo"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTS_PhatSinhCoc",
+                Category = "Civil - Sampleline",
+                Description = "Phát sinh cọc",
+                Usage = "CTS_PhatSinhCoc",
+                VideoLink = "https://www.youtube.com/watch?v=V9REdWjKfYA"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTS_PhatSinhCoc_ChiTiet",
+                Category = "Civil - Sampleline",
+                Description = "Phát sinh cọc chi tiết",
+                Usage = "CTS_PhatSinhCoc_ChiTiet"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTS_PhatSinhCoc_theoKhoangDelta",
+                Category = "Civil - Sampleline",
+                Description = "Phát sinh cọc theo khoảng Delta",
+                Usage = "CTS_PhatSinhCoc_theoKhoangDelta"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTS_PhatSinhCoc_TuCogoPoint",
+                Category = "Civil - Sampleline",
+                Description = "Phát sinh cọc từ CoGo Point",
+                Usage = "CTS_PhatSinhCoc_TuCogoPoint"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTS_DoiTenCoc_TheoThuTu",
+                Category = "Civil - Sampleline",
+                Description = "Đổi tên cọc theo thứ tự",
+                Usage = "CTS_DoiTenCoc_TheoThuTu"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTS_DichCoc_TinhTien",
+                Category = "Civil - Sampleline",
+                Description = "Dịch cọc tịnh tiến",
+                Usage = "CTS_DichCoc_TinhTien"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTS_Copy_NhomCoc",
+                Category = "Civil - Sampleline",
+                Description = "Copy nhóm cọc",
+                Usage = "CTS_Copy_NhomCoc"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTS_DongBo_2_NhomCoc",
+                Category = "Civil - Sampleline",
+                Description = "Đồng bộ 2 nhóm cọc",
+                Usage = "CTS_DongBo_2_NhomCoc"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTS_DongBo_2_NhomCoc_TheoDoan",
+                Category = "Civil - Sampleline",
+                Description = "Đồng bộ 2 nhóm cọc theo đoạn",
+                Usage = "CTS_DongBo_2_NhomCoc_TheoDoan"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTS_DichCoc_TinhTien40",
+                Category = "Civil - Sampleline",
+                Description = "Dịch cọc tịnh tiến (40)",
+                Usage = "CTS_DichCoc_TinhTien40"
+            });
+
             // 08. Sectionview
             AddCommand(new CommandInfo
             {
                 Name = "CTSV_ChuyenDoi_TNTK_TNTN",
                 Category = "Civil - SectionView",
                 Description = "Chuyển đổi giữa trắc ngang thiết kế và trắc ngang tự nhiên",
-                Usage = "CTSV_ChuyenDoi_TNTK_TNTN"
+                Usage = "CTSV_ChuyenDoi_TNTK_TNTN",
+                VideoLink = "https://www.youtube.com/watch?v=sA-KAgMnPDo"
             });
 
             AddCommand(new CommandInfo
@@ -679,7 +1057,8 @@ namespace Civil3DCsharp.HelpSystem
                     "2. Chọn Section View",
                     "3. Nhập thông số cấp",
                     "4. Các đường cấp sẽ được vẽ"
-                }
+                },
+                VideoLink = "https://www.youtube.com/watch?v=pv6sLHth4uc"
             });
 
             AddCommand(new CommandInfo
@@ -845,7 +1224,8 @@ namespace Civil3DCsharp.HelpSystem
                 Name = "CTSV_VeTracNgangThietKe",
                 Category = "Civil - SectionView",
                 Description = "Vẽ trắc ngang thiết kế trên Section View",
-                Usage = "CTSV_VeTracNgangThietKe"
+                Usage = "CTSV_VeTracNgangThietKe",
+                VideoLink = "https://www.youtube.com/watch?v=BDIWPRXbgDg"
             });
 
             AddCommand(new CommandInfo
@@ -953,7 +1333,8 @@ namespace Civil3DCsharp.HelpSystem
                 Name = "CTSU_CaoDoMatPhang_TaiCogopoint",
                 Category = "Civil - Surface",
                 Description = "Lấy cao độ mặt phẳng tại vị trí CoGo Point",
-                Usage = "CTSU_CaoDoMatPhang_TaiCogopoint"
+                Usage = "CTSU_CaoDoMatPhang_TaiCogopoint",
+                VideoLink = "https://www.youtube.com/watch?v=yqwLRoXL5RY"
             });
 
             // 27. CT_TaoDuong_ConnectedAlignment_NutGiao

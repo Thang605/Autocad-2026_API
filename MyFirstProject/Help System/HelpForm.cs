@@ -168,6 +168,7 @@ namespace Civil3DCsharp.HelpSystem
                 Font = new Font("Consolas", 10F),
                 BorderStyle = BorderStyle.None
             };
+            rtbDetails.LinkClicked += RtbDetails_LinkClicked;
 
             // QUAN TRỌNG: Thêm rtbDetails trước, sau đó thêm titlePanel
             rightPanel.Controls.Add(rtbDetails);
@@ -415,21 +416,8 @@ namespace Civil3DCsharp.HelpSystem
                 rtbDetails.SelectionFont = new Font("Consolas", 10, FontStyle.Underline);
 
                 // Enable link clicking
-                rtbDetails.LinkClicked += (s, e) =>
-                {
-                    try
-                    {
-                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                        {
-                            FileName = e.LinkText,
-                            UseShellExecute = true
-                        });
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show($"Không thể mở link: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    }
-                };
+                // Enable link clicking
+                // Event handler is now attached in InitializeComponent
             }
 
             rtbDetails.SelectionStart = 0;
@@ -507,6 +495,23 @@ namespace Civil3DCsharp.HelpSystem
             else
             {
                 lblStatus.Text = "⚠️ Vui lòng chọn một lệnh trước!";
+            }
+        }
+
+        private void RtbDetails_LinkClicked(object sender, LinkClickedEventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = e.LinkText,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Không thể mở link: {ex.Message}", "Lỗi",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }
