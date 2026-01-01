@@ -1747,5 +1747,24 @@ namespace Civil3DCsharp.HelpSystem
                 ed.WriteMessage("\n❌ Lỗi khi mở form: " + ex.Message);
             }
         }
+
+        /// <summary>
+        /// Lệnh mở Form quản lý lệnh tắt (Shortcut Manager)
+        /// </summary>
+        [CommandMethod("SHORTCUT_MANAGER")]
+        public static void ShowShortcutManager()
+        {
+            try
+            {
+                // Hiển thị form modeless trong AutoCAD
+                ShortcutManagerForm form = new ShortcutManagerForm();
+                AcadApp.ShowModelessDialog(form);
+            }
+            catch (System.Exception ex)
+            {
+                Editor ed = AcadApp.DocumentManager.MdiActiveDocument.Editor;
+                ed.WriteMessage("\n❌ Lỗi khi mở form: " + ex.Message);
+            }
+        }
     }
 }
