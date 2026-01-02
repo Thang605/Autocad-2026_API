@@ -695,7 +695,23 @@ namespace Civil3DCsharp
         [CommandMethod("CTS_PhatSinhCoc")]
         public static void CTSPhatSinhCoc()
         {
-            // start transantion
+            // Show form first
+            var form = new MyFirstProject.Civil_Tool.PhatSinhCocForm();
+            var result = Autodesk.AutoCAD.ApplicationServices.Application.ShowModalDialog(form);
+
+            if (result != System.Windows.Forms.DialogResult.OK || !form.FormAccepted)
+            {
+                A.Ed.WriteMessage("\n Đã hủy lệnh.");
+                return;
+            }
+
+            // Get values from form
+            bool phatSinhCocH = form.PhatSinhCocH;
+            int Km = form.KmBatDau;
+            int khoangCach = form.KhoangCachChiTiet;
+            string labelStyleName = form.SampleLineLabelStyleName;
+
+            // start transaction
             using Transaction tr = A.Db.TransactionManager.StartTransaction();
             try
             {
@@ -764,23 +780,16 @@ namespace Civil3DCsharp
                     ObjectId sampleLineId = UtilitiesC3D.CreateSampleline(sampleLineGeo[i].ToString(), sampleLineGroupId, alignment, station[i].RawStation);
                 }
 
-                //phát sinh cọc H
-#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
-                String luaChon = UserInput.GYesNo2("\n Phát sinh cọc H và Km hay không? (Y/N)");
-#pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
-                int Km = UserInput.GInt("\n Nhập Km bắt đầu của tuyến: ");
+                //phát sinh cọc H (từ form)
                 int LyTrinh = Km;
                 int H_number = 1;
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
-                luaChon = luaChon.ToUpper();
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
                 int soLuongCocH = 0;
                 for (int i = 0; i < alignment.Length / 100 - 1; i++)
                 {
                     soLuongCocH++;
                 }
                 Double[] stationCocH = new double[soLuongCocH];
-                if (luaChon == "Y")
+                if (phatSinhCocH)
                 {
                     for (int i = 0; i < alignment.Length / 100 - 1; i++)
                     {
@@ -798,11 +807,7 @@ namespace Civil3DCsharp
                         }
                     }
                 }
-                A.Ed.WriteMessage("\n" + soLuongCocH);
-                foreach (var item in stationCocH)
-                {
-                    A.Ed.WriteMessage("\n" + item.ToString());
-                }
+                A.Ed.WriteMessage("\n Số cọc H: " + soLuongCocH);
 
                 //cộng 2 mảng đặc biệt và H
                 Double[] rawStation = new double[station.Count() + soLuongCocH];
@@ -814,14 +819,9 @@ namespace Civil3DCsharp
                 {
                     rawStation[i + station.Count()] = stationCocH[i];
                 }
-                foreach (var item in rawStation)
-                {
-                    A.Ed.WriteMessage(item.ToString() + "\n");
-                }
                 rawStation = Csharp.CSMangSapXepTangDan(rawStation);
 
-                //cọc chi tiết
-                int khoangCach = UserInput.GInt("Nhập khoảng cách giữa các cọc chi tiết (tùy vào bước thiết kế): \n");
+                //cọc chi tiết (từ form)
                 List<double> stationList = [];
                 List<String> sampleLineNameS = [];
                 for (int i = 0; i < rawStation.Count() - 1; i++)
@@ -862,15 +862,41 @@ namespace Civil3DCsharp
                 }
 #pragma warning restore CS8602 // Dereference of a possibly null reference.
 
-                // tạo label
-                ObjectId labelId = A.Cdoc.Styles.LabelStyles.SampleLineLabelStyles.LabelStyles["Tên cọc"];
-                ObjectId labelSampleLineGroup = SampleLineLabelGroup.Create(sampleLineGroupId, labelId);
+                // tạo label (từ form)
+                ObjectId labelId = GetLabelStyleId(labelStyleName);
+                if (labelId != ObjectId.Null)
+                {
+                    ObjectId labelSampleLineGroup = SampleLineLabelGroup.Create(sampleLineGroupId, labelId);
+                }
 
+                A.Ed.WriteMessage($"\n Đã phát sinh {station.Count()} cọc đặc biệt, {soLuongCocH} cọc H/Km, {stationList.Count} cọc chi tiết.");
                 tr.Commit();
             }
             catch (Autodesk.AutoCAD.Runtime.Exception e)
             {
                 A.Ed.WriteMessage(e.Message);
+            }
+        }
+
+        /// <summary>
+        /// Helper method to get SampleLine Label Style ID
+        /// </summary>
+        private static ObjectId GetLabelStyleId(string styleName)
+        {
+            try
+            {
+                return A.Cdoc.Styles.LabelStyles.SampleLineLabelStyles.LabelStyles[styleName];
+            }
+            catch
+            {
+                try
+                {
+                    return A.Cdoc.Styles.LabelStyles.SampleLineLabelStyles.LabelStyles["Tên cọc"];
+                }
+                catch
+                {
+                    return ObjectId.Null;
+                }
             }
         }
 

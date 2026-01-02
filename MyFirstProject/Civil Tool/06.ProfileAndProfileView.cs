@@ -82,56 +82,136 @@ namespace Civil3DCsharp
         [CommandMethod("CTP_VeTracDoc_TuNhien_TatCaTuyen")]
         public static void CTPVeTracDocTuNhienTatCaTuyen()
         {
-            // start transantion
+            // Show form first
+            var form = new MyFirstProject.Civil_Tool.VeTracDocTatCaTuyenForm();
+            var result = Autodesk.AutoCAD.ApplicationServices.Application.ShowModalDialog(form);
+
+            if (result != System.Windows.Forms.DialogResult.OK || !form.FormAccepted)
+            {
+                A.Ed.WriteMessage("\n Đã hủy lệnh.");
+                return;
+            }
+
+            // Get values from form
+            ObjectId surfaceId = form.SelectedSurfaceId;
+            int khoangCach = form.KhoangCach;
+            string profileStyleName = form.ProfileStyleName;
+            string profileLabelSetName = form.ProfileLabelSetName;
+            string profileViewStyleName = form.ProfileViewStyleName;
+            string profileViewBandSetName = form.ProfileViewBandSetName;
+
+            // start transaction
             using Transaction tr = A.Db.TransactionManager.StartTransaction();
             try
             {
                 UserInput UI = new();
                 UtilitiesCAD CAD = new();
                 UtilitiesC3D C3D = new();
-                //start here
-                // get alignment
-                ObjectId surfaceId = UserInput.GSurfaceId("\n Chọn mặt phẳng " + "để vẽ trắc dọc tự nhiên:\n");
-                ObjectIdCollection alignmentIds = A.Cdoc.GetAlignmentIds();
+
+                // Get point for placing profiles
                 Point3d basePoint = UserInput.GPoint("\n Chọn vị trí điểm" + " đặt trắc dọc:\n");
-                int khoangCach = UserInput.GInt("Nhập khoảng cách giữa các trắc dọc:(300) \n");
-                // Draw all profiles
-                int x = 0;
+                
+                ObjectIdCollection alignmentIds = A.Cdoc.GetAlignmentIds();
+
+                // Sort alignments by name
+                var sortedAlignments = new List<(ObjectId Id, string Name)>();
                 foreach (ObjectId alignmentId in alignmentIds)
                 {
+                    Alignment? alignment = tr.GetObject(alignmentId, OpenMode.ForRead) as Alignment;
+                    if (alignment != null && alignment.AlignmentType == AlignmentType.Centerline)
+                    {
+                        sortedAlignments.Add((alignmentId, alignment.Name));
+                    }
+                }
+                sortedAlignments = sortedAlignments.OrderBy(a => a.Name).ToList();
+
+                // Get style IDs with fallback
+                ObjectId profileStyleId = GetStyleId(() => A.Cdoc.Styles.ProfileStyles[profileStyleName], 
+                    () => A.Cdoc.Styles.ProfileStyles["0.TN"]);
+                ObjectId profileLabelSetId = GetStyleId(() => A.Cdoc.Styles.LabelSetStyles.ProfileLabelSetStyles[profileLabelSetName],
+                    () => A.Cdoc.Styles.LabelSetStyles.ProfileLabelSetStyles["_No Labels"]);
+                ObjectId profileViewStyleId = GetStyleId(() => A.Cdoc.Styles.ProfileViewStyles[profileViewStyleName],
+                    () => A.Cdoc.Styles.ProfileViewStyles["TDTN GT 1-1000"]);
+                ObjectId profileBandStyleId = GetStyleId(() => A.Cdoc.Styles.ProfileViewBandSetStyles[profileViewBandSetName],
+                    () => A.Cdoc.Styles.ProfileViewBandSetStyles["TRẮC DỌC DO THI"]);
+
+                // Draw all profiles (sorted by name)
+                int x = 0;
+                int skipped = 0;
+                foreach (var alignmentInfo in sortedAlignments)
+                {
+                    ObjectId alignmentId = alignmentInfo.Id;
                     Alignment? alignment1 = tr.GetObject(alignmentId, OpenMode.ForWrite) as Alignment;
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
-                    if (alignment1.AlignmentType == AlignmentType.Centerline)
+                    x++;
+                    Point3d basePointNext = new(basePoint.X, basePoint.Y - x * khoangCach, basePoint.Z);
+
+                    // get layer ID
+                    Autodesk.Civil.DatabaseServices.Alignment? alignment = tr.GetObject(alignmentId, OpenMode.ForRead) as Autodesk.Civil.DatabaseServices.Alignment;
+#pragma warning disable CS8602 // Dereference of a possibly null reference.
+                    ObjectId layerID = alignment.LayerId;
+#pragma warning restore CS8602 // Dereference of a possibly null reference.
+
+                    // create the profiles from surface and profile view
+                    CivSurface? surface = tr.GetObject(surfaceId, OpenMode.ForRead) as CivSurface;
+#pragma warning disable CS8602 // Dereference of a possibly null reference.
+                    string profileName = surface.Name + "-" + alignment.Name;
+#pragma warning restore CS8602 // Dereference of a possibly null reference.
+
+                    // Check if profile already exists - skip creating if it does
+                    bool profileExists = false;
+                    ObjectIdCollection existingProfileIds = alignment.GetProfileIds();
+                    foreach (ObjectId existingProfileId in existingProfileIds)
                     {
-                        x++;
-                        Point3d basePointNext = new(basePoint.X, basePoint.Y - x * khoangCach, basePoint.Z);
-
-                        // get layer ID, 1st surface ID, 1st profiles style, 1st profiles label, 1st profile view style, 
-                        Autodesk.Civil.DatabaseServices.Alignment? alignment = tr.GetObject(alignmentId, OpenMode.ForRead) as Autodesk.Civil.DatabaseServices.Alignment;
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
-                        ObjectId layerID = alignment.LayerId;
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
-                        ObjectId profileStyleId = A.Cdoc.Styles.ProfileStyles["0.TN"];
-                        ObjectId profileLabelSetId = A.Cdoc.Styles.LabelSetStyles.ProfileLabelSetStyles["_No Labels"];
-                        ObjectId profileViewStyleId = A.Cdoc.Styles.ProfileViewStyles["TDTN GT 1-1000"];
-                        ObjectId profileBandStyleId = A.Cdoc.Styles.ProfileViewBandSetStyles["TRẮC DỌC DO THI"];
-
-                        // create the profiles from surface and profile view
-                        CivSurface? surface = tr.GetObject(surfaceId, OpenMode.ForRead) as CivSurface;
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
-                        string profileName = surface.Name + "-" + alignment.Name;
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
-                        ObjectId profilesId = Profile.CreateFromSurface(profileName, alignmentId, surfaceId, layerID, profileStyleId, profileLabelSetId);
-                        ObjectId profileViewId = ProfileView.Create(alignmentId, basePointNext, alignment.Name, profileBandStyleId, profileViewStyleId);
+                        Profile? existingProfile = tr.GetObject(existingProfileId, OpenMode.ForRead) as Profile;
+                        if (existingProfile != null && existingProfile.Name == profileName)
+                        {
+                            profileExists = true;
+                            A.Ed.WriteMessage($"\n Tuyến '{alignment.Name}' - Profile đã tồn tại, chỉ tạo ProfileView.");
+                            skipped++;
+                            break;
+                        }
                     }
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
 
+                    // Only create profile if it doesn't exist
+                    if (!profileExists)
+                    {
+                        ObjectId profilesId = Profile.CreateFromSurface(profileName, alignmentId, surfaceId, layerID, profileStyleId, profileLabelSetId);
+                    }
+
+                    // Always create ProfileView
+                    ObjectId profileViewId = ProfileView.Create(alignmentId, basePointNext, alignment.Name, profileBandStyleId, profileViewStyleId);
+#pragma warning restore CS8602 // Dereference of a possibly null reference.
                 }
+
+                A.Ed.WriteMessage($"\n Đã tạo trắc dọc cho {x - skipped} tuyến centerline. Bỏ qua {skipped} tuyến đã có profile.");
                 tr.Commit();
             }
             catch (Autodesk.AutoCAD.Runtime.Exception e)
             {
                 A.Ed.WriteMessage(e.Message);
+            }
+        }
+
+        /// <summary>
+        /// Helper method to get style ID with fallback
+        /// </summary>
+        private static ObjectId GetStyleId(Func<ObjectId> primary, Func<ObjectId> fallback)
+        {
+            try
+            {
+                return primary();
+            }
+            catch
+            {
+                try
+                {
+                    return fallback();
+                }
+                catch
+                {
+                    return ObjectId.Null;
+                }
             }
         }
 
@@ -269,198 +349,149 @@ namespace Civil3DCsharp
         [CommandMethod("CTP_GanNhanNutGiao_LenTracDoc")]
         public static void CTPGanNhanNutGiaoLenTracDoc()
         {
-            // start transantion
-            using Transaction tr = A.Db.TransactionManager.StartTransaction();
-            try
+            // Show form first
+            var form = new MyFirstProject.Civil_Tool.GanNhanNutGiaoForm();
+            var result = Autodesk.AutoCAD.ApplicationServices.Application.ShowModalDialog(form);
+
+            if (result != System.Windows.Forms.DialogResult.OK || !form.FormAccepted)
             {
-                UserInput UI = new();
-                UtilitiesCAD CAD = new();
-                UtilitiesC3D C3D = new();
-                
-                //start here
-                //get point group
-                ObjectId cogoPointId = UserInput.GCogoPointId("\n Chọn cogo point " + " thuộc nhóm điểm cần gắn nhãn nút giao lên trắc dọc: \n");
-                
-                // Validate cogo point selection
-                if (cogoPointId == ObjectId.Null)
-                {
-                    A.Ed.WriteMessage("\n Lỗi: Không chọn được cogo point hợp lệ.");
-                    return;
-                }
-                
-                Double saiSo = UserInput.GDouble("\n Nhập sai số điểm so với tuyến (0.02):");
-                CogoPoint? cogoPoint = tr.GetObject(cogoPointId, OpenMode.ForWrite) as CogoPoint;
-                
-                if (cogoPoint == null)
-                {
-                    A.Ed.WriteMessage("\n Lỗi: Không thể truy cập cogo point.");
-                    return;
-                }
+                A.Ed.WriteMessage("\n Đã hủy lệnh.");
+                return;
+            }
 
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
-                ObjectId pointGroupId = cogoPoint.PrimaryPointGroupId;
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
-                
-                // Validate point group
-                if (pointGroupId == ObjectId.Null)
-                {
-                    A.Ed.WriteMessage("\n Lỗi: Cogo point không thuộc về nhóm điểm nào.");
-                    return;
-                }
+            // Get values from form
+            ObjectId pointGroupId = form.SelectedPointGroupId;
+            double saiSo = form.SaiSo;
+            List<ObjectId> profileViewIds = form.SelectedProfileViewIds;
 
-                // Get points once from point group
-                ObjectIdCollection pointIds = UtilitiesC3D.GPointIdsFromPointGroup(pointGroupId);
-                if (pointIds.Count == 0)
-                {
-                    A.Ed.WriteMessage("\n Cảnh báo: Không tìm thấy điểm nào trong nhóm điểm.");
-                    return;
-                }
+            if (profileViewIds.Count == 0)
+            {
+                A.Ed.WriteMessage("\n Không có ProfileView nào được chọn.");
+                return;
+            }
 
-                // Commit transaction once before the loop
-                tr.Commit();
-
-                // Process multiple ProfileViews in a loop - UPDATED LOGIC
-                string continueProcess = "Enter";
-                int processedCount = 0;
-                
-                while (continueProcess == "Enter")
+            // Get points from point group first
+            ObjectIdCollection pointIds;
+            using (Transaction tr = A.Db.TransactionManager.StartTransaction())
+            {
+                try
                 {
-                    try
+                    pointIds = UtilitiesC3D.GPointIdsFromPointGroup(pointGroupId);
+                    if (pointIds.Count == 0)
                     {
-                        using (Transaction innerTr = A.Db.TransactionManager.StartTransaction())
+                        A.Ed.WriteMessage("\n Cảnh báo: Không tìm thấy điểm nào trong nhóm điểm.");
+                        return;
+                    }
+                    tr.Commit();
+                }
+                catch (System.Exception ex)
+                {
+                    A.Ed.WriteMessage($"\n Lỗi khi lấy điểm từ Point Group: {ex.Message}");
+                    return;
+                }
+            }
+
+            A.Ed.WriteMessage($"\n=== BẮT ĐẦU XỬ LÝ {profileViewIds.Count} PROFILEVIEW ===");
+            int processedCount = 0;
+
+            // Process each selected ProfileView
+            foreach (ObjectId profileViewId in profileViewIds)
+            {
+                try
+                {
+                    using (Transaction innerTr = A.Db.TransactionManager.StartTransaction())
+                    {
+                        ProfileView? profileView = innerTr.GetObject(profileViewId, OpenMode.ForRead) as ProfileView;
+                        if (profileView == null)
                         {
-                            // *** QUY TRÌNH CHÍNH XÁC: Chọn ProfileView trước ***
-                            ObjectId profileViewId = UserInput.GProfileViewId("Chọn trắc dọc cần gắn nhãn: \n");
-                            
-                            // Validate profile view selection
-                            if (profileViewId == ObjectId.Null)
-                            {
-                                A.Ed.WriteMessage("\n Người dùng hủy chọn ProfileView.");
-                                innerTr.Commit();
-                                break;
-                            }
-                            
-                            // Get ProfileView and its corresponding Alignment
-                            ProfileView? profileView = innerTr.GetObject(profileViewId, OpenMode.ForRead) as ProfileView;
-                            if (profileView == null)
-                            {
-                                A.Ed.WriteMessage("\n Lỗi: Profile view không hợp lệ.");
-                                innerTr.Commit();
-                                continue;
-                            }
+                            A.Ed.WriteMessage("\n Lỗi: Profile view không hợp lệ.");
+                            innerTr.Commit();
+                            continue;
+                        }
 
-                            // Get alignment from ProfileView
-                            ObjectId alignmentId = profileView.AlignmentId;
-                            Alignment? alignment = innerTr.GetObject(alignmentId, OpenMode.ForRead) as Alignment;
-                            
-                            if (alignment == null)
-                            {
-                                A.Ed.WriteMessage("\n Lỗi: Không thể lấy alignment từ ProfileView.");
-                                innerTr.Commit();
-                                continue;
-                            }
+                        // Get alignment from ProfileView
+                        ObjectId alignmentId = profileView.AlignmentId;
+                        Alignment? alignment = innerTr.GetObject(alignmentId, OpenMode.ForRead) as Alignment;
+                        
+                        if (alignment == null)
+                        {
+                            A.Ed.WriteMessage("\n Lỗi: Không thể lấy alignment từ ProfileView.");
+                            innerTr.Commit();
+                            continue;
+                        }
 
-                            A.Ed.WriteMessage($"\n Đang xử lý ProfileView: {profileView.Name}");
-                            A.Ed.WriteMessage($"\n Alignment tương ứng: {alignment.Name}");
-                            
-                            // *** KIỂM TRA CHÍNH XÁC CÁC ĐIỂM TRÊN ALIGNMENT ***
-                            ObjectIdCollection validPointIds = new ObjectIdCollection();
-                            int totalPoints = 0;
-                            int validPoints = 0;
-                            
-                            A.Ed.WriteMessage($"\n=== KIỂM TRA {pointIds.Count} ĐIỂM TRONG NHÓM ===");
-                            
-                            foreach (ObjectId pointId in pointIds)
-                            {
-                                totalPoints++;
-                                CogoPoint? point = innerTr.GetObject(pointId, OpenMode.ForRead) as CogoPoint;
-                                if (point == null) continue;
+                        A.Ed.WriteMessage($"\n\n Đang xử lý ProfileView: {profileView.Name}");
+                        A.Ed.WriteMessage($"\n Alignment tương ứng: {alignment.Name}");
+                        
+                        // Filter points that are on this alignment
+                        ObjectIdCollection validPointIds = new ObjectIdCollection();
+                        int totalPoints = 0;
+                        int validPoints = 0;
+                        
+                        foreach (ObjectId pointId in pointIds)
+                        {
+                            totalPoints++;
+                            CogoPoint? point = innerTr.GetObject(pointId, OpenMode.ForRead) as CogoPoint;
+                            if (point == null) continue;
 
-                                double station = 0;
-                                double offset = 0;
-                                
-                                try
-                                {
-                                    // Tính station và offset của điểm so với alignment
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
-                                    alignment.StationOffset(point.Easting, point.Northing, ref station, ref offset);
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
-                                    
-                                    double absOffset = Math.Abs(offset);
-                                    
-                                    A.Ed.WriteMessage($"\n Điểm {point.PointName}: Station={station:F3}, Offset={offset:F3}, |Offset|={absOffset:F3}");
-                                    
-                                    // Kiểm tra khoảng cách nhỏ hơn sai số cho phép
-                                    if (absOffset <= saiSo)
-                                    {
-                                        validPointIds.Add(pointId);
-                                        validPoints++;
-                                        A.Ed.WriteMessage($" -> HỢP LỆ (≤ {saiSo})");
-                                    }
-                                    else
-                                    {
-                                        A.Ed.WriteMessage($" -> LOẠI BỎ (> {saiSo})");
-                                    }
-                                }
-                                catch (System.Exception ex)
-                                {
-                                    A.Ed.WriteMessage($"\n Lỗi tính station/offset cho điểm {point.PointName}: {ex.Message}");
-                                }
-                            }
+                            double station = 0;
+                            double offset = 0;
                             
-                            A.Ed.WriteMessage($"\n=== KẾT QUẢ LỌC ===");
-                            A.Ed.WriteMessage($"\n Tổng điểm kiểm tra: {totalPoints}");
-                            A.Ed.WriteMessage($"\n Điểm hợp lệ (≤ {saiSo}m): {validPoints}");
-                            A.Ed.WriteMessage($"\n Điểm bị loại bỏ: {totalPoints - validPoints}");
-                            
-                            if (validPointIds.Count == 0)
-                            {
-                                A.Ed.WriteMessage($"\n CẢNH BÁO: Không có điểm nào trong phạm vi sai số {saiSo}m so với alignment '{alignment.Name}'");
-                                innerTr.Commit();
-                                continue;
-                            }
-                            
-                            // Set selection and execute command với các điểm đã được lọc chính xác
                             try
                             {
-                                ObjectId[] pointArray = UserInput.ConvertObjectIdCollectionToArray(validPointIds);
-                                A.Ed.SetImpliedSelection(pointArray);
+                                alignment.StationOffset(point.Easting, point.Northing, ref station, ref offset);
+                                double absOffset = Math.Abs(offset);
                                 
-                                // Commit inner transaction before using Editor.Command
-                                innerTr.Commit();
-                                
-                                // Execute the AutoCAD command
-                                A.Ed.WriteMessage($"\n Đang thực hiện lệnh gắn {validPointIds.Count} điểm lên ProfileView...");
-                                A.Ed.Command("_AECCPROJECTOBJECTSTOPROF", profileViewId);
-                                
-                                A.Ed.WriteMessage($"\n ✓ ĐÃ GẮN THÀNH CÔNG {validPointIds.Count} điểm lên ProfileView '{profileView.Name}'");
-                                processedCount++;
+                                if (absOffset <= saiSo)
+                                {
+                                    validPointIds.Add(pointId);
+                                    validPoints++;
+                                }
                             }
-                            catch (Autodesk.AutoCAD.Runtime.Exception ex)
+                            catch (System.Exception)
                             {
-                                A.Ed.WriteMessage($"\n Lỗi khi thực hiện lệnh project objects to profile: {ex.Message}");
-                                innerTr.Commit();
+                                // Skip points that fail station/offset calculation
                             }
                         }
                         
-                        // Ask user if they want to continue with another ProfileView
-                        continueProcess = UserInput.GStopWithESC();
+                        A.Ed.WriteMessage($"\n Điểm hợp lệ (≤ {saiSo}m): {validPoints}/{totalPoints}");
                         
-                    }
-                    catch (System.Exception ex)
-                    {
-                        A.Ed.WriteMessage($"\n Lỗi trong vòng lặp xử lý: {ex.Message}");
-                        continueProcess = "Cancel"; // Exit loop on error
+                        if (validPointIds.Count == 0)
+                        {
+                            A.Ed.WriteMessage($"\n CẢNH BÁO: Không có điểm nào trong phạm vi sai số {saiSo}m so với alignment '{alignment.Name}'");
+                            innerTr.Commit();
+                            continue;
+                        }
+                        
+                        // Set selection and execute command
+                        try
+                        {
+                            ObjectId[] pointArray = UserInput.ConvertObjectIdCollectionToArray(validPointIds);
+                            A.Ed.SetImpliedSelection(pointArray);
+                            
+                            // Commit inner transaction before using Editor.Command
+                            innerTr.Commit();
+                            
+                            // Execute the AutoCAD command
+                            A.Ed.Command("_AECCPROJECTOBJECTSTOPROF", profileViewId);
+                            
+                            A.Ed.WriteMessage($"\n ✓ ĐÃ GẮN THÀNH CÔNG {validPointIds.Count} điểm lên ProfileView '{profileView.Name}'");
+                            processedCount++;
+                        }
+                        catch (Autodesk.AutoCAD.Runtime.Exception ex)
+                        {
+                            A.Ed.WriteMessage($"\n Lỗi khi thực hiện lệnh project objects to profile: {ex.Message}");
+                        }
                     }
                 }
-                
-                A.Ed.WriteMessage($"\n=== HOÀN THÀNH ===");
-                A.Ed.WriteMessage($"\n Đã xử lý thành công: {processedCount} ProfileView(s)");
+                catch (System.Exception ex)
+                {
+                    A.Ed.WriteMessage($"\n Lỗi khi xử lý ProfileView: {ex.Message}");
+                }
             }
-            catch (Autodesk.AutoCAD.Runtime.Exception e)
-            {
-                A.Ed.WriteMessage($"\n Lỗi: {e.Message}");
-            }
+            
+            A.Ed.WriteMessage($"\n\n=== HOÀN THÀNH ===");
+            A.Ed.WriteMessage($"\n Đã xử lý thành công: {processedCount}/{profileViewIds.Count} ProfileView(s)");
         }
 
         /* lệnh tạo cogo point từ điểm PVI trên trắc dọc
