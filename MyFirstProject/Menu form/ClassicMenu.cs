@@ -82,7 +82,7 @@ namespace MyFirstProject
             dynamic subMenuAlignment = menu.AddSubMenu(menu.Count + 1, "Alignment");
             AddMenuItem(subMenuAlignment, "Offset from Alignment", "AT_OffsetAlignment ");
             AddMenuItem(subMenuAlignment, "Bảng Thống Kê Tuyến Đường", "CTA_BangThongKeCacTuyenDuong ");
-            AddMenuItem(subMenuAlignment, "Tạo Đường Nút Giao", "CT_TaoDuong_ConnectedAlignment_NutGiao ");
+            AddMenuItem(subMenuAlignment, "Tạo Đường Nút Giao", "CTA_TaoDuong_ConnectedAlignment_NutGiao ");
 
             // Corridor
             dynamic subMenuCorridor = menu.AddSubMenu(menu.Count + 1, "Corridor");
@@ -122,6 +122,7 @@ namespace MyFirstProject
             AddMenuItem(subMenuPoint, "Update All Point Group", "CTPO_UpdateAllPointGroup ");
             AddMenuItem(subMenuPoint, "Ẩn CogoPoint", "CTPO_An_CogoPoint ");
             AddHeader(subMenuPoint, "--- Đổi tên ---");
+            AddMenuItem(subMenuPoint, "Đổi Tên CogoPoint (Template)", "CTPO_DoiTen_Cogopoint ");
             AddMenuItem(subMenuPoint, "Đổi Tên CogoPoint Theo Alignment", "CTPo_DoiTen_CogoPoint_fromAlignment ");
 
             // Profile

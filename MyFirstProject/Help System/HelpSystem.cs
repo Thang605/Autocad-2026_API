@@ -757,6 +757,26 @@ namespace Civil3DCsharp.HelpSystem
             // 05. Point
             AddCommand(new CommandInfo
             {
+                Name = "CTPO_DoiTen_Cogopoint",
+                Category = "Civil - Point",
+                Description = "Đổi tên CogoPoint theo template (mẫu tên)",
+                Usage = "CTPO_DoiTen_Cogopoint",
+                Steps = new[] {
+                    "1. Gõ lệnh CTPO_DoiTen_Cogopoint",
+                    "2. Form Name Template hiện ra",
+                    "3. Chọn Property fields và nhấn Insert để chèn vào mẫu tên",
+                    "4. Nhập mẫu tên (VD: POINT-<[Next Counter]>)",
+                    "5. Chọn kiểu đánh số, số bắt đầu, giá trị tăng",
+                    "6. Nhấn OK, chọn các CogoPoint cần đổi tên"
+                },
+                Notes = new[] {
+                    "Hỗ trợ nhiều kiểu đánh số: 1,2,3 hoặc I,II,III hoặc A,B,C...",
+                    "Có thể chèn thuộc tính điểm vào tên: Point Number, Description, Elevation..."
+                }
+            });
+
+            AddCommand(new CommandInfo
+            {
                 Name = "CTPo_DoiTen_CogoPoint_fromAlignment",
                 Category = "Civil - Point",
                 Description = "Đổi tên các CoGo Point theo Alignment",
@@ -1337,13 +1357,13 @@ namespace Civil3DCsharp.HelpSystem
                 VideoLink = "https://www.youtube.com/watch?v=yqwLRoXL5RY"
             });
 
-            // 27. CT_TaoDuong_ConnectedAlignment_NutGiao
+            // 27. CTA_TaoDuong_ConnectedAlignment_NutGiao
             AddCommand(new CommandInfo
             {
-                Name = "CT_TaoDuong_ConnectedAlignment_NutGiao",
+                Name = "CTA_TaoDuong_ConnectedAlignment_NutGiao",
                 Category = "Civil - Alignment",
                 Description = "Tạo đường nối (Connected Alignment) tại nút giao",
-                Usage = "CT_TaoDuong_ConnectedAlignment_NutGiao"
+                Usage = "CTA_TaoDuong_ConnectedAlignment_NutGiao"
             });
 
             // 28. CTC_TaoCooridor_DuongDoThi_RePhai

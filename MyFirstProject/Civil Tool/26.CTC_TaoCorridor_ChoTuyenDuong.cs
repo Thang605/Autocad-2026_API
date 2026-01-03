@@ -614,6 +614,10 @@ namespace Civil3DCsharp
 
         private void InitializeComponent()
         {
+            // Standard Font
+            var standardFont = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Regular);
+            var boldFont = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
+
             this.lblCorridorName = new System.Windows.Forms.Label();
             this.lblAssembly = new System.Windows.Forms.Label();
             this.lblCodeSetStyle = new System.Windows.Forms.Label();
@@ -642,120 +646,142 @@ namespace Civil3DCsharp
 
             // Form
             this.Text = "Tạo Corridor cho Tuyến Đường";
-            this.Size = new System.Drawing.Size(500, 620);
+            this.Size = new System.Drawing.Size(550, 650);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
+            this.Font = standardFont;
 
             // Corridor Mode Group
             this.grpCorridorMode.Text = "Chế độ tạo Corridor";
-            this.grpCorridorMode.Location = new System.Drawing.Point(12, 12);
-            this.grpCorridorMode.Size = new System.Drawing.Size(460, 80);
+            this.grpCorridorMode.Font = boldFont;
+            this.grpCorridorMode.Location = new System.Drawing.Point(20, 20);
+            this.grpCorridorMode.Size = new System.Drawing.Size(495, 90);
 
             // Multiple Corridors Radio Button
             this.rdbMultipleCorridors.Text = "Tạo nhiều corridor (mỗi tuyến đường 1 corridor)";
-            this.rdbMultipleCorridors.Location = new System.Drawing.Point(10, 25);
-            this.rdbMultipleCorridors.Size = new System.Drawing.Size(400, 20);
+            this.rdbMultipleCorridors.Font = standardFont;
+            this.rdbMultipleCorridors.Location = new System.Drawing.Point(20, 25);
+            this.rdbMultipleCorridors.Size = new System.Drawing.Size(460, 25);
             this.rdbMultipleCorridors.Checked = true;
             this.rdbMultipleCorridors.CheckedChanged += new EventHandler(this.rdb_CheckedChanged);
 
             // Single Corridor Radio Button
             this.rdbSingleCorridor.Text = "Tạo 1 corridor cho tất cả (mỗi tuyến đường 1 baseline)";
-            this.rdbSingleCorridor.Location = new System.Drawing.Point(10, 50);
-            this.rdbSingleCorridor.Size = new System.Drawing.Size(400, 20);
+            this.rdbSingleCorridor.Font = standardFont;
+            this.rdbSingleCorridor.Location = new System.Drawing.Point(20, 55);
+            this.rdbSingleCorridor.Size = new System.Drawing.Size(460, 25);
             this.rdbSingleCorridor.CheckedChanged += new EventHandler(this.rdb_CheckedChanged);
 
             // Basic Settings Group
             this.grpBasicSettings.Text = "Thiết lập cơ bản";
-            this.grpBasicSettings.Location = new System.Drawing.Point(12, 100);
-            this.grpBasicSettings.Size = new System.Drawing.Size(460, 200);
+            this.grpBasicSettings.Font = boldFont;
+            this.grpBasicSettings.Location = new System.Drawing.Point(20, 120);
+            this.grpBasicSettings.Size = new System.Drawing.Size(495, 220);
 
             // Corridor Name Label
             this.lblCorridorName.Text = "Tiền tố tên Corridor:";
-            this.lblCorridorName.Location = new System.Drawing.Point(10, 30);
-            this.lblCorridorName.Size = new System.Drawing.Size(130, 23);
+            this.lblCorridorName.Font = standardFont;
+            this.lblCorridorName.Location = new System.Drawing.Point(20, 35);
+            this.lblCorridorName.Size = new System.Drawing.Size(180, 25);
 
             // Corridor Name TextBox
-            this.txtCorridorName.Location = new System.Drawing.Point(150, 27);
-            this.txtCorridorName.Size = new System.Drawing.Size(200, 23);
+            this.txtCorridorName.Location = new System.Drawing.Point(200, 32);
+            this.txtCorridorName.Size = new System.Drawing.Size(270, 25);
+            this.txtCorridorName.Font = standardFont;
             this.txtCorridorName.Text = "Corridor_";
 
             // Assembly Label
             this.lblAssembly.Text = "Mẫu mặt cắt (Assembly):";
-            this.lblAssembly.Location = new System.Drawing.Point(10, 65);
-            this.lblAssembly.Size = new System.Drawing.Size(130, 23);
+            this.lblAssembly.Font = standardFont;
+            this.lblAssembly.Location = new System.Drawing.Point(20, 75);
+            this.lblAssembly.Size = new System.Drawing.Size(180, 25);
 
             // Assembly ComboBox
-            this.cmbAssembly.Location = new System.Drawing.Point(150, 62);
-            this.cmbAssembly.Size = new System.Drawing.Size(200, 23);
+            this.cmbAssembly.Location = new System.Drawing.Point(200, 72);
+            this.cmbAssembly.Size = new System.Drawing.Size(270, 25);
+            this.cmbAssembly.Font = standardFont;
             this.cmbAssembly.DropDownStyle = ComboBoxStyle.DropDownList;
 
             // Code Set Style Label
             this.lblCodeSetStyle.Text = "Code Set Style:";
-            this.lblCodeSetStyle.Location = new System.Drawing.Point(10, 100);
-            this.lblCodeSetStyle.Size = new System.Drawing.Size(130, 23);
+            this.lblCodeSetStyle.Font = standardFont;
+            this.lblCodeSetStyle.Location = new System.Drawing.Point(20, 115);
+            this.lblCodeSetStyle.Size = new System.Drawing.Size(180, 25);
 
             // Code Set Style ComboBox
-            this.cmbCodeSetStyle.Location = new System.Drawing.Point(150, 97);
-            this.cmbCodeSetStyle.Size = new System.Drawing.Size(200, 23);
+            this.cmbCodeSetStyle.Location = new System.Drawing.Point(200, 112);
+            this.cmbCodeSetStyle.Size = new System.Drawing.Size(270, 25);
+            this.cmbCodeSetStyle.Font = standardFont;
             this.cmbCodeSetStyle.DropDownStyle = ComboBoxStyle.DropDownList;
 
             // Target Surface Label
             this.lblTargetSurface.Text = "Bề mặt tham chiếu:";
-            this.lblTargetSurface.Location = new System.Drawing.Point(10, 135);
-            this.lblTargetSurface.Size = new System.Drawing.Size(130, 23);
+            this.lblTargetSurface.Font = standardFont;
+            this.lblTargetSurface.Location = new System.Drawing.Point(20, 155);
+            this.lblTargetSurface.Size = new System.Drawing.Size(180, 25);
 
             // Target Surface ComboBox
-            this.cmbTargetSurface.Location = new System.Drawing.Point(150, 132);
-            this.cmbTargetSurface.Size = new System.Drawing.Size(200, 23);
+            this.cmbTargetSurface.Location = new System.Drawing.Point(200, 152);
+            this.cmbTargetSurface.Size = new System.Drawing.Size(270, 25);
+            this.cmbTargetSurface.Font = standardFont;
             this.cmbTargetSurface.DropDownStyle = ComboBoxStyle.DropDownList;
 
             // Advanced Settings Group
             this.grpAdvancedSettings.Text = "Thiết lập nâng cao";
-            this.grpAdvancedSettings.Location = new System.Drawing.Point(12, 310);
-            this.grpAdvancedSettings.Size = new System.Drawing.Size(460, 180);
+            this.grpAdvancedSettings.Font = boldFont;
+            this.grpAdvancedSettings.Location = new System.Drawing.Point(20, 350);
+            this.grpAdvancedSettings.Size = new System.Drawing.Size(495, 180);
 
             // Frequency Label
             this.lblFrequency.Text = "Khoảng cách section (m):";
-            this.lblFrequency.Location = new System.Drawing.Point(10, 30);
-            this.lblFrequency.Size = new System.Drawing.Size(130, 23);
+            this.lblFrequency.Font = standardFont;
+            this.lblFrequency.Location = new System.Drawing.Point(20, 35);
+            this.lblFrequency.Size = new System.Drawing.Size(180, 25);
 
             // Frequency TextBox
-            this.txtFrequency.Location = new System.Drawing.Point(150, 27);
-            this.txtFrequency.Size = new System.Drawing.Size(100, 23);
+            this.txtFrequency.Location = new System.Drawing.Point(200, 32);
+            this.txtFrequency.Size = new System.Drawing.Size(120, 25);
+            this.txtFrequency.Font = standardFont;
             this.txtFrequency.Text = "25.0";
 
             // Start Offset Label
             this.lblStartOffset.Text = "Offset bắt đầu (m):";
-            this.lblStartOffset.Location = new System.Drawing.Point(10, 65);
-            this.lblStartOffset.Size = new System.Drawing.Size(130, 23);
+            this.lblStartOffset.Font = standardFont;
+            this.lblStartOffset.Location = new System.Drawing.Point(20, 75);
+            this.lblStartOffset.Size = new System.Drawing.Size(180, 25);
 
             // Start Offset TextBox
-            this.txtStartOffset.Location = new System.Drawing.Point(150, 62);
-            this.txtStartOffset.Size = new System.Drawing.Size(100, 23);
+            this.txtStartOffset.Location = new System.Drawing.Point(200, 72);
+            this.txtStartOffset.Size = new System.Drawing.Size(120, 25);
+            this.txtStartOffset.Font = standardFont;
             this.txtStartOffset.Text = "-25.0";
 
             // End Offset Label
             this.lblEndOffset.Text = "Offset kết thúc (m):";
-            this.lblEndOffset.Location = new System.Drawing.Point(10, 100);
-            this.lblEndOffset.Size = new System.Drawing.Size(130, 23);
+            this.lblEndOffset.Font = standardFont;
+            this.lblEndOffset.Location = new System.Drawing.Point(20, 115);
+            this.lblEndOffset.Size = new System.Drawing.Size(180, 25);
 
             // End Offset TextBox
-            this.txtEndOffset.Location = new System.Drawing.Point(150, 97);
-            this.txtEndOffset.Size = new System.Drawing.Size(100, 23);
+            this.txtEndOffset.Location = new System.Drawing.Point(200, 112);
+            this.txtEndOffset.Size = new System.Drawing.Size(120, 25);
+            this.txtEndOffset.Font = standardFont;
             this.txtEndOffset.Text = "25.0";
 
             // OK Button
             this.btnOK.Text = "Tạo Corridor";
-            this.btnOK.Location = new System.Drawing.Point(297, 540);
-            this.btnOK.Size = new System.Drawing.Size(85, 30);
+            this.btnOK.Location = new System.Drawing.Point(290, 560);
+            this.btnOK.Size = new System.Drawing.Size(110, 35);
+            this.btnOK.Font = boldFont;
             this.btnOK.Click += new EventHandler(this.btnOK_Click);
 
             // Cancel Button
             this.btnCancel.Text = "Hủy";
-            this.btnCancel.Location = new System.Drawing.Point(387, 540);
-            this.btnCancel.Size = new System.Drawing.Size(75, 30);
+            this.btnCancel.Location = new System.Drawing.Point(415, 560);
+            this.btnCancel.Size = new System.Drawing.Size(100, 35);
+            this.btnCancel.Font = standardFont;
             this.btnCancel.Click += new EventHandler(this.btnCancel_Click);
 
             // Add controls to groups
