@@ -24,14 +24,14 @@ namespace Civil3DCsharp
         private const string ERROR_INDICATOR = "[X]";
         private const string WARNING_INDICATOR = "[!]";
 
-        [CommandMethod("CTC_TaoCooridor_DuongDoThi_RePhai")]
-        public static void CTC_TaoCooridor_DuongDoThi_RePhai()
+        [CommandMethod("CAC_TaoCooridor_DuongDoThi_RePhai")]
+        public static void CAC_TaoCooridor_DuongDoThi_RePhai()
         {
             using Transaction tr = A.Db.TransactionManager.StartTransaction();
             try
             {
                 var executionResult = ExecuteCorridorCreation(tr);
-                
+
                 if (executionResult.Success)
                 {
                     tr.Commit();
@@ -62,7 +62,7 @@ namespace Civil3DCsharp
                 A.Ed.WriteMessage("\n================================================");
                 A.Ed.WriteMessage("\n  TAO CORRIDOR RE PHAI - DUONG DO THI");
                 A.Ed.WriteMessage("\n================================================");
-                
+
                 // Step 1: Get user input from FORM (replaced command line)
                 var inputResult = GetUserInputFromForm(tr);
                 if (!inputResult.Success)
@@ -88,10 +88,10 @@ namespace Civil3DCsharp
             }
             catch (System.Exception ex)
             {
-                return new ExecutionResult 
-                { 
-                    Success = false, 
-                    Message = $"Lỗi không mong đợi: {ex.Message}" 
+                return new ExecutionResult
+                {
+                    Success = false,
+                    Message = $"Lỗi không mong đợi: {ex.Message}"
                 };
             }
         }
@@ -319,7 +319,7 @@ namespace Civil3DCsharp
             // ====== STEP 1: SELECT SURFACE ONCE FOR ALL CORRIDORS ======
             A.Ed.WriteMessage("\n\n--- Cấu hình chung cho tất cả corridors ---");
             A.Ed.WriteMessage("\n--- Chọn Surface (dùng chung) ---");
-            
+
             ObjectIdCollection sharedSurfaceTargets = new ObjectIdCollection();
             try
             {
@@ -346,7 +346,7 @@ namespace Civil3DCsharp
 
             // ====== STEP 2: CONFIGURE TARGET MAPPING ONCE ======
             A.Ed.WriteMessage("\n\n--- Cấu hình Target Mapping (dùng chung) ---");
-            
+
             TargetMappingConfiguration? targetMapping = null;
             bool useFormConfig = true;
 
@@ -373,11 +373,11 @@ namespace Civil3DCsharp
                     try
                     {
                         A.Ed.WriteMessage($"\n📋 Lấy thông tin subassembly targets từ assembly '{objects.AssemblyName}'...");
-                        
+
                         // Create temporary corridor structures to analyze assembly
                         ObjectId profileId = firstAlignment.GetProfileIds()[0];
                         Profile? profile = tr.GetObject(profileId, OpenMode.ForRead) as Profile;
-                        
+
                         string tempBaselineName = "TEMP_BL_" + Guid.NewGuid().ToString().Substring(0, 8);
                         Baseline tempBaseline = objects.Corridor.Baselines.Add(tempBaselineName, firstAlignment.Id, profileId);
 
@@ -401,7 +401,7 @@ namespace Civil3DCsharp
 
                         // Get subassembly targets
                         SubassemblyTargetInfoCollection sampleTargets = tempRegion.GetTargets();
-                        
+
                         A.Ed.WriteMessage($"\n✅ Tìm thấy {sampleTargets.Count} subassembly targets trong assembly.");
 
                         if (sampleTargets.Count > 0)
@@ -415,7 +415,7 @@ namespace Civil3DCsharp
                                 try
                                 {
                                     A.Ed.WriteMessage("\n\n=== Mở form cấu hình Target (dùng chung cho tất cả corridors) ===");
-                                    
+
                                     var targetConfigForm = new SubassemblyTargetConfigForm(
                                         sampleTargets,
                                         sharedAlignmentTargets,
@@ -428,7 +428,7 @@ namespace Civil3DCsharp
                                     if (dialogResult == DialogResult.OK && targetConfigForm.ConfigurationApplied)
                                     {
                                         A.Ed.WriteMessage("\n✅ Người dùng đã cấu hình target mapping.");
-                                        
+
                                         // Store the target mapping configuration
                                         targetMapping = new TargetMappingConfiguration
                                         {
@@ -500,21 +500,21 @@ namespace Civil3DCsharp
             for (int i = 0; i < formData.AlignmentNumber; i++)
             {
                 var pair = formData.AlignmentPolylinePairs[i];
-                
+
                 A.Ed.WriteMessage($"\n\n--- Xử lý cặp {i + 1}/{formData.AlignmentNumber} ---");
-                
+
                 try
                 {
                     var result = ProcessSinglePairWithSharedConfig(
-                        tr, 
-                        pair, 
-                        objects, 
+                        tr,
+                        pair,
+                        objects,
                         i,
                         sharedAlignmentTargets,
                         sharedProfileTargets,
                         sharedSurfaceTargets,
                         targetMapping);
-                    
+
                     if (result.Success)
                     {
                         successCount++;
@@ -539,7 +539,7 @@ namespace Civil3DCsharp
             A.Ed.WriteMessage($"\n  KET QUA");
             A.Ed.WriteMessage($"\n================================================");
             A.Ed.WriteMessage($"\nĐã hoàn thành: {successCount}/{formData.AlignmentNumber} corridor rẽ phải");
-            
+
             if (errors.Count > 0)
             {
                 A.Ed.WriteMessage($"\nCó {errors.Count} lỗi xảy ra:");
@@ -548,25 +548,25 @@ namespace Civil3DCsharp
                     A.Ed.WriteMessage($"\n  - {error}");
                 }
             }
-            
+
             A.Ed.WriteMessage("\n================================================\n");
 
             var overallSuccess = successCount > 0;
-            var message = overallSuccess 
+            var message = overallSuccess
                 ? $"Đã tạo thành công {successCount}/{formData.AlignmentNumber} corridor."
                 : "Không có corridor nào được tạo thành công.";
 
-            return new ExecutionResult 
-            { 
-                Success = overallSuccess, 
-                Message = message 
+            return new ExecutionResult
+            {
+                Success = overallSuccess,
+                Message = message
             };
         }
 
         private static ExecutionResult ProcessSinglePairWithSharedConfig(
-            Transaction tr, 
-            AlignmentPolylinePair pair, 
-            CorridorObjects objects, 
+            Transaction tr,
+            AlignmentPolylinePair pair,
+            CorridorObjects objects,
             int pairIndex,
             ObjectIdCollection sharedAlignmentTargets,
             ObjectIdCollection sharedProfileTargets,
@@ -594,10 +594,10 @@ namespace Civil3DCsharp
                 // Validate alignment has profile
                 if (alignment.GetProfileIds().Count == 0)
                 {
-                    return new ExecutionResult 
-                    { 
-                        Success = false, 
-                        Message = $"Alignment '{alignment.Name}' không có profile" 
+                    return new ExecutionResult
+                    {
+                        Success = false,
+                        Message = $"Alignment '{alignment.Name}' không có profile"
                     };
                 }
 
@@ -605,12 +605,12 @@ namespace Civil3DCsharp
                 try
                 {
                     A.Ed.WriteMessage($"\n→ Tạo corridor với cấu hình đã thiết lập...");
-                    
+
                     TaoCooridorDuongDoThiWithSharedConfig(
-                        alignment, 
-                        objects.Corridor, 
-                        polyline, 
-                        objects.AssemblyId, 
+                        alignment,
+                        objects.Corridor,
+                        polyline,
+                        objects.AssemblyId,
                         objects.AssemblyName,
                         sharedAlignmentTargets,
                         sharedProfileTargets,
@@ -622,19 +622,19 @@ namespace Civil3DCsharp
                 }
                 catch (System.Exception ex)
                 {
-                    return new ExecutionResult 
-                    { 
-                        Success = false, 
-                        Message = $"Lỗi khi tạo corridor: {ex.Message}" 
+                    return new ExecutionResult
+                    {
+                        Success = false,
+                        Message = $"Lỗi khi tạo corridor: {ex.Message}"
                     };
                 }
             }
             catch (System.Exception ex)
             {
-                return new ExecutionResult 
-                { 
-                    Success = false, 
-                    Message = $"Lỗi khi xử lý cặp: {ex.Message}" 
+                return new ExecutionResult
+                {
+                    Success = false,
+                    Message = $"Lỗi khi xử lý cặp: {ex.Message}"
                 };
             }
         }
@@ -642,10 +642,10 @@ namespace Civil3DCsharp
         // ========== MOVED METHODS FROM UtilitiesC3D ==========
 
         public static void TaoCooridorDuongDoThiWithSharedConfig(
-            Alignment alignment, 
-            Corridor corridor, 
-            Polyline polyline, 
-            ObjectId assemblyId, 
+            Alignment alignment,
+            Corridor corridor,
+            Polyline polyline,
+            ObjectId assemblyId,
             string assemblyName,
             ObjectIdCollection sharedAlignmentTargets,
             ObjectIdCollection sharedProfileTargets,
@@ -729,7 +729,7 @@ namespace Civil3DCsharp
                 if (targetMapping.UseFormConfig && targetMapping.TargetConnections != null && targetMapping.TargetConnections.Count > 0)
                 {
                     A.Ed.WriteMessage("\n=== Áp dụng cấu hình từ Form (đã lưu) ===");
-                    ApplyTargetConfigurationFromForm(baselineRegion, targetMapping.TargetConnections, 
+                    ApplyTargetConfigurationFromForm(baselineRegion, targetMapping.TargetConnections,
                         TagetIds_0, TagetIds_1, TagetIds_2, TagetIds_3);
                 }
                 else
@@ -915,9 +915,9 @@ namespace Civil3DCsharp
 
                 // *** NEW: Show form to configure targets ***
                 A.Ed.WriteMessage("\n=== Mở form cấu hình Target ===");
-                
+
                 bool useFormConfig = true; // You can make this a user choice
-                
+
                 if (useFormConfig && subassemblyTargetInfoCollection.Count > 0)
                 {
                     try
@@ -932,9 +932,9 @@ namespace Civil3DCsharp
                         if (dialogResult == DialogResult.OK && targetConfigForm.ConfigurationApplied)
                         {
                             A.Ed.WriteMessage("\n✅ Người dùng đã áp dụng cấu hình từ form.");
-                            
+
                             // Apply the configuration from form IN THIS TRANSACTION CONTEXT
-                            ApplyTargetConfigurationFromForm(baselineRegion, targetConfigForm.TargetConnections, 
+                            ApplyTargetConfigurationFromForm(baselineRegion, targetConfigForm.TargetConnections,
                                 TagetIds_0, TagetIds_1, TagetIds_2, TagetIds_3);
                         }
                         else
