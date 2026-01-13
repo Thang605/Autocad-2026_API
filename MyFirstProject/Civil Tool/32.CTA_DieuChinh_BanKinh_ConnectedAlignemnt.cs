@@ -251,8 +251,6 @@ namespace Civil3DCsharp
                         if (changedCount > 0)
                         {
                             ed.WriteMessage($"\n\n✅ Hoàn thành! Đã thay đổi bán kính của {changedCount} đường cong.");
-                            MessageBox.Show($"Đã thay đổi bán kính của {changedCount} đường cong thành công!",
-                                "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
                         else
                         {

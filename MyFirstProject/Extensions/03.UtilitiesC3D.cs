@@ -562,29 +562,39 @@ namespace MyFirstProject.Extensions
 
         public static ObjectId CreateSampleline(string sampleLineName, ObjectId sampleLineGroupId, Alignment alignment, double station)
         {
-            Transaction tr = A.Db.TransactionManager.StartTransaction();
+            // Kiểm tra station có nằm trong phạm vi của alignment không
+            if (station < alignment.StartingStation || station > alignment.EndingStation)
             {
-                _ = new UserInput();
-                _ = new UtilitiesCAD();
-                _ = new UtilitiesC3D();
-                //start here
+                A.Ed.WriteMessage($"\n⚠️ Station {station:F2} nằm ngoài phạm vi alignment ({alignment.StartingStation:F2} - {alignment.EndingStation:F2}). Bỏ qua.");
+                return ObjectId.Null;
+            }
 
-                // Lấy khoảng dịch 2 bên
-                Point2dCollection point2Ds = [];
-                double easting = new();
-                double northing = new();
-                alignment.PointLocation(station, -10, ref easting, ref northing);
-                Point2d point2D = new(easting, northing);
-                point2Ds.Add(point2D);
-                alignment.PointLocation(station, 10, ref easting, ref northing);
-                Point2d point2D1 = new(easting, northing);
-                point2Ds.Add(point2D1);
+            using (Transaction tr = A.Db.TransactionManager.StartTransaction())
+            {
+                try
+                {
+                    // Lấy khoảng dịch 2 bên
+                    Point2dCollection point2Ds = [];
+                    double easting = new();
+                    double northing = new();
+                    alignment.PointLocation(station, -10, ref easting, ref northing);
+                    Point2d point2D = new(easting, northing);
+                    point2Ds.Add(point2D);
+                    alignment.PointLocation(station, 10, ref easting, ref northing);
+                    Point2d point2D1 = new(easting, northing);
+                    point2Ds.Add(point2D1);
 
-                // Tạo sampleline
-                ObjectId sampleLineId = SampleLine.Create(sampleLineName, sampleLineGroupId, point2Ds);
+                    // Tạo sampleline
+                    ObjectId sampleLineId = SampleLine.Create(sampleLineName, sampleLineGroupId, point2Ds);
 
-                tr.Commit();
-                return sampleLineId;
+                    tr.Commit();
+                    return sampleLineId;
+                }
+                catch (Autodesk.Civil.PointNotOnEntityException)
+                {
+                    A.Ed.WriteMessage($"\n⚠️ Không thể tạo sampleline '{sampleLineName}' tại station {station:F2}. Bỏ qua.");
+                    return ObjectId.Null;
+                }
             }
         }
 

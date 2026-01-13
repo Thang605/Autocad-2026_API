@@ -39,7 +39,7 @@ namespace Civil3DCsharp
         private static double lastLeftOffset = 50.0;
         private static double lastRightOffset = 50.0;
         private static bool lastUseInputMode = true; // true for input, false for pick from model
-        private static bool lastApplyToGroup = false; // Apply to entire sample line group
+        private static int lastSelectionMode = 3; // 0 = quét chọn, 1 = nhặt 1 cái lấy nhóm, 2 = chọn từng cái, 3 = chọn từ danh sách nhóm
 
         [CommandMethod("CTS_ThayDoi_BeRong_Sampleline")]
         public static void CTSThayDoiBeRongSampleline()
@@ -50,8 +50,27 @@ namespace Civil3DCsharp
             {
                 UserInput uI = new();
 
+                // Collect SampleLineGroups
+                Dictionary<ObjectId, string> slGroups = new Dictionary<ObjectId, string>();
+                CivilDocument civilDoc = CivilApplication.ActiveDocument;
+                foreach (ObjectId alignId in civilDoc.GetAlignmentIds())
+                {
+                    Alignment align = tr.GetObject(alignId, OpenMode.ForRead) as Alignment;
+                    if (align != null)
+                    {
+                        foreach (ObjectId groupId in align.GetSampleLineGroupIds())
+                        {
+                            SampleLineGroup grp = tr.GetObject(groupId, OpenMode.ForRead) as SampleLineGroup;
+                            if (grp != null)
+                            {
+                                slGroups.Add(groupId, $"{align.Name} - {grp.Name}");
+                            }
+                        }
+                    }
+                }
+
                 // Show settings form to user
-                var settingsForm = new SamplelineWidthForm(lastLeftOffset, lastRightOffset, lastUseInputMode, lastApplyToGroup);
+                var settingsForm = new SamplelineWidthForm(lastLeftOffset, lastRightOffset, lastUseInputMode, lastSelectionMode, slGroups);
                 var result = settingsForm.ShowDialog();
                 
                 if (result != DialogResult.OK)
@@ -64,7 +83,7 @@ namespace Civil3DCsharp
                 lastLeftOffset = settingsForm.LeftOffset;
                 lastRightOffset = settingsForm.RightOffset;
                 lastUseInputMode = settingsForm.UseInputMode;
-                lastApplyToGroup = settingsForm.ApplyToGroup;
+                lastSelectionMode = settingsForm.SelectionMode;
 
                 double leftOffset = lastLeftOffset;
                 double rightOffset = lastRightOffset;
@@ -86,38 +105,61 @@ namespace Civil3DCsharp
                 // Get sample lines to modify
                 ObjectIdCollection sampleLineIds;
 
-                if (lastApplyToGroup)
+                switch (lastSelectionMode)
                 {
-                    // Get one sample line to determine the group, then apply to entire group
-                    ObjectId selectedSampleLineId = UserInput.GSampleLineId("Chọn một sample line từ nhóm cần thay đổi bề rộng: \n");
-                    if (selectedSampleLineId == ObjectId.Null)
-                    {
-                        A.Ed.WriteMessage("\nKhông có sample line nào được chọn.");
-                        return;
-                    }
+                    case 0: // Quét chọn các sampleline
+                        A.Ed.WriteMessage("\nQuét chọn các sample line cần điều chỉnh...");
+                        sampleLineIds = UserInput.GSelectionSetWithType("Quét chọn các sample line cần thay đổi bề rộng: \n", "AECC_SAMPLE_LINE");
+                        break;
 
-                    SampleLine? selectedSampleLine = tr.GetObject(selectedSampleLineId, OpenMode.ForRead) as SampleLine;
-                    if (selectedSampleLine == null)
-                    {
-                        A.Ed.WriteMessage("\nKhông thể đọc sample line đã chọn.");
-                        return;
-                    }
+                    case 1: // Áp dụng cho toàn bộ nhóm (Pick)
+                        ObjectId selectedSampleLineId = UserInput.GSampleLineId("Chọn một sample line từ nhóm cần thay đổi bề rộng: \n");
+                        if (selectedSampleLineId == ObjectId.Null)
+                        {
+                            A.Ed.WriteMessage("\nKhông có sample line nào được chọn.");
+                            return;
+                        }
 
-                    ObjectId groupId = selectedSampleLine.GroupId;
-                    SampleLineGroup? group = tr.GetObject(groupId, OpenMode.ForRead) as SampleLineGroup;
-                    if (group == null)
-                    {
-                        A.Ed.WriteMessage("\nKhông thể đọc sample line group.");
-                        return;
-                    }
+                        SampleLine? selectedSampleLine = tr.GetObject(selectedSampleLineId, OpenMode.ForRead) as SampleLine;
+                        if (selectedSampleLine == null)
+                        {
+                            A.Ed.WriteMessage("\nKhông thể đọc sample line đã chọn.");
+                            return;
+                        }
 
-                    sampleLineIds = group.GetSampleLineIds();
-                    A.Ed.WriteMessage($"\nSẽ áp dụng cho tất cả {sampleLineIds.Count} sample line(s) trong nhóm '{group.Name}'.");
-                }
-                else
-                {
-                    // Select multiple sample lines
-                    sampleLineIds = UserInput.GSelectionSetWithType("Chọn các sample line cần thay đổi bề rộng: \n", "AECC_SAMPLE_LINE");
+                        ObjectId groupId = selectedSampleLine.GroupId;
+                        SampleLineGroup? group = tr.GetObject(groupId, OpenMode.ForRead) as SampleLineGroup;
+                        if (group == null)
+                        {
+                            A.Ed.WriteMessage("\nKhông thể đọc sample line group.");
+                            return;
+                        }
+
+                        sampleLineIds = group.GetSampleLineIds();
+                        A.Ed.WriteMessage($"\nSẽ áp dụng cho tất cả {sampleLineIds.Count} sample line(s) trong nhóm '{group.Name}'.");
+                        break;
+                    
+                    case 3: // Áp dụng cho danh sách nhóm đã chọn
+                        sampleLineIds = new ObjectIdCollection();
+                        foreach (ObjectId grpId in settingsForm.SelectedGroupIds)
+                        {
+                            SampleLineGroup grp = tr.GetObject(grpId, OpenMode.ForRead) as SampleLineGroup;
+                            if (grp != null)
+                            {
+                                ObjectIdCollection ids = grp.GetSampleLineIds();
+                                foreach (ObjectId id in ids)
+                                {
+                                    sampleLineIds.Add(id);
+                                }
+                            }
+                        }
+                        A.Ed.WriteMessage($"\nSẽ áp dụng cho tất cả {sampleLineIds.Count} sample line(s) trong các nhóm đã chọn.");
+                        break;
+
+                    case 2: // Chọn từng sampleline (Individual)
+                    default:
+                        sampleLineIds = UserInput.GSelectionSetWithType("Chọn các sample line cần thay đổi bề rộng: \n", "AECC_SAMPLE_LINE");
+                        break;
                 }
                 
                 if (sampleLineIds.Count == 0)
@@ -166,7 +208,7 @@ namespace Civil3DCsharp
 
                 tr.Commit();
                 
-                string modeText = lastApplyToGroup ? "trong nhóm" : "được chọn";
+                string modeText = lastSelectionMode == 1 ? "trong nhóm" : "được chọn";
                 A.Ed.WriteMessage($"\nHoàn thành! Đã cập nhật {successCount} sample line(s) {modeText}. Lỗi: {errorCount}");
             }
             catch (Autodesk.AutoCAD.Runtime.Exception e)
@@ -236,13 +278,21 @@ namespace Civil3DCsharp
         public double LeftOffset { get; private set; }
         public double RightOffset { get; private set; }
         public bool UseInputMode { get; private set; }
-        public bool ApplyToGroup { get; private set; }
+        public int SelectionMode { get; private set; } // 0 = quét chọn, 1 = áp dụng cho nhóm, 2 = chọn từng cái
+
+        public List<ObjectId> SelectedGroupIds { get; private set; } = new List<ObjectId>();
+        private Dictionary<ObjectId, string> _slGroups;
 
         private TextBox txtLeftOffset;
         private TextBox txtRightOffset;
         private RadioButton rbInputMode;
         private RadioButton rbPickMode;
-        private CheckBox chkApplyToGroup;
+        private RadioButton rbScopeWindow;   // Quét chọn các sampleline
+        private RadioButton rbScopeGroup;    // Áp dụng cho toàn bộ nhóm (Pick)
+        private RadioButton rbScopeList;     // Chọn từ danh sách
+        private RadioButton rbScopeIndividual; // Chọn từng cái
+        private CheckedListBox clbGroups;    // Danh sách các group
+        private Button btnSelectAll;         // Nút chọn hết
         private Button btnOK;
         private Button btnCancel;
         private System.Windows.Forms.Label lblLeftOffset;
@@ -251,8 +301,9 @@ namespace Civil3DCsharp
         private GroupBox gbOffsets;
         private GroupBox gbApplyScope;
 
-        public SamplelineWidthForm(double defaultLeftOffset, double defaultRightOffset, bool defaultUseInputMode, bool defaultApplyToGroup)
+        public SamplelineWidthForm(double defaultLeftOffset, double defaultRightOffset, bool defaultUseInputMode, int defaultSelectionMode, Dictionary<ObjectId, string> slGroups)
         {
+            _slGroups = slGroups;
             InitializeComponent();
             
             // Set default values
@@ -268,12 +319,30 @@ namespace Civil3DCsharp
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
             rbPickMode.Checked = !defaultUseInputMode;
 #pragma warning restore CS8602 // Dereference of a possibly null reference.
+            
+            // Set selection mode radio buttons
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
-            chkApplyToGroup.Checked = defaultApplyToGroup;
+            rbScopeWindow.Checked = (defaultSelectionMode == 0);
+            rbScopeGroup.Checked = (defaultSelectionMode == 1);
+            rbScopeIndividual.Checked = (defaultSelectionMode == 2);
+            rbScopeList.Checked = (defaultSelectionMode == 3);
 #pragma warning restore CS8602 // Dereference of a possibly null reference.
             
+            // Populate groups
+            foreach (var kvp in _slGroups)
+            {
+                clbGroups.Items.Add(new SampleLineGroupItem { Id = kvp.Key, DisplayName = kvp.Value });
+            }
+
             // Update controls state
             UpdateControlsState();
+        }
+
+        public class SampleLineGroupItem
+        {
+            public ObjectId Id { get; set; }
+            public string DisplayName { get; set; } = "";
+            public override string ToString() { return DisplayName; }
         }
 
         private void InitializeComponent()
@@ -282,7 +351,12 @@ namespace Civil3DCsharp
             this.txtRightOffset = new TextBox();
             this.rbInputMode = new RadioButton();
             this.rbPickMode = new RadioButton();
-            this.chkApplyToGroup = new CheckBox();
+            this.rbScopeWindow = new RadioButton();
+            this.rbScopeGroup = new RadioButton();
+            this.rbScopeList = new RadioButton();
+            this.rbScopeIndividual = new RadioButton();
+            this.clbGroups = new CheckedListBox();
+            this.btnSelectAll = new Button();
             this.btnOK = new Button();
             this.btnCancel = new Button();
             this.lblLeftOffset = new System.Windows.Forms.Label();
@@ -294,7 +368,7 @@ namespace Civil3DCsharp
 
             // Form properties
             this.Text = "Thay đổi bề rộng Sample Line";
-            this.Size = new System.Drawing.Size(350, 360);
+            this.Size = new System.Drawing.Size(450, 600);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -303,7 +377,7 @@ namespace Civil3DCsharp
             // Mode GroupBox
             this.gbMode.Text = "Chế độ nhập liệu";
             this.gbMode.Location = new System.Drawing.Point(12, 12);
-            this.gbMode.Size = new System.Drawing.Size(310, 80);
+            this.gbMode.Size = new System.Drawing.Size(360, 80);
 
             // Radio buttons
             this.rbInputMode.Text = "Nhập khoảng offset 2 bên";
@@ -318,7 +392,7 @@ namespace Civil3DCsharp
             // Offsets GroupBox
             this.gbOffsets.Text = "Khoảng cách offset";
             this.gbOffsets.Location = new System.Drawing.Point(12, 100);
-            this.gbOffsets.Size = new System.Drawing.Size(310, 100);
+            this.gbOffsets.Size = new System.Drawing.Size(360, 100);
 
             // Labels
             this.lblLeftOffset.Text = "Offset trái:";
@@ -339,21 +413,47 @@ namespace Civil3DCsharp
             // Apply Scope GroupBox
             this.gbApplyScope.Text = "Phạm vi áp dụng";
             this.gbApplyScope.Location = new System.Drawing.Point(12, 210);
-            this.gbApplyScope.Size = new System.Drawing.Size(310, 60);
+            this.gbApplyScope.Size = new System.Drawing.Size(410, 300);
 
-            // CheckBox for applying to group
-            this.chkApplyToGroup.Text = "Áp dụng cho toàn bộ nhóm sample line";
-            this.chkApplyToGroup.Location = new System.Drawing.Point(15, 25);
-            this.chkApplyToGroup.Size = new System.Drawing.Size(280, 20);
+            // Radio buttons for selection scope
+            this.rbScopeWindow.Text = "Quét chọn các sample line cần điều chỉnh";
+            this.rbScopeWindow.Location = new System.Drawing.Point(15, 25);
+            this.rbScopeWindow.Size = new System.Drawing.Size(380, 20);
+            this.rbScopeWindow.CheckedChanged += RbScope_CheckedChanged;
+
+            this.rbScopeGroup.Text = "Chọn 1 SL mẫu để áp dụng cho cả nhóm";
+            this.rbScopeGroup.Location = new System.Drawing.Point(15, 50);
+            this.rbScopeGroup.Size = new System.Drawing.Size(380, 20);
+            this.rbScopeGroup.CheckedChanged += RbScope_CheckedChanged;
+
+            this.rbScopeList.Text = "Chọn các nhóm (tích chọn bên dưới)";
+            this.rbScopeList.Location = new System.Drawing.Point(15, 75);
+            this.rbScopeList.Size = new System.Drawing.Size(380, 20);
+            this.rbScopeList.CheckedChanged += RbScope_CheckedChanged;
+
+            this.clbGroups.Location = new System.Drawing.Point(35, 100);
+            this.clbGroups.Size = new System.Drawing.Size(350, 130);
+            this.clbGroups.CheckOnClick = true;
+
+            this.btnSelectAll.Text = "Chọn hết";
+            this.btnSelectAll.Location = new System.Drawing.Point(305, 235);
+            this.btnSelectAll.Size = new System.Drawing.Size(80, 23);
+            this.btnSelectAll.Click += BtnSelectAll_Click;
+
+            this.rbScopeIndividual.Text = "Chọn từng sample line riêng lẻ";
+            this.rbScopeIndividual.Location = new System.Drawing.Point(15, 265);
+            this.rbScopeIndividual.Size = new System.Drawing.Size(380, 20);
+            this.rbScopeIndividual.CheckedChanged += RbScope_CheckedChanged;
 
             // Buttons
             this.btnOK.Text = "OK";
-            this.btnOK.Location = new System.Drawing.Point(167, 290);
+            this.btnOK.Location = new System.Drawing.Point(267, 520);
             this.btnOK.Size = new System.Drawing.Size(75, 25);
             this.btnOK.Click += BtnOK_Click;
 
+            
             this.btnCancel.Text = "Hủy";
-            this.btnCancel.Location = new System.Drawing.Point(247, 290);
+            this.btnCancel.Location = new System.Drawing.Point(347, 520);
             this.btnCancel.Size = new System.Drawing.Size(75, 25);
             this.btnCancel.Click += BtnCancel_Click;
             this.btnCancel.DialogResult = DialogResult.Cancel;
@@ -367,7 +467,12 @@ namespace Civil3DCsharp
             this.gbOffsets.Controls.Add(this.lblRightOffset);
             this.gbOffsets.Controls.Add(this.txtRightOffset);
 
-            this.gbApplyScope.Controls.Add(this.chkApplyToGroup);
+            this.gbApplyScope.Controls.Add(this.rbScopeWindow);
+            this.gbApplyScope.Controls.Add(this.rbScopeGroup);
+            this.gbApplyScope.Controls.Add(this.rbScopeList);
+            this.gbApplyScope.Controls.Add(this.clbGroups);
+            this.gbApplyScope.Controls.Add(this.btnSelectAll);
+            this.gbApplyScope.Controls.Add(this.rbScopeIndividual);
 
             this.Controls.Add(this.gbMode);
             this.Controls.Add(this.gbOffsets);
@@ -383,6 +488,11 @@ namespace Civil3DCsharp
             UpdateControlsState();
         }
 
+        private void RbScope_CheckedChanged(object? sender, EventArgs e)
+        {
+            UpdateControlsState();
+        }
+
         private void UpdateControlsState()
         {
             bool enableOffsets = rbInputMode.Checked;
@@ -390,6 +500,30 @@ namespace Civil3DCsharp
             txtRightOffset.Enabled = enableOffsets;
             lblLeftOffset.Enabled = enableOffsets;
             lblRightOffset.Enabled = enableOffsets;
+
+            // Enable CheckedListBox only when Scope List is selected
+            clbGroups.Enabled = rbScopeList.Checked;
+            btnSelectAll.Enabled = rbScopeList.Checked;
+        }
+
+        private void BtnSelectAll_Click(object? sender, EventArgs e)
+        {
+            if (clbGroups.Items.Count == 0) return;
+
+            // Check if all are currently checked
+            bool allChecked = (clbGroups.CheckedItems.Count == clbGroups.Items.Count);
+            
+            // Toggle
+            for (int i = 0; i < clbGroups.Items.Count; i++)
+            {
+                clbGroups.SetItemChecked(i, !allChecked);
+            }
+
+            // Force visual update
+            clbGroups.Invalidate();
+            
+            // Allow events to process
+            System.Windows.Forms.Application.DoEvents();
         }
 
         private void BtnOK_Click(object? sender, EventArgs e)
@@ -397,7 +531,33 @@ namespace Civil3DCsharp
             try
             {
                 UseInputMode = rbInputMode.Checked;
-                ApplyToGroup = chkApplyToGroup.Checked;
+                
+                // Determine selection mode
+                if (rbScopeWindow.Checked)
+                    SelectionMode = 0;
+                else if (rbScopeGroup.Checked)
+                    SelectionMode = 1;
+                else if (rbScopeList.Checked)
+                {
+                    SelectionMode = 3;
+                    if (clbGroups.CheckedItems.Count == 0)
+                    {
+                        MessageBox.Show("Vui lòng chọn ít nhất một nhóm Sample Line.", "Lỗi chọn nhóm",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                    
+                    SelectedGroupIds.Clear();
+                    foreach (object item in clbGroups.CheckedItems)
+                    {
+                        if (item is SampleLineGroupItem groupItem)
+                        {
+                            SelectedGroupIds.Add(groupItem.Id);
+                        }
+                    }
+                }
+                else
+                    SelectionMode = 2;
                 
                 if (UseInputMode)
                 {

@@ -45,9 +45,9 @@ namespace Civil3DCsharp
             {
                 // Show form to get user inputs OUTSIDE of transaction
                 CorridorSurfaceForm form = new();
-                
+
                 var dialogResult = form.ShowDialog();
-                
+
                 if (dialogResult != System.Windows.Forms.DialogResult.OK || !form.DialogResultOK)
                 {
                     A.Ed.WriteMessage("\nLệnh đã bị hủy bỏ.");
@@ -71,7 +71,7 @@ namespace Civil3DCsharp
 
                 // Start transaction for the main work
                 tr = A.Db.TransactionManager.StartTransaction();
-                
+
                 List<ObjectId> allCreatedSurfaces = new List<ObjectId>();
                 int processedCorridors = 0;
                 int successfulCorridors = 0;
@@ -80,7 +80,7 @@ namespace Civil3DCsharp
                 foreach (ObjectId corridorId in form.CorridorIds)
                 {
                     processedCorridors++;
-                    
+
                     if (!corridorId.IsValid)
                     {
                         A.Ed.WriteMessage($"\nCorridor {processedCorridors} có ID không hợp lệ, bỏ qua.");
@@ -106,7 +106,9 @@ namespace Civil3DCsharp
                     if (form.CreateTopSurface)
                     {
                         string topSurfaceName = $"{corridor.Name}-L_Top";
-                        ObjectId topSurfaceId = CreateCorridorSurface(corridorSurfaces, topSurfaceName, "Top", form.TopSurfaceStyleId, tr);
+                        ObjectId topSurfaceId = CreateCorridorSurface(
+                            corridorSurfaces, topSurfaceName, "Top",
+                            form.TopSurfaceStyleId, form.TopLinkCodes, form.TopAddAsBreakline, tr);
                         if (topSurfaceId != ObjectId.Null)
                         {
                             corridorCreatedSurfaces.Add(topSurfaceId);
@@ -119,7 +121,9 @@ namespace Civil3DCsharp
                     if (form.CreateDatumSurface)
                     {
                         string datumSurfaceName = $"{corridor.Name}-L_Datum";
-                        ObjectId datumSurfaceId = CreateCorridorSurface(corridorSurfaces, datumSurfaceName, "Datum", form.DatumSurfaceStyleId, tr);
+                        ObjectId datumSurfaceId = CreateCorridorSurface(
+                            corridorSurfaces, datumSurfaceName, "Datum",
+                            form.DatumSurfaceStyleId, form.DatumLinkCodes, form.DatumAddAsBreakline, tr);
                         if (datumSurfaceId != ObjectId.Null)
                         {
                             corridorCreatedSurfaces.Add(datumSurfaceId);
@@ -174,11 +178,11 @@ namespace Civil3DCsharp
                 A.Ed.WriteMessage($"\n• Tổng số corridors được xử lý: {processedCorridors}");
                 A.Ed.WriteMessage($"\n• Số corridors tạo surface thành công: {successfulCorridors}");
                 A.Ed.WriteMessage($"\n• Tổng số surfaces đã tạo: {allCreatedSurfaces.Count}");
-                
+
                 if (allCreatedSurfaces.Count > 0)
                 {
                     A.Ed.WriteMessage($"\n✅ Hoàn thành tạo corridor surfaces cho {successfulCorridors} corridor(s)!");
-                    
+
                     // Display configuration instructions
                     DisplayConfigurationInstructions(allCreatedSurfaces.Count, successfulCorridors);
                 }
@@ -212,10 +216,10 @@ namespace Civil3DCsharp
             try
             {
                 A.Ed.WriteMessage("\nChọn corridor để tạo surfaces...");
-                
+
                 // Direct corridor selection for single corridor mode
                 ObjectId corridorId = UserInput.GCorridorId("\nChọn corridor để tạo corridor surface:");
-                
+
                 if (corridorId == ObjectId.Null)
                 {
                     A.Ed.WriteMessage("\nLệnh đã bị hủy bỏ.");
@@ -224,7 +228,7 @@ namespace Civil3DCsharp
 
                 // Start transaction
                 tr = A.Db.TransactionManager.StartTransaction();
-                
+
                 Corridor? corridor = tr.GetObject(corridorId, OpenMode.ForWrite) as Corridor;
                 if (corridor == null)
                 {
@@ -241,9 +245,13 @@ namespace Civil3DCsharp
                 // Get default style
                 ObjectId defaultStyleId = GetDefaultSurfaceStyle("Top");
 
+                // Default link codes for single corridor mode
+                List<string> defaultTopLinkCodes = new List<string> { "Top", "Top Links", "Crown", "EOP" };
+                List<string> defaultDatumLinkCodes = new List<string> { "Datum", "Bottom Links", "Subgrade" };
+
                 // Create Top Surface
                 string topSurfaceName = $"{corridor.Name}-L_Top";
-                ObjectId topSurfaceId = CreateCorridorSurface(corridorSurfaces, topSurfaceName, "Top", defaultStyleId, tr);
+                ObjectId topSurfaceId = CreateCorridorSurface(corridorSurfaces, topSurfaceName, "Top", defaultStyleId, defaultTopLinkCodes, true, tr);
                 if (topSurfaceId != ObjectId.Null)
                 {
                     createdSurfaces.Add(topSurfaceId);
@@ -252,7 +260,7 @@ namespace Civil3DCsharp
 
                 // Create Datum Surface
                 string datumSurfaceName = $"{corridor.Name}-L_Datum";
-                ObjectId datumSurfaceId = CreateCorridorSurface(corridorSurfaces, datumSurfaceName, "Datum", defaultStyleId, tr);
+                ObjectId datumSurfaceId = CreateCorridorSurface(corridorSurfaces, datumSurfaceName, "Datum", defaultStyleId, defaultDatumLinkCodes, true, tr);
                 if (datumSurfaceId != ObjectId.Null)
                 {
                     createdSurfaces.Add(datumSurfaceId);
@@ -271,7 +279,7 @@ namespace Civil3DCsharp
                 }
 
                 A.Ed.WriteMessage($"\nHoàn thành! Đã tạo {createdSurfaces.Count} corridor surface(s) cho corridor: {corridor.Name}");
-                
+
                 // Display quick instructions
                 DisplayQuickInstructions(corridor.Name, createdSurfaces.Count);
 
@@ -313,7 +321,7 @@ namespace Civil3DCsharp
         }
 
         // Helper method to create a specific corridor surface
-        private static ObjectId CreateCorridorSurface(CorridorSurfaceCollection corridorSurfaces, string surfaceName, string surfaceType, ObjectId styleId, Transaction tr)
+        private static ObjectId CreateCorridorSurface(CorridorSurfaceCollection corridorSurfaces, string surfaceName, string surfaceType, ObjectId styleId, List<string> linkCodes, bool addAsBreakline, Transaction tr)
         {
             try
             {
@@ -322,8 +330,49 @@ namespace Civil3DCsharp
                 {
                     if (existingSurface.Name == surfaceName)
                     {
-                        A.Ed.WriteMessage($"\nSurface '{surfaceName}' đã tồn tại.");
-                        return ObjectId.Null;
+                        A.Ed.WriteMessage($"\nSurface '{surfaceName}' đã tồn tại. Kiểm tra link codes...");
+                        
+                        // Check if link codes have been added - get existing link codes count
+                        var existingLinkCodesList = existingSurface.LinkCodes().ToList();
+                        int existingLinkCodesCount = existingLinkCodesList.Count;
+                        
+                        if (existingLinkCodesCount == 0 && linkCodes != null && linkCodes.Count > 0)
+                        {
+                            A.Ed.WriteMessage($"\n⚠️ Surface chưa có link codes. Đang thêm {linkCodes.Count} link codes...");
+                            int addedCount = 0;
+                            int failedCount = 0;
+                            
+                            foreach (string code in linkCodes)
+                            {
+                                if (string.IsNullOrWhiteSpace(code))
+                                    continue;
+
+                                try
+                                {
+                                    existingSurface.AddLinkCode(code, addAsBreakline);
+                                    addedCount++;
+                                    A.Ed.WriteMessage($"\n  ✅ Đã thêm link code: '{code}'");
+                                }
+                                catch (System.Exception ex)
+                                {
+                                    failedCount++;
+                                    A.Ed.WriteMessage($"\n  ❌ Lỗi khi thêm '{code}': {ex.Message}");
+                                }
+                            }
+                            
+                            A.Ed.WriteMessage($"\n📊 Kết quả: Đã thêm {addedCount}/{linkCodes.Count} link codes vào surface có sẵn (thất bại: {failedCount})");
+                            return existingSurface.SurfaceId;
+                        }
+                        else if (existingLinkCodesCount > 0)
+                        {
+                            A.Ed.WriteMessage($"\n✅ Surface đã có {existingLinkCodesCount} link codes.");
+                        }
+                        else
+                        {
+                            A.Ed.WriteMessage($"\n⚠️ Không có link codes để thêm vào surface có sẵn.");
+                        }
+                        
+                        return existingSurface.SurfaceId;
                     }
                 }
 
@@ -361,14 +410,56 @@ namespace Civil3DCsharp
 
                 // Create new corridor surface
                 CorridorSurface corridorSurface = corridorSurfaces.Add(surfaceName, surfaceStyleId);
-                
+
                 A.Ed.WriteMessage($"\n✅ Đã tạo corridor surface: {surfaceName} với style ID: {surfaceStyleId}");
-                
+
+                // Add link codes (Add Data)
+                if (linkCodes != null && linkCodes.Count > 0)
+                {
+                    A.Ed.WriteMessage($"\n📦 Thêm {linkCodes.Count} link codes vào surface '{surfaceName}'...");
+                    int addedCount = 0;
+                    int failedCount = 0;
+                    foreach (string code in linkCodes)
+                    {
+                        if (string.IsNullOrWhiteSpace(code))
+                        {
+                            A.Ed.WriteMessage($"\n  ⚠️ Bỏ qua code rỗng");
+                            continue;
+                        }
+
+                        try
+                        {
+                            A.Ed.WriteMessage($"\n  🔄 Đang thêm link code: '{code}' (isBreakline: {addAsBreakline})...");
+                            corridorSurface.AddLinkCode(code, addAsBreakline);
+                            addedCount++;
+                            A.Ed.WriteMessage($"\n  ✅ Đã thêm link code: '{code}'");
+                        }
+                        catch (Autodesk.AutoCAD.Runtime.Exception acEx)
+                        {
+                            failedCount++;
+                            A.Ed.WriteMessage($"\n  ❌ Lỗi AutoCAD khi thêm '{code}': {acEx.Message}");
+                            A.Ed.WriteMessage($"\n     ErrorStatus: {acEx.ErrorStatus}");
+                        }
+                        catch (System.Exception ex)
+                        {
+                            failedCount++;
+                            A.Ed.WriteMessage($"\n  ❌ Lỗi khi thêm '{code}': {ex.Message}");
+                            A.Ed.WriteMessage($"\n     Type: {ex.GetType().Name}");
+                        }
+                    }
+                    A.Ed.WriteMessage($"\n📊 Kết quả: Đã thêm {addedCount}/{linkCodes.Count} link codes (thất bại: {failedCount})");
+                }
+                else
+                {
+                    A.Ed.WriteMessage($"\n⚠️ Không có link codes được chọn. Surface sẽ được tạo mà không có data.");
+                    A.Ed.WriteMessage($"\n   Để thêm link codes, sử dụng Corridor Properties > Surfaces > Add Data.");
+                }
+
                 // Configure surface based on type (including overhang correction and boundaries)
                 ConfigureCorridorSurface(corridorSurface, surfaceType);
 
                 A.Ed.WriteMessage($"\n✅ Đã tạo corridor surface: {surfaceName}");
-                
+
                 // Return the ObjectId of the created surface
                 return corridorSurface.SurfaceId;
             }
@@ -385,24 +476,24 @@ namespace Civil3DCsharp
             try
             {
                 var surfaceStyles = A.Cdoc.Styles.SurfaceStyles;
-                
+
                 // First priority: BORDER ONLY style for corridor surfaces
                 if (surfaceStyles.Contains("BORDER ONLY"))
                 {
                     A.Ed.WriteMessage($"\n  ✅ Sử dụng style: BORDER ONLY");
                     return surfaceStyles["BORDER ONLY"];
                 }
-                
+
                 // Alternative names for border only style
-                string[] borderStyleNames = { 
-                    "Border Only", 
-                    "BorderOnly", 
-                    "Border", 
+                string[] borderStyleNames = {
+                    "Border Only",
+                    "BorderOnly",
+                    "Border",
                     "Borders Only",
                     "Boundary Only",
                     "Outline Only"
                 };
-                
+
                 foreach (string styleName in borderStyleNames)
                 {
                     if (surfaceStyles.Contains(styleName))
@@ -411,7 +502,7 @@ namespace Civil3DCsharp
                         return surfaceStyles[styleName];
                     }
                 }
-                
+
                 // Second priority: ALL CODES style (fallback)
                 ObjectId allCodesStyleId = GetAllCodesStyle();
                 if (allCodesStyleId != ObjectId.Null)
@@ -419,7 +510,7 @@ namespace Civil3DCsharp
                     A.Ed.WriteMessage($"\n  ✅ Sử dụng corridor style (fallback): All Codes 1-1000");
                     return allCodesStyleId;
                 }
-                
+
                 // Third priority: surface type specific styles
                 if (surfaceType == "Top")
                 {
@@ -441,7 +532,7 @@ namespace Civil3DCsharp
                     if (surfaceStyles.Contains("Corridor Datum"))
                         return surfaceStyles["Corridor Datum"];
                 }
-                
+
                 // Final fallback to first available style
                 if (surfaceStyles.Count > 0)
                 {
@@ -449,7 +540,7 @@ namespace Civil3DCsharp
                     A.Ed.WriteMessage($"\n  ⚠️ Sử dụng style đầu tiên có sẵn (không tìm thấy BORDER ONLY)");
                     return firstStyle;
                 }
-                    
+
                 A.Ed.WriteMessage($"\n  ❌ Không tìm thấy surface style phù hợp");
                 return ObjectId.Null;
             }
@@ -467,17 +558,17 @@ namespace Civil3DCsharp
             {
                 // Try CodeSet styles first (preferred for corridor sources)
                 var codeSetStyles = A.Cdoc.Styles.CodeSetStyles;
-                
+
                 // Priority style names for All Codes
                 string[] allCodesStyleNames = {
                     "1. All Codes 1-1000",
-                    "All Codes 1-1000", 
+                    "All Codes 1-1000",
                     "1.All Codes 1-1000",
                     "All Codes",
                     "1. All Codes",
                     "ALL CODES 1-1000"
                 };
-                
+
                 foreach (string styleName in allCodesStyleNames)
                 {
                     if (codeSetStyles.Contains(styleName))
@@ -486,7 +577,7 @@ namespace Civil3DCsharp
                         return codeSetStyles[styleName];
                     }
                 }
-                
+
                 // Try surface styles as fallback
                 var surfaceStyles = A.Cdoc.Styles.SurfaceStyles;
                 foreach (string styleName in allCodesStyleNames)
@@ -497,7 +588,7 @@ namespace Civil3DCsharp
                         return surfaceStyles[styleName];
                     }
                 }
-                
+
                 A.Ed.WriteMessage($"\n  ⚠️ Không tìm thấy All Codes 1-1000 style");
                 return ObjectId.Null;
             }
@@ -514,7 +605,7 @@ namespace Civil3DCsharp
             try
             {
                 A.Ed.WriteMessage($"\nBắt đầu cấu hình chi tiết {surfaceType} surface: {corridorSurface.Name}");
-                
+
                 // 1. Set overhang correction based on surface type
                 try
                 {
@@ -563,12 +654,12 @@ namespace Civil3DCsharp
             try
             {
                 A.Ed.WriteMessage($"\n  Cấu hình boundaries cho {surfaceType} surface...");
-                
+
                 // Get the corridor surface boundary collection
                 CorridorSurfaceBoundaryCollection boundaries = corridorSurface.Boundaries;
-                
+
                 A.Ed.WriteMessage($"\n    Hiện có {boundaries.Count} boundaries");
-                
+
                 try
                 {
                     // Add corridor extents boundary with proper name parameter
@@ -580,16 +671,16 @@ namespace Civil3DCsharp
                 {
                     A.Ed.WriteMessage($"\n  ⚠️ Không thể thêm automatic boundary: {ex.Message}");
                 }
-                
+
                 A.Ed.WriteMessage($"\n    Tổng số boundaries hiện có: {boundaries.Count}");
-                
+
                 // Provide additional guidance for manual configuration if needed
                 A.Ed.WriteMessage($"\n  💡 Hướng dẫn thêm boundaries bổ sung (nếu cần):");
                 A.Ed.WriteMessage($"\n    1. Mở Corridor Properties");
                 A.Ed.WriteMessage($"\n    2. Tab 'Surfaces' > Chọn surface '{corridorSurface.Name}'");
                 A.Ed.WriteMessage($"\n    3. Click 'Add Boundaries' để thêm boundaries chi tiết hơn");
                 A.Ed.WriteMessage($"\n    4. Chọn boundary type: Interactive, Hide, Show, hoặc Outer");
-                
+
                 A.Ed.WriteMessage($"\n  ✅ Hoàn thành cấu hình boundaries cho {surfaceType} surface");
             }
             catch (System.Exception ex)
@@ -604,69 +695,102 @@ namespace Civil3DCsharp
         {
             try
             {
-                A.Ed.WriteMessage("\nThêm surfaces vào section sources...");
-                
-                // Get sample line group
-                if (alignment.GetSampleLineGroupIds().Count == 0)
-                {
-                    A.Ed.WriteMessage("\nKhông có sample line group để thêm surfaces.");
-                    A.Ed.WriteMessage("\nSurfaces sẽ xuất hiện khi tạo sample line group cho alignment này.");
-                    return;
-                }
-                
-                ObjectId sampleLineGroupId = alignment.GetSampleLineGroupIds()[0];
-                SampleLineGroup? sampleLineGroup = tr.GetObject(sampleLineGroupId, OpenMode.ForWrite) as SampleLineGroup;
-                if (sampleLineGroup == null)
-                {
-                    A.Ed.WriteMessage("\nKhông thể mở sample line group.");
-                    return;
-                }
-                
-                SectionSourceCollection sectionSources = sampleLineGroup.GetSectionSources();
-                int addedCount = 0;
+                A.Ed.WriteMessage("\n📋 Thêm surfaces vào section sources...");
 
-                foreach (ObjectId surfaceId in surfaceIds)
+                // Get sample line group
+                ObjectIdCollection sampleLineGroupIds = alignment.GetSampleLineGroupIds();
+                if (sampleLineGroupIds.Count == 0)
                 {
-                    if (surfaceId != ObjectId.Null && surfaceId.IsValid)
+                    A.Ed.WriteMessage("\n⚠️ Không có sample line group để thêm surfaces.");
+                    A.Ed.WriteMessage("\n   Surfaces sẽ xuất hiện trong Available sources khi tạo sample line group.");
+                    return;
+                }
+
+                int totalAdded = 0;
+
+                // Process all sample line groups
+                foreach (ObjectId sampleLineGroupId in sampleLineGroupIds)
+                {
+                    SampleLineGroup? sampleLineGroup = tr.GetObject(sampleLineGroupId, OpenMode.ForWrite) as SampleLineGroup;
+                    if (sampleLineGroup == null)
                     {
+                        continue;
+                    }
+
+                    A.Ed.WriteMessage($"\n   Xử lý Sample Line Group: {sampleLineGroup.Name}");
+
+                    SectionSourceCollection sectionSources = sampleLineGroup.GetSectionSources();
+
+                    foreach (ObjectId surfaceId in surfaceIds)
+                    {
+                        if (surfaceId == ObjectId.Null || !surfaceId.IsValid)
+                            continue;
+
                         try
                         {
-                            // Check if source already exists
-                            bool exists = false;
+                            // Find the section source for this surface
+                            bool found = false;
                             foreach (SectionSource source in sectionSources)
                             {
                                 if (source.SourceId == surfaceId)
                                 {
-                                    exists = true;
+                                    found = true;
+
+                                    // Check if already sampled
+                                    if (!source.IsSampled)
+                                    {
+                                        // Set IsSampled to true to add to Sampled sources
+                                        source.IsSampled = true;
+                                        totalAdded++;
+
+                                        // Get surface name for display
+                                        string surfaceName = "Unknown";
+                                        try
+                                        {
+                                            var surfaceObj = tr.GetObject(surfaceId, OpenMode.ForRead);
+                                            var nameProp = surfaceObj.GetType().GetProperty("Name");
+                                            if (nameProp != null)
+                                            {
+                                                surfaceName = nameProp.GetValue(surfaceObj)?.ToString() ?? "Unknown";
+                                            }
+                                        }
+                                        catch { }
+
+                                        A.Ed.WriteMessage($"\n   ✅ Đã thêm vào Sampled sources: {surfaceName}");
+                                    }
+                                    else
+                                    {
+                                        A.Ed.WriteMessage($"\n   ℹ️ Surface đã có trong Sampled sources");
+                                    }
                                     break;
                                 }
                             }
-                            
-                            if (!exists)
+
+                            if (!found)
                             {
-                                // Note: Direct addition might not work with all Civil 3D versions
-                                // Surfaces will be automatically available when creating section views
-                                A.Ed.WriteMessage($"\nSurface ID {surfaceId} đã được đánh dấu để thêm vào section sources.");
-                                addedCount++;
-                            }
-                            else
-                            {
-                                A.Ed.WriteMessage($"\nSurface đã có trong section sources.");
+                                A.Ed.WriteMessage($"\n   ⚠️ Surface chưa có trong Available sources (cần rebuild corridor trước)");
                             }
                         }
                         catch (System.Exception ex)
                         {
-                            A.Ed.WriteMessage($"\nLỗi khi thêm surface: {ex.Message}");
+                            A.Ed.WriteMessage($"\n   ❌ Lỗi khi thêm surface: {ex.Message}");
                         }
                     }
                 }
-                
-                A.Ed.WriteMessage($"\nĐã xử lý {addedCount} surface(s) cho section sources.");
-                A.Ed.WriteMessage("\nSurfaces sẽ tự động xuất hiện khi tạo section views.");
+
+                if (totalAdded > 0)
+                {
+                    A.Ed.WriteMessage($"\n✅ Đã thêm {totalAdded} surface(s) vào Sampled sources.");
+                }
+                else
+                {
+                    A.Ed.WriteMessage($"\n⚠️ Không thêm được surface nào vào Sampled sources.");
+                    A.Ed.WriteMessage($"\n   Có thể cần rebuild corridor trước hoặc thêm thủ công.");
+                }
             }
             catch (System.Exception ex)
             {
-                A.Ed.WriteMessage($"\nLỗi khi thêm surfaces vào section sources: {ex.Message}");
+                A.Ed.WriteMessage($"\n❌ Lỗi khi thêm surfaces vào section sources: {ex.Message}");
             }
         }
 
@@ -676,7 +800,7 @@ namespace Civil3DCsharp
             A.Ed.WriteMessage("\n" + new string('=', 70));
             A.Ed.WriteMessage("\n📋 HƯỚNG DẪN CẤU HÌNH CORRIDOR SURFACE - ĐÃ CẤU HÌNH TỰ ĐỘNG");
             A.Ed.WriteMessage("\n" + new string('=', 70));
-            
+
             if (surfaceCount > 0)
             {
                 A.Ed.WriteMessage($"\n✅ Đã tự động cấu hình cho {corridorCount} corridor(s) - {surfaceCount} surface(s):");
@@ -684,35 +808,35 @@ namespace Civil3DCsharp
                 A.Ed.WriteMessage("\n   • Surface Style = BORDER ONLY (ưu tiên), All Codes 1-1000 (fallback)");
                 A.Ed.WriteMessage("\n   • Corridor Extents Boundaries đã được thêm tự động");
                 A.Ed.WriteMessage("\n   • Daylight Boundaries đã được thêm (nếu có thể)");
-                
+
                 A.Ed.WriteMessage("\n🔧 Bước tiếp theo - Kiểm tra và điều chỉnh:");
                 A.Ed.WriteMessage("\n1. Mở Corridor Properties cho từng corridor:");
                 A.Ed.WriteMessage("\n   • Toolspace > Prospector > Corridors > [Corridor Name] > Properties");
                 A.Ed.WriteMessage("\n   • Hoặc click chuột phải vào corridor > Properties");
-                
+
                 A.Ed.WriteMessage("\n2. Tab 'Surfaces' - Kiểm tra cấu hình cho mỗi surface:");
                 A.Ed.WriteMessage("\n   • Chọn surface vừa tạo (L_Top hoặc L_Datum)");
                 A.Ed.WriteMessage("\n   • ✅ Overhang Correction: TopLinks (L_Top) / BottomLinks (L_Datum)");
                 A.Ed.WriteMessage("\n   • ✅ Boundaries: Corridor Extents boundaries đã được thêm");
                 A.Ed.WriteMessage("\n   • ✅ Style: BORDER ONLY (ưu tiên) hoặc All Codes 1-1000 (fallback)");
-                
+
                 A.Ed.WriteMessage("\n3. 🔧 Sửa Style nếu cần (nếu hiển thị No Style):");
                 A.Ed.WriteMessage("\n   • Trong Corridor Properties > Tab Surfaces");
                 A.Ed.WriteMessage("\n   • Chọn surface > Click vào Style dropdown");
                 A.Ed.WriteMessage("\n   • Ưu tiên chọn: 'BORDER ONLY' (khuyến nghị cho corridor surfaces)");
                 A.Ed.WriteMessage("\n   • Backup chọn: '1. All Codes 1-1000' hoặc style phù hợp khác");
                 A.Ed.WriteMessage("\n   • Click Apply để áp dụng thay đổi");
-                
+
                 A.Ed.WriteMessage("\n4. Điều chỉnh nếu cần (áp dụng cho tất cả corridors):");
                 A.Ed.WriteMessage("\n   • Boundary settings: Điều chỉnh extents boundaries");
                 A.Ed.WriteMessage("\n   • Add thêm boundaries: Interactive, Hide, Show boundaries");
                 A.Ed.WriteMessage("\n   • Link codes: Kiểm tra assembly link codes");
                 A.Ed.WriteMessage("\n   • Overhang Correction: Thay đổi nếu cần thiết");
-                
+
                 A.Ed.WriteMessage("\n5. Cấu hình Link Codes (quan trọng cho tất cả surfaces):");
                 A.Ed.WriteMessage("\n   • Top Surface (L_Top): Pave, Top, Crown, Shoulder, Curb_Top");
                 A.Ed.WriteMessage("\n   • Datum Surface (L_Datum): Datum, Subgrade, Formation, Base");
-                
+
                 A.Ed.WriteMessage("\n6. Sử dụng trong Section Views:");
                 A.Ed.WriteMessage("\n   • Chạy lệnh CTSV_VeTracNgangThietKe cho từng alignment");
                 A.Ed.WriteMessage("\n   • Surfaces sẽ tự động xuất hiện trong danh sách");
@@ -723,7 +847,7 @@ namespace Civil3DCsharp
                 A.Ed.WriteMessage("\n   • Sử dụng Corridor Properties > Copy/Paste để nhanh chóng áp dụng cùng cấu hình");
                 A.Ed.WriteMessage($"\n   • Tất cả {surfaceCount} surfaces đã được tạo với cùng cấu hình style và boundaries");
             }
-            
+
             A.Ed.WriteMessage("\n" + new string('=', 70));
             A.Ed.WriteMessage($"\n✅ Hoàn thành tạo corridor surface cho {corridorCount} corridor(s) với cấu hình hoàn toàn tự động!");
             A.Ed.WriteMessage("\n📝 Lưu ý: Style mặc định là BORDER ONLY (khuyến nghị cho corridor surfaces)");
@@ -737,7 +861,7 @@ namespace Civil3DCsharp
             A.Ed.WriteMessage("\n" + new string('=', 50));
             A.Ed.WriteMessage($"\n🚀 NHANH CHÓNG HOÀN THÀNH - {corridorName}");
             A.Ed.WriteMessage("\n" + new string('=', 50));
-            
+
             if (surfaceCount > 0)
             {
                 A.Ed.WriteMessage($"\n✅ Đã tạo {surfaceCount} surface(s) với cấu hình tự động:");
@@ -745,16 +869,16 @@ namespace Civil3DCsharp
                 A.Ed.WriteMessage("\n   • BORDER ONLY style (hoặc All Codes 1-1000 fallback)");
                 A.Ed.WriteMessage("\n   • Corridor Extents Boundaries tự động");
                 A.Ed.WriteMessage("\n   • Đã rebuild corridor và thêm vào section sources");
-                
+
                 A.Ed.WriteMessage("\n🔧 Nếu cần điều chỉnh:");
                 A.Ed.WriteMessage($"\n   • Mở Corridor Properties > {corridorName}");
                 A.Ed.WriteMessage("\n   • Tab 'Surfaces' > Kiểm tra cấu hình");
                 A.Ed.WriteMessage("\n   • Điều chỉnh Link Codes nếu cần");
-                
+
                 A.Ed.WriteMessage("\n💡 Để tạo nhiều corridors cùng lúc, sử dụng:");
                 A.Ed.WriteMessage("\n   • CTSV_TaoCorridorSurface (phiên bản form với nhiều tùy chọn)");
             }
-            
+
             A.Ed.WriteMessage("\n" + new string('=', 50));
         }
     }

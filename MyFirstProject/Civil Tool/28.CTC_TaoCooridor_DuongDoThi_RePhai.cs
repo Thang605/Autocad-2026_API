@@ -24,6 +24,10 @@ namespace Civil3DCsharp
         private const string ERROR_INDICATOR = "[X]";
         private const string WARNING_INDICATOR = "[!]";
 
+        // Static fields to save configuration for next run
+        private static TargetMappingConfiguration? _savedTargetMapping = null;
+        private static string? _savedSurfaceName = null;
+
         [CommandMethod("CAC_TaoCooridor_DuongDoThi_RePhai")]
         public static void CAC_TaoCooridor_DuongDoThi_RePhai()
         {
@@ -323,13 +327,60 @@ namespace Civil3DCsharp
             ObjectIdCollection sharedSurfaceTargets = new ObjectIdCollection();
             try
             {
-                ObjectId surfaceId = UserInput.GSurfaceId("\nChọn surface để target taluy (dùng chung cho tất cả): ");
+                ObjectId surfaceId = ObjectId.Null;
+                
+                // Check if we have a saved surface from previous run
+                if (!string.IsNullOrEmpty(_savedSurfaceName))
+                {
+                    A.Ed.WriteMessage($"\n📋 Đã tìm thấy surface đã lưu: {_savedSurfaceName}");
+                    
+                    // Try to find the surface by name
+                    surfaceId = FindSurfaceByName(tr, _savedSurfaceName);
+                    
+                    if (surfaceId != ObjectId.Null)
+                    {
+                        // Ask user if they want to use the saved surface
+                        PromptKeywordOptions pko = new PromptKeywordOptions(
+                            $"\nSử dụng surface đã lưu '{_savedSurfaceName}'? [Yes/No] <Yes>: ");
+                        pko.Keywords.Add("Yes");
+                        pko.Keywords.Add("No");
+                        pko.Keywords.Default = "Yes";
+                        pko.AllowNone = true;
+                        
+                        PromptResult pkr = A.Ed.GetKeywords(pko);
+                        
+                        if (pkr.Status == PromptStatus.Cancel || 
+                            (pkr.Status == PromptStatus.Keyword && pkr.StringResult == "No"))
+                        {
+                            // User wants to select a new surface
+                            surfaceId = ObjectId.Null;
+                            A.Ed.WriteMessage("\n→ Chọn surface mới...");
+                        }
+                        else
+                        {
+                            A.Ed.WriteMessage($"\n✅ Sử dụng surface đã lưu: {_savedSurfaceName}");
+                        }
+                    }
+                    else
+                    {
+                        A.Ed.WriteMessage($"\n⚠️ Không tìm thấy surface '{_savedSurfaceName}' trong bản vẽ.");
+                    }
+                }
+                
+                // If no saved surface or user wants to select new one
+                if (surfaceId == ObjectId.Null)
+                {
+                    surfaceId = UserInput.GSurfaceId("\nChọn surface để target taluy (dùng chung cho tất cả): ");
+                }
+                
                 if (surfaceId != ObjectId.Null)
                 {
                     sharedSurfaceTargets.Add(surfaceId);
                     CivSurface? surface = tr.GetObject(surfaceId, OpenMode.ForRead) as CivSurface;
                     if (surface != null)
                     {
+                        // Save surface name for next run
+                        _savedSurfaceName = surface.Name;
                         A.Ed.WriteMessage($"\n✅ Đã chọn surface: {surface.Name}");
                     }
                 }
@@ -414,36 +465,84 @@ namespace Civil3DCsharp
                             {
                                 try
                                 {
-                                    A.Ed.WriteMessage("\n\n=== Mở form cấu hình Target (dùng chung cho tất cả corridors) ===");
-
-                                    var targetConfigForm = new SubassemblyTargetConfigForm(
-                                        sampleTargets,
-                                        sharedAlignmentTargets,
-                                        sharedProfileTargets,
-                                        sharedSurfaceTargets,
-                                        samplePolylineTargets);
-
-                                    var dialogResult = Autodesk.AutoCAD.ApplicationServices.Application.ShowModalDialog(targetConfigForm);
-
-                                    if (dialogResult == DialogResult.OK && targetConfigForm.ConfigurationApplied)
+                                    // Check if we have saved target mapping from previous run
+                                    bool useSavedMapping = false;
+                                    if (_savedTargetMapping != null && _savedTargetMapping.UseFormConfig && 
+                                        _savedTargetMapping.SavedConnections != null && _savedTargetMapping.SavedConnections.Count > 0)
                                     {
-                                        A.Ed.WriteMessage("\n✅ Người dùng đã cấu hình target mapping.");
-
-                                        // Store the target mapping configuration
-                                        targetMapping = new TargetMappingConfiguration
+                                        A.Ed.WriteMessage($"\n📋 Đã tìm thấy cấu hình target đã lưu ({_savedTargetMapping.SavedConnections.Count} targets)");
+                                        
+                                        // Ask user if they want to use the saved configuration
+                                        PromptKeywordOptions pko = new PromptKeywordOptions(
+                                            $"\nSử dụng cấu hình target đã lưu? [Yes/No] <Yes>: ");
+                                        pko.Keywords.Add("Yes");
+                                        pko.Keywords.Add("No");
+                                        pko.Keywords.Default = "Yes";
+                                        pko.AllowNone = true;
+                                        
+                                        PromptResult pkr = A.Ed.GetKeywords(pko);
+                                        
+                                        // Only open form if user explicitly says "No"
+                                        // Otherwise (Enter, "Y", "Yes", or any other) use saved config
+                                        if (pkr.Status == PromptStatus.Cancel ||
+                                            (pkr.Status == PromptStatus.Keyword && pkr.StringResult == "No"))
                                         {
-                                            UseFormConfig = true,
-                                            TargetConnections = targetConfigForm.TargetConnections
-                                        };
+                                            A.Ed.WriteMessage("\n→ Mở form cấu hình target mới...");
+                                        }
+                                        else
+                                        {
+                                            useSavedMapping = true;
+                                            targetMapping = _savedTargetMapping;
+                                            A.Ed.WriteMessage("\n✅ Sử dụng cấu hình target đã lưu.");
+                                        }
                                     }
-                                    else
+
+                                    // If not using saved configuration, show the form
+                                    if (!useSavedMapping)
                                     {
-                                        A.Ed.WriteMessage("\n⚠️ Người dùng đã hủy form. Sẽ sử dụng cấu hình mặc định.");
-                                        targetMapping = new TargetMappingConfiguration
+                                        A.Ed.WriteMessage("\n\n=== Mở form cấu hình Target (dùng chung cho tất cả corridors) ===");
+
+                                        var targetConfigForm = new SubassemblyTargetConfigForm(
+                                            sampleTargets,
+                                            sharedAlignmentTargets,
+                                            sharedProfileTargets,
+                                            sharedSurfaceTargets,
+                                            samplePolylineTargets);
+
+                                        var dialogResult = Autodesk.AutoCAD.ApplicationServices.Application.ShowModalDialog(targetConfigForm);
+
+                                        if (dialogResult == DialogResult.OK && targetConfigForm.ConfigurationApplied)
                                         {
-                                            UseFormConfig = false,
-                                            TargetConnections = null
-                                        };
+                                            A.Ed.WriteMessage("\n✅ Người dùng đã cấu hình target mapping.");
+
+                                            // Store the target mapping configuration
+                                            targetMapping = new TargetMappingConfiguration
+                                            {
+                                                UseFormConfig = true,
+                                                TargetConnections = targetConfigForm.TargetConnections,
+                                                // Create SavedConnections (primitives only) for next run
+                                                SavedConnections = targetConfigForm.TargetConnections
+                                                    .Select(tc => new SavedTargetConnection
+                                                    {
+                                                        SubassemblyIndex = tc.SubassemblyIndex,
+                                                        TargetGroupId = tc.TargetGroupId,
+                                                        TargetOption = (int)tc.TargetOption
+                                                    }).ToList()
+                                            };
+
+                                            // Save for next run
+                                            _savedTargetMapping = targetMapping;
+                                            A.Ed.WriteMessage("\n💾 Đã lưu cấu hình target cho lần thực hiện sau.");
+                                        }
+                                        else
+                                        {
+                                            A.Ed.WriteMessage("\n⚠️ Người dùng đã hủy form. Sẽ sử dụng cấu hình mặc định.");
+                                            targetMapping = new TargetMappingConfiguration
+                                            {
+                                                UseFormConfig = false,
+                                                TargetConnections = null
+                                            };
+                                        }
                                     }
                                 }
                                 catch (System.Exception formEx)
@@ -531,6 +630,23 @@ namespace Civil3DCsharp
                     var errorMsg = $"Lỗi: {ex.Message}";
                     errors.Add($"Cặp {i + 1}: {errorMsg}");
                     A.Ed.WriteMessage($"\n{ERROR_INDICATOR} Cặp {i + 1}: {errorMsg}");
+                }
+            }
+
+            // Rebuild corridor after all baselines and regions have been created
+            if (successCount > 0)
+            {
+                try
+                {
+                    A.Ed.WriteMessage("\n\n--- Rebuild Corridor ---");
+                    // Upgrade corridor to write mode before rebuild
+                    objects.Corridor.UpgradeOpen();
+                    objects.Corridor.Rebuild();
+                    A.Ed.WriteMessage($"\n{SUCCESS_INDICATOR} Đã rebuild corridor thành công.");
+                }
+                catch (System.Exception rebuildEx)
+                {
+                    A.Ed.WriteMessage($"\n{WARNING_INDICATOR} Lỗi khi rebuild corridor: {rebuildEx.Message}");
                 }
             }
 
@@ -726,7 +842,14 @@ namespace Civil3DCsharp
                 }
 
                 // Apply target configuration based on mapping
-                if (targetMapping.UseFormConfig && targetMapping.TargetConnections != null && targetMapping.TargetConnections.Count > 0)
+                // First check for SavedConnections (primitives, survives across transactions)
+                if (targetMapping.UseFormConfig && targetMapping.SavedConnections != null && targetMapping.SavedConnections.Count > 0)
+                {
+                    A.Ed.WriteMessage("\n=== Áp dụng cấu hình từ Form/Saved Config ===");
+                    ApplyTargetConfigurationFromSaved(baselineRegion, targetMapping.SavedConnections,
+                        TagetIds_0, TagetIds_1, TagetIds_2, TagetIds_3);
+                }
+                else if (targetMapping.UseFormConfig && targetMapping.TargetConnections != null && targetMapping.TargetConnections.Count > 0)
                 {
                     A.Ed.WriteMessage("\n=== Áp dụng cấu hình từ Form (đã lưu) ===");
                     ApplyTargetConfigurationFromForm(baselineRegion, targetMapping.TargetConnections,
@@ -1203,6 +1326,114 @@ namespace Civil3DCsharp
         }
 
         /// <summary>
+        /// Apply target configuration from SavedConnections (primitives only)
+        /// This can work across transactions since it doesn't depend on SubassemblyTargetInfo objects
+        /// </summary>
+        private static void ApplyTargetConfigurationFromSaved(BaselineRegion baselineRegion,
+            List<SavedTargetConnection> savedConnections,
+            ObjectIdCollection TagetIds_0, ObjectIdCollection TagetIds_1, ObjectIdCollection TagetIds_2, ObjectIdCollection TagetIds_3)
+        {
+            if (savedConnections.Count == 0)
+            {
+                A.Ed.WriteMessage("\n⚠️ Không có saved connections.");
+                return;
+            }
+
+            try
+            {
+                // Get a fresh copy of targets from baseline region (in current transaction)
+                var targetInfoCollection = baselineRegion.GetTargets();
+
+                A.Ed.WriteMessage("\n=== Áp dụng cấu hình từ SavedConnections ===");
+                A.Ed.WriteMessage($"\nSố lượng subassembly targets: {targetInfoCollection.Count}");
+                A.Ed.WriteMessage($"\nSố lượng saved connections: {savedConnections.Count}");
+
+                int successCount = 0;
+
+                foreach (var savedConn in savedConnections)
+                {
+                    try
+                    {
+                        if (savedConn.SubassemblyIndex < 0 || savedConn.SubassemblyIndex >= targetInfoCollection.Count)
+                        {
+                            A.Ed.WriteMessage($"\n⚠️ Target index {savedConn.SubassemblyIndex} ngoài phạm vi.");
+                            continue;
+                        }
+
+                        var targetInfo = targetInfoCollection[savedConn.SubassemblyIndex];
+                        A.Ed.WriteMessage($"\n\nTarget {savedConn.SubassemblyIndex}:");
+
+                        // Get appropriate target collection based on GroupId
+                        ObjectIdCollection? selectedTargets = savedConn.TargetGroupId switch
+                        {
+                            0 => TagetIds_0,
+                            1 => TagetIds_1,
+                            2 => TagetIds_2,
+                            3 => TagetIds_3,
+                            _ => null
+                        };
+
+                        if (selectedTargets == null || selectedTargets.Count == 0)
+                        {
+                            A.Ed.WriteMessage($"\n  ⚠️ Không gắn kết (GroupId={savedConn.TargetGroupId})");
+                            continue;
+                        }
+
+                        string groupName = savedConn.TargetGroupId switch
+                        {
+                            0 => "Alignments",
+                            1 => "Profiles",
+                            2 => "Surfaces",
+                            3 => "Polylines",
+                            _ => "Unknown"
+                        };
+                        A.Ed.WriteMessage($"\n  - Gắn kết với: {groupName} ({selectedTargets.Count} đối tượng)");
+
+                        // Create NEW ObjectIdCollection
+                        ObjectIdCollection newTargetIds = new ObjectIdCollection();
+
+                        // Add new targets
+                        if (selectedTargets.Count >= 2)
+                        {
+                            newTargetIds.Add(selectedTargets[0]);
+                            newTargetIds.Add(selectedTargets[1]);
+                        }
+                        else if (selectedTargets.Count == 1)
+                        {
+                            newTargetIds.Add(selectedTargets[0]);
+                            newTargetIds.Add(selectedTargets[0]); // Duplicate
+                        }
+
+                        // Assign NEW collection
+                        targetInfo.TargetIds = newTargetIds;
+
+                        // Set target option
+                        targetInfo.TargetToOption = (SubassemblyTargetToOption)savedConn.TargetOption;
+                        A.Ed.WriteMessage($"\n  - Tùy chọn: {(SubassemblyTargetToOption)savedConn.TargetOption}");
+                        A.Ed.WriteMessage($"\n  - TargetIds count: {targetInfo.TargetIds.Count}");
+
+                        successCount++;
+                    }
+                    catch (System.Exception ex)
+                    {
+                        A.Ed.WriteMessage($"\n  ❌ Lỗi khi áp dụng target {savedConn.SubassemblyIndex}: {ex.Message}");
+                    }
+                }
+
+                // Apply to baseline region
+                A.Ed.WriteMessage($"\n\n--- Gọi SetTargets() trên baseline region ---");
+                baselineRegion.SetTargets(targetInfoCollection);
+
+                A.Ed.WriteMessage($"\n✅ Đã áp dụng cấu hình từ saved connections cho {successCount}/{savedConnections.Count} targets.");
+            }
+            catch (System.Exception ex)
+            {
+                A.Ed.WriteMessage($"\n❌ Lỗi khi áp dụng saved connections: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Apply target configuration from form's TargetConnections
         /// This executes in the transaction context where BaselineRegion was created
         /// </summary>
@@ -1313,6 +1544,30 @@ namespace Civil3DCsharp
             }
         }
 
+        /// <summary>
+        /// Helper method to find a surface by name in the current document
+        /// </summary>
+        private static ObjectId FindSurfaceByName(Transaction tr, string surfaceName)
+        {
+            try
+            {
+                var surfaceIds = A.Cdoc.GetSurfaceIds();
+                foreach (ObjectId surfaceId in surfaceIds)
+                {
+                    CivSurface? surface = tr.GetObject(surfaceId, OpenMode.ForRead) as CivSurface;
+                    if (surface != null && surface.Name.Equals(surfaceName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return surfaceId;
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                A.Ed.WriteMessage($"\n⚠️ Lỗi khi tìm surface '{surfaceName}': {ex.Message}");
+            }
+            return ObjectId.Null;
+        }
+
         // Helper classes
         public class CorridorFormData
         {
@@ -1346,6 +1601,19 @@ namespace Civil3DCsharp
         {
             public bool UseFormConfig { get; set; }
             public List<TargetConnection>? TargetConnections { get; set; }
+            
+            // Saved version (primitives only) for reuse across transactions
+            public List<SavedTargetConnection>? SavedConnections { get; set; }
+        }
+
+        /// <summary>
+        /// Serializable version of TargetConnection (primitives only, no Civil 3D objects)
+        /// </summary>
+        public class SavedTargetConnection
+        {
+            public int SubassemblyIndex { get; set; }
+            public int TargetGroupId { get; set; }
+            public int TargetOption { get; set; } // SubassemblyTargetToOption as int
         }
 
         public class ExecutionResult
