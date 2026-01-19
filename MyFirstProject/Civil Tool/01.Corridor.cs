@@ -48,7 +48,7 @@ namespace Civil3DCsharp
                 }
 
                 ProcessCorridorBaselines(corridor, tr);
-                
+
                 corridor.Rebuild();
                 tr.Commit();
                 A.Ed.WriteMessage("\nSections added successfully to corridor.");
@@ -110,7 +110,7 @@ namespace Civil3DCsharp
 
             // Get user selection for multiple groups
             int selectedIndex = UserInput.GInt("Enter the index of the sample line group to add sections:");
-            
+
             if (selectedIndex < 0 || selectedIndex >= sampleLineGroupIds.Count)
             {
                 A.Ed.WriteMessage("\nInvalid group index selected.");
@@ -144,12 +144,10 @@ namespace Civil3DCsharp
         {
             foreach (BaselineRegion baselineRegion in baseline.BaselineRegions)
             {
-                // Clear existing additional stations
-                baselineRegion.ClearAdditionalStations();
-                
+
                 // Get existing stations in the region
                 var existingStations = new HashSet<double>(baselineRegion.SortedStations());
-                
+
                 // Add new stations that fall within the region and don't already exist
                 foreach (double station in newStations)
                 {
@@ -171,7 +169,7 @@ namespace Civil3DCsharp
 
         private static bool IsStationInRegion(double station, BaselineRegion region)
         {
-            return station > region.StartStation && station < region.EndStation;
+            return station >= region.StartStation && station <= region.EndStation;
         }
     }
 }

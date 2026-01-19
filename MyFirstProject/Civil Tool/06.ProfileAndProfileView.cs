@@ -99,6 +99,13 @@ namespace Civil3DCsharp
             string profileLabelSetName = form.ProfileLabelSetName;
             string profileViewStyleName = form.ProfileViewStyleName;
             string profileViewBandSetName = form.ProfileViewBandSetName;
+            List<ObjectId> selectedAlignmentIds = form.SelectedAlignmentIds;
+
+            if (selectedAlignmentIds.Count == 0)
+            {
+                A.Ed.WriteMessage("\n Không có tim đường nào được chọn.");
+                return;
+            }
 
             // start transaction
             using Transaction tr = A.Db.TransactionManager.StartTransaction();
@@ -111,14 +118,12 @@ namespace Civil3DCsharp
                 // Get point for placing profiles
                 Point3d basePoint = UserInput.GPoint("\n Chọn vị trí điểm" + " đặt trắc dọc:\n");
                 
-                ObjectIdCollection alignmentIds = A.Cdoc.GetAlignmentIds();
-
-                // Sort alignments by name
+                // Sort selected alignments by name
                 var sortedAlignments = new List<(ObjectId Id, string Name)>();
-                foreach (ObjectId alignmentId in alignmentIds)
+                foreach (ObjectId alignmentId in selectedAlignmentIds)
                 {
                     Alignment? alignment = tr.GetObject(alignmentId, OpenMode.ForRead) as Alignment;
-                    if (alignment != null && alignment.AlignmentType == AlignmentType.Centerline)
+                    if (alignment != null)
                     {
                         sortedAlignments.Add((alignmentId, alignment.Name));
                     }
@@ -179,12 +184,37 @@ namespace Civil3DCsharp
                         ObjectId profilesId = Profile.CreateFromSurface(profileName, alignmentId, surfaceId, layerID, profileStyleId, profileLabelSetId);
                     }
 
-                    // Always create ProfileView
-                    ObjectId profileViewId = ProfileView.Create(alignmentId, basePointNext, alignment.Name, profileBandStyleId, profileViewStyleId);
+                    // Generate unique ProfileView name
+                    string profileViewName = alignment.Name;
+                    ObjectIdCollection existingProfileViewIds = alignment.GetProfileViewIds();
+                    var existingNames = new HashSet<string>();
+                    foreach (ObjectId pvId in existingProfileViewIds)
+                    {
+                        ProfileView? existingPV = tr.GetObject(pvId, OpenMode.ForRead) as ProfileView;
+                        if (existingPV != null)
+                        {
+                            existingNames.Add(existingPV.Name);
+                        }
+                    }
+                    
+                    // If name already exists, append suffix number
+                    if (existingNames.Contains(profileViewName))
+                    {
+                        int suffix = 1;
+                        while (existingNames.Contains($"{alignment.Name}_{suffix}"))
+                        {
+                            suffix++;
+                        }
+                        profileViewName = $"{alignment.Name}_{suffix}";
+                        A.Ed.WriteMessage($"\n Tuyến '{alignment.Name}' - ProfileView đã tồn tại, tạo mới với tên: {profileViewName}");
+                    }
+
+                    // Always create ProfileView with unique name
+                    ObjectId profileViewId = ProfileView.Create(alignmentId, basePointNext, profileViewName, profileBandStyleId, profileViewStyleId);
 #pragma warning restore CS8602 // Dereference of a possibly null reference.
                 }
 
-                A.Ed.WriteMessage($"\n Đã tạo trắc dọc cho {x - skipped} tuyến centerline. Bỏ qua {skipped} tuyến đã có profile.");
+                A.Ed.WriteMessage($"\n Đã tạo trắc dọc cho {x - skipped} tuyến centerline (đã chọn: {selectedAlignmentIds.Count}). Bỏ qua {skipped} tuyến đã có profile.");
                 tr.Commit();
             }
             catch (Autodesk.AutoCAD.Runtime.Exception e)

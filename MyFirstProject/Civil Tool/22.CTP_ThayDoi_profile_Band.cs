@@ -97,29 +97,84 @@ namespace Civil3DCsharp
                         var bandItem = bottomBands[i];
                         A.Ed.WriteMessage($"\n  - Band {i + 1}: {bandItem.BandType}");
                         
+                        // Bỏ qua các band type không hỗ trợ Profile1Id/Profile2Id
+                        if (bandItem.BandType.ToString() == "HorizontalGeometry")
+                        {
+                            A.Ed.WriteMessage($"\n    (Bỏ qua - loại band không hỗ trợ thay đổi profile)");
+                            continue;
+                        }
+                        
                         try
                         {
                             // Kiểm tra và thay đổi Profile1Id
-                            if (profile1Settings.ShouldChange && bandItem.Profile1Id != ObjectId.Null)
+                            if (profile1Settings.ShouldChange)
                             {
-                                Profile? profile1 = tr.GetObject(bandItem.Profile1Id, OpenMode.ForRead) as Profile;
-                                if (profile1?.Name == profile1Settings.OldProfileName)
+                                bool shouldChangeProfile1 = false;
+                                string currentName = "";
+                                
+                                // Kiểm tra profile hiện tại (có thể đã bị xóa)
+                                if (bandItem.Profile1Id != ObjectId.Null)
+                                {
+                                    try
+                                    {
+                                        Profile? profile1 = tr.GetObject(bandItem.Profile1Id, OpenMode.ForRead) as Profile;
+                                        currentName = profile1?.Name ?? "";
+                                        shouldChangeProfile1 = string.IsNullOrEmpty(profile1Settings.OldProfileName) || 
+                                                              profile1?.Name == profile1Settings.OldProfileName;
+                                    }
+                                    catch
+                                    {
+                                        // Profile đã bị xóa (eWasErased) -> cho phép thay đổi
+                                        currentName = "(đã bị xóa)";
+                                        shouldChangeProfile1 = string.IsNullOrEmpty(profile1Settings.OldProfileName);
+                                    }
+                                }
+                                else
+                                {
+                                    // Band chưa có Profile1 -> cho phép gán mới nếu OldProfileName rỗng
+                                    shouldChangeProfile1 = string.IsNullOrEmpty(profile1Settings.OldProfileName);
+                                }
+                                
+                                if (shouldChangeProfile1)
                                 {
                                     bottomBands[i].Profile1Id = profile1Settings.NewProfileId;
-                                    A.Ed.WriteMessage($"\n    ✓ Đã thay đổi Profile1 từ '{profile1Settings.OldProfileName}' sang '{profile1Settings.NewProfileName}'");
+                                    A.Ed.WriteMessage($"\n    ✓ Đã thay đổi Profile1 từ '{currentName}' sang '{profile1Settings.NewProfileName}'");
                                     bottomChanged = true;
                                     successCount++;
                                 }
                             }
                             
                             // Kiểm tra và thay đổi Profile2Id
-                            if (profile2Settings.ShouldChange && bandItem.Profile2Id != ObjectId.Null)
+                            if (profile2Settings.ShouldChange)
                             {
-                                Profile? profile2 = tr.GetObject(bandItem.Profile2Id, OpenMode.ForRead) as Profile;
-                                if (profile2?.Name == profile2Settings.OldProfileName)
+                                bool shouldChangeProfile2 = false;
+                                string currentName = "";
+                                
+                                if (bandItem.Profile2Id != ObjectId.Null)
+                                {
+                                    try
+                                    {
+                                        Profile? profile2 = tr.GetObject(bandItem.Profile2Id, OpenMode.ForRead) as Profile;
+                                        currentName = profile2?.Name ?? "";
+                                        shouldChangeProfile2 = string.IsNullOrEmpty(profile2Settings.OldProfileName) || 
+                                                              profile2?.Name == profile2Settings.OldProfileName;
+                                    }
+                                    catch
+                                    {
+                                        // Profile đã bị xóa (eWasErased) -> cho phép thay đổi
+                                        currentName = "(đã bị xóa)";
+                                        shouldChangeProfile2 = string.IsNullOrEmpty(profile2Settings.OldProfileName);
+                                    }
+                                }
+                                else
+                                {
+                                    shouldChangeProfile2 = string.IsNullOrEmpty(profile2Settings.OldProfileName);
+                                }
+                                
+                                if (shouldChangeProfile2)
                                 {
                                     bottomBands[i].Profile2Id = profile2Settings.NewProfileId;
-                                    A.Ed.WriteMessage($"\n    ✓ Đã thay đổi Profile2 từ '{profile2Settings.OldProfileName}' sang '{profile2Settings.NewProfileName}'");
+                                    A.Ed.WriteMessage($"\n    ✓ Đã thay đổi Profile2 từ '{currentName}' sang '{profile2Settings.NewProfileName}'");
                                     bottomChanged = true;
                                     successCount++;
                                 }
@@ -159,29 +214,82 @@ namespace Civil3DCsharp
                         var bandItem = topBands[i];
                         A.Ed.WriteMessage($"\n  - Band {i + 1}: {bandItem.BandType}");
                         
+                        // Bỏ qua các band type không hỗ trợ Profile1Id/Profile2Id
+                        if (bandItem.BandType.ToString() == "HorizontalGeometry")
+                        {
+                            A.Ed.WriteMessage($"\n    (Bỏ qua - loại band không hỗ trợ thay đổi profile)");
+                            continue;
+                        }
+                        
                         try
                         {
                             // Kiểm tra và thay đổi Profile1Id
-                            if (profile1Settings.ShouldChange && bandItem.Profile1Id != ObjectId.Null)
+                            if (profile1Settings.ShouldChange)
                             {
-                                Profile? profile1 = tr.GetObject(bandItem.Profile1Id, OpenMode.ForRead) as Profile;
-                                if (profile1?.Name == profile1Settings.OldProfileName)
+                                bool shouldChangeProfile1 = false;
+                                string currentName = "";
+                                
+                                if (bandItem.Profile1Id != ObjectId.Null)
+                                {
+                                    try
+                                    {
+                                        Profile? profile1 = tr.GetObject(bandItem.Profile1Id, OpenMode.ForRead) as Profile;
+                                        currentName = profile1?.Name ?? "";
+                                        shouldChangeProfile1 = string.IsNullOrEmpty(profile1Settings.OldProfileName) || 
+                                                              profile1?.Name == profile1Settings.OldProfileName;
+                                    }
+                                    catch
+                                    {
+                                        // Profile đã bị xóa (eWasErased) -> cho phép thay đổi
+                                        currentName = "(đã bị xóa)";
+                                        shouldChangeProfile1 = string.IsNullOrEmpty(profile1Settings.OldProfileName);
+                                    }
+                                }
+                                else
+                                {
+                                    shouldChangeProfile1 = string.IsNullOrEmpty(profile1Settings.OldProfileName);
+                                }
+                                
+                                if (shouldChangeProfile1)
                                 {
                                     topBands[i].Profile1Id = profile1Settings.NewProfileId;
-                                    A.Ed.WriteMessage($"\n    ✓ Đã thay đổi Profile1 từ '{profile1Settings.OldProfileName}' sang '{profile1Settings.NewProfileName}'");
+                                    A.Ed.WriteMessage($"\n    ✓ Đã thay đổi Profile1 từ '{currentName}' sang '{profile1Settings.NewProfileName}'");
                                     topChanged = true;
                                     successCount++;
                                 }
                             }
                             
                             // Kiểm tra và thay đổi Profile2Id
-                            if (profile2Settings.ShouldChange && bandItem.Profile2Id != ObjectId.Null)
+                            if (profile2Settings.ShouldChange)
                             {
-                                Profile? profile2 = tr.GetObject(bandItem.Profile2Id, OpenMode.ForRead) as Profile;
-                                if (profile2?.Name == profile2Settings.OldProfileName)
+                                bool shouldChangeProfile2 = false;
+                                string currentName = "";
+                                
+                                if (bandItem.Profile2Id != ObjectId.Null)
+                                {
+                                    try
+                                    {
+                                        Profile? profile2 = tr.GetObject(bandItem.Profile2Id, OpenMode.ForRead) as Profile;
+                                        currentName = profile2?.Name ?? "";
+                                        shouldChangeProfile2 = string.IsNullOrEmpty(profile2Settings.OldProfileName) || 
+                                                              profile2?.Name == profile2Settings.OldProfileName;
+                                    }
+                                    catch
+                                    {
+                                        // Profile đã bị xóa (eWasErased) -> cho phép thay đổi
+                                        currentName = "(đã bị xóa)";
+                                        shouldChangeProfile2 = string.IsNullOrEmpty(profile2Settings.OldProfileName);
+                                    }
+                                }
+                                else
+                                {
+                                    shouldChangeProfile2 = string.IsNullOrEmpty(profile2Settings.OldProfileName);
+                                }
+                                
+                                if (shouldChangeProfile2)
                                 {
                                     topBands[i].Profile2Id = profile2Settings.NewProfileId;
-                                    A.Ed.WriteMessage($"\n    ✓ Đã thay đổi Profile2 từ '{profile2Settings.OldProfileName}' sang '{profile2Settings.NewProfileName}'");
+                                    A.Ed.WriteMessage($"\n    ✓ Đã thay đổi Profile2 từ '{currentName}' sang '{profile2Settings.NewProfileName}'");
                                     topChanged = true;
                                     successCount++;
                                 }
@@ -869,13 +977,6 @@ namespace Civil3DCsharp
             // Kiểm tra Profile 1 settings
             if (chkChangeProfile1.Checked)
             {
-                if (string.IsNullOrEmpty(currentProfile1Name))
-                {
-                    MessageBox.Show("Không tìm thấy Profile 1 hiện tại trong band!", "Cảnh báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    this.DialogResult = DialogResult.None;
-                    return;
-                }
-                
                 if (!(cmbProfile1New.SelectedItem is ProfileItem profile1NewItem))
                 {
                     MessageBox.Show("Vui lòng chọn Profile 1 mới!", "Cảnh báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -884,7 +985,7 @@ namespace Civil3DCsharp
                 }
                 
                 Profile1Settings.ShouldChange = true;
-                Profile1Settings.OldProfileName = currentProfile1Name;
+                Profile1Settings.OldProfileName = currentProfile1Name; // Có thể rỗng nếu không tìm thấy
                 Profile1Settings.NewProfileName = profile1NewItem.Name;
                 Profile1Settings.NewProfileId = profile1NewItem.Id;
             }
@@ -896,13 +997,6 @@ namespace Civil3DCsharp
             // Kiểm tra Profile 2 settings
             if (chkChangeProfile2.Checked)
             {
-                if (string.IsNullOrEmpty(currentProfile2Name))
-                {
-                    MessageBox.Show("Không tìm thấy Profile 2 hiện tại trong band!", "Cảnh báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    this.DialogResult = DialogResult.None;
-                    return;
-                }
-                
                 if (!(cmbProfile2New.SelectedItem is ProfileItem profile2NewItem))
                 {
                     MessageBox.Show("Vui lòng chọn Profile 2 mới!", "Cảnh báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -911,7 +1005,7 @@ namespace Civil3DCsharp
                 }
                 
                 Profile2Settings.ShouldChange = true;
-                Profile2Settings.OldProfileName = currentProfile2Name;
+                Profile2Settings.OldProfileName = currentProfile2Name; // Có thể rỗng nếu không tìm thấy
                 Profile2Settings.NewProfileName = profile2NewItem.Name;
                 Profile2Settings.NewProfileId = profile2NewItem.Id;
             }
