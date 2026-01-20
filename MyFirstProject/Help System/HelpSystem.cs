@@ -986,14 +986,6 @@ namespace Civil3DCsharp.HelpSystem
 
             AddCommand(new CommandInfo
             {
-                Name = "CTS_PhatSinhCoc_ChiTiet",
-                Category = "Civil - Sampleline",
-                Description = "Phát sinh cọc chi tiết",
-                Usage = "CTS_PhatSinhCoc_ChiTiet"
-            });
-
-            AddCommand(new CommandInfo
-            {
                 Name = "CTS_PhatSinhCoc_theoKhoangDelta",
                 Category = "Civil - Sampleline",
                 Description = "Phát sinh cọc theo khoảng Delta",

@@ -161,7 +161,6 @@ namespace MyFirstProject
             AddMenuItem(subMenuSample, "Chèn Cọc Trên Trắc Dọc", "CTS_ChenCoc_TrenTracDoc ");
             AddMenuItem(subMenuSample, "Chèn Cọc Trên Trắc Ngang", "CTS_CHENCOC_TRENTRACNGANG ");
             AddMenuItem(subMenuSample, "Phát Sinh Cọc", "CTS_PhatSinhCoc ");
-            AddMenuItem(subMenuSample, "Phát Sinh Cọc Chi Tiết", "CTS_PhatSinhCoc_ChiTiet ");
             AddMenuItem(subMenuSample, "Phát Sinh Cọc Theo Delta", "CTS_PhatSinhCoc_theoKhoangDelta ");
             AddMenuItem(subMenuSample, "Phát Sinh Cọc Từ CogoPoint", "CTS_PhatSinhCoc_TuCogoPoint ");
             AddMenuItem(subMenuSample, "Phát Sinh Cọc Theo Bảng", "CTS_PhatSinhCoc_TheoBang ");

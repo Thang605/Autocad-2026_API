@@ -71,7 +71,6 @@
 - `CTS_CHENCOC_TRENTRACNGANG` - Chèn c?c trên tr?c ngang
 - `CTS_DoiTenCoc_fromCogoPoint` - ??i tên c?c t? CogoPoint
 - `CTS_PhatSinhCoc` - Phát sinh c?c
-- `CTS_PhatSinhCoc_ChiTiet` - Phát sinh c?c chi ti?t
 - `CTS_PhatSinhCoc_theoKhoangDelta` - Phát sinh c?c theo kho?ng delta
 - `CTS_PhatSinhCoc_TuCogoPoint` - Phát sinh c?c t? CogoPoint
 - `CTS_DoiTenCoc_TheoThuTu` - ??i tên c?c theo th? t?
