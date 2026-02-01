@@ -48,7 +48,7 @@ namespace MyFirstProject
 
                 // Step 1: Select multiple alignments
                 A.Ed.WriteMessage("\nChọn các tuyến đường cần xuất thông tin:");
-                
+
                 PromptSelectionOptions pso = new()
                 {
                     MessageForAdding = "\nChọn các alignment (tuyến đường): ",
@@ -88,12 +88,100 @@ namespace MyFirstProject
                         Alignment? alignment = tr.GetObject(alignmentId, OpenMode.ForRead) as Alignment;
                         if (alignment != null)
                         {
+                            // Chỉ thống kê alignment loại Centerline
+                            if (alignment.AlignmentType != AlignmentType.Centerline)
+                            {
+                                A.Ed.WriteMessage($"\nBỏ qua '{alignment.Name}' - Loại: {alignment.AlignmentType}");
+                                continue;
+                            }
+
                             AlignmentInfo info = new()
                             {
                                 TenDuong = alignment.Name ?? "Không có tên",
                                 MoTa = alignment.Description ?? "Không có mô tả",
-                                ChieuDaiTuyen = Math.Round(alignment.Length, 3)
+                                ChieuDaiTuyen = Math.Round(alignment.Length, 3),
+                                CocDau = Math.Round(alignment.StartingStation, 3),
+                                CocCuoi = Math.Round(alignment.EndingStation, 3)
                             };
+
+                            // Lấy tên Style
+                            try
+                            {
+                                if (alignment.StyleId != ObjectId.Null)
+                                {
+                                    AlignmentStyle? style = tr.GetObject(alignment.StyleId, OpenMode.ForRead) as AlignmentStyle;
+                                    info.TenStyle = style?.Name ?? "Không có";
+                                }
+                            }
+                            catch { info.TenStyle = "Không xác định"; }
+
+                            // Lấy tên Site
+                            try
+                            {
+                                if (alignment.SiteId != ObjectId.Null)
+                                {
+                                    Site? site = tr.GetObject(alignment.SiteId, OpenMode.ForRead) as Site;
+                                    info.TenSite = site?.Name ?? "Không thuộc Site";
+                                }
+                                else
+                                {
+                                    info.TenSite = "Không thuộc Site";
+                                }
+                            }
+                            catch { info.TenSite = "Không xác định"; }
+
+                            // Phân tích các entities để lấy thông tin hình học
+                            int tangentCount = 0;
+                            int curveCount = 0;
+                            double minRadius = double.MaxValue;
+                            double maxRadius = 0;
+
+                            AlignmentEntityCollection entities = alignment.Entities;
+                            foreach (AlignmentEntity entity in entities)
+                            {
+                                switch (entity.EntityType)
+                                {
+                                    case AlignmentEntityType.Line:
+                                        tangentCount++;
+                                        break;
+                                    case AlignmentEntityType.Arc:
+                                        curveCount++;
+                                        if (entity is AlignmentArc arc)
+                                        {
+                                            if (arc.Radius < minRadius) minRadius = arc.Radius;
+                                            if (arc.Radius > maxRadius) maxRadius = arc.Radius;
+                                        }
+                                        break;
+                                    case AlignmentEntityType.Spiral:
+                                    case AlignmentEntityType.SpiralCurve:
+                                    case AlignmentEntityType.SpiralCurveSpiral:
+                                    case AlignmentEntityType.SpiralLine:
+                                    case AlignmentEntityType.SpiralLineSpiral:
+                                    case AlignmentEntityType.SpiralSpiral:
+                                    case AlignmentEntityType.SpiralSpiralCurveSpiralSpiral:
+                                    case AlignmentEntityType.MultipleSegments:
+                                        curveCount++;
+                                        // Cố gắng lấy Radius từ các subentities nếu có
+                                        if (entity is AlignmentSCS scs)
+                                        {
+                                            if (scs.Arc.Radius < minRadius) minRadius = scs.Arc.Radius;
+                                            if (scs.Arc.Radius > maxRadius) maxRadius = scs.Arc.Radius;
+                                        }
+                                        else if (entity is AlignmentSCSCS scscs)
+                                        {
+                                            if (scscs.Arc1.Radius < minRadius) minRadius = scscs.Arc1.Radius;
+                                            if (scscs.Arc1.Radius > maxRadius) maxRadius = scscs.Arc1.Radius;
+                                            if (scscs.Arc2.Radius < minRadius) minRadius = scscs.Arc2.Radius;
+                                            if (scscs.Arc2.Radius > maxRadius) maxRadius = scscs.Arc2.Radius;
+                                        }
+                                        break;
+                                }
+                            }
+
+                            info.SoDoanThang = tangentCount;
+                            info.SoDuongCong = curveCount;
+                            info.BanKinhMin = (minRadius == double.MaxValue) ? 0 : Math.Round(minRadius, 2);
+                            info.BanKinhMax = Math.Round(maxRadius, 2);
 
                             alignmentData.Add(info);
                         }
@@ -113,7 +201,7 @@ namespace MyFirstProject
 
                 // Step 2.5: Sort by road name (alphabetical order) and assign sequential numbers
                 alignmentData = [.. alignmentData.OrderBy(x => x.TenDuong)];
-                
+
                 // Assign sequential numbers after sorting
                 for (int i = 0; i < alignmentData.Count; i++)
                 {
@@ -161,17 +249,17 @@ namespace MyFirstProject
             {
                 // Get current database
                 Database db = A.Db;
-                
+
                 // Get ModelSpace for writing
                 BlockTable? bt = tr.GetObject(db.BlockTableId, OpenMode.ForRead) as BlockTable;
                 if (bt == null) return;
-                
+
                 BlockTableRecord? btr = tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForWrite) as BlockTableRecord;
                 if (btr == null) return;
 
-                // Create table
+                // Create table - expanded with more columns
                 int numRows = alignmentData.Count + 2; // Data rows + header + title
-                int numCols = 4; // STT, Tên đường, Mô tả, Chiều dài
+                int numCols = 10; // STT, Tên đường, Mô tả, Cọc đầu, Cọc cuối, Chiều dài, Đoạn thẳng, Đường cong, R min, R max
 
                 ATable table = new();
                 table.SetSize(numRows, numCols);
@@ -181,10 +269,16 @@ namespace MyFirstProject
                 table.TableStyle = db.Tablestyle; // Use current table style
 
                 // Set column widths
-                table.SetColumnWidth(0, 15.0); // STT
-                table.SetColumnWidth(1, 60.0); // Tên đường  
-                table.SetColumnWidth(2, 80.0); // Mô tả
-                table.SetColumnWidth(3, 25.0); // Chiều dài
+                table.SetColumnWidth(0, 12.0);  // STT
+                table.SetColumnWidth(1, 50.0);  // Tên đường  
+                table.SetColumnWidth(2, 65.0);  // Mô tả
+                table.SetColumnWidth(3, 25.0);  // Cọc đầu
+                table.SetColumnWidth(4, 25.0);  // Cọc cuối
+                table.SetColumnWidth(5, 25.0);  // Chiều dài
+                table.SetColumnWidth(6, 18.0);  // Số đoạn thẳng
+                table.SetColumnWidth(7, 18.0);  // Số đường cong
+                table.SetColumnWidth(8, 25.0);  // Bán kính min
+                table.SetColumnWidth(9, 25.0);  // Bán kính max
 
                 // Set row heights
                 for (int i = 0; i < numRows; i++)
@@ -199,12 +293,12 @@ namespace MyFirstProject
                 table.Cells[0, 0].TextHeight = 6.0;
 
                 // Header row
-                string[] headers = ["STT", "TÊN ĐƯỜNG", "MÔ TẢ", "CHIỀU DÀI (m)"];
+                string[] headers = ["STT", "TÊN ĐƯỜNG", "MÔ TẢ", "CỌC ĐẦU (m)", "CỌC CUỐI (m)", "CHIỀU DÀI (m)", "SỐ ĐOẠN THẲNG", "SỐ ĐƯỜNG CONG", "R MIN (m)", "R MAX (m)"];
                 for (int col = 0; col < numCols; col++)
                 {
                     table.Cells[1, col].TextString = headers[col];
                     table.Cells[1, col].Alignment = CellAlignment.MiddleCenter;
-                    table.Cells[1, col].TextHeight = 4.0;
+                    table.Cells[1, col].TextHeight = 3.5;
                 }
 
                 // Data rows
@@ -213,21 +307,57 @@ namespace MyFirstProject
                     int row = i + 2; // Skip title and header rows
                     AlignmentInfo info = alignmentData[i];
 
+                    // STT
                     table.Cells[row, 0].TextString = info.SoThuTu.ToString();
                     table.Cells[row, 0].Alignment = CellAlignment.MiddleCenter;
                     table.Cells[row, 0].TextHeight = 3.5;
 
+                    // Tên đường
                     table.Cells[row, 1].TextString = info.TenDuong;
                     table.Cells[row, 1].Alignment = CellAlignment.MiddleLeft;
                     table.Cells[row, 1].TextHeight = 3.5;
 
+                    // Mô tả
                     table.Cells[row, 2].TextString = info.MoTa;
                     table.Cells[row, 2].Alignment = CellAlignment.MiddleLeft;
                     table.Cells[row, 2].TextHeight = 3.5;
 
-                    table.Cells[row, 3].TextString = info.ChieuDaiTuyen.ToString("F3");
+                    // Cọc đầu
+                    table.Cells[row, 3].TextString = info.CocDau.ToString("F3");
                     table.Cells[row, 3].Alignment = CellAlignment.MiddleCenter;
                     table.Cells[row, 3].TextHeight = 3.5;
+
+                    // Cọc cuối
+                    table.Cells[row, 4].TextString = info.CocCuoi.ToString("F3");
+                    table.Cells[row, 4].Alignment = CellAlignment.MiddleCenter;
+                    table.Cells[row, 4].TextHeight = 3.5;
+
+                    // Chiều dài
+                    table.Cells[row, 5].TextString = info.ChieuDaiTuyen.ToString("F3");
+                    table.Cells[row, 5].Alignment = CellAlignment.MiddleCenter;
+                    table.Cells[row, 5].TextHeight = 3.5;
+
+                    // Số đoạn thẳng
+                    table.Cells[row, 6].TextString = info.SoDoanThang.ToString();
+                    table.Cells[row, 6].Alignment = CellAlignment.MiddleCenter;
+                    table.Cells[row, 6].TextHeight = 3.5;
+
+                    // Số đường cong
+                    table.Cells[row, 7].TextString = info.SoDuongCong.ToString();
+                    table.Cells[row, 7].Alignment = CellAlignment.MiddleCenter;
+                    table.Cells[row, 7].TextHeight = 3.5;
+
+                    // Bán kính min
+                    string rMinStr = info.BanKinhMin > 0 ? info.BanKinhMin.ToString("F2") : "-";
+                    table.Cells[row, 8].TextString = rMinStr;
+                    table.Cells[row, 8].Alignment = CellAlignment.MiddleCenter;
+                    table.Cells[row, 8].TextHeight = 3.5;
+
+                    // Bán kính max
+                    string rMaxStr = info.BanKinhMax > 0 ? info.BanKinhMax.ToString("F2") : "-";
+                    table.Cells[row, 9].TextString = rMaxStr;
+                    table.Cells[row, 9].Alignment = CellAlignment.MiddleCenter;
+                    table.Cells[row, 9].TextHeight = 3.5;
                 }
 
                 // Add table to database
@@ -249,6 +379,16 @@ namespace MyFirstProject
             public string TenDuong { get; set; } = "";
             public string MoTa { get; set; } = "";
             public double ChieuDaiTuyen { get; set; }
+
+            // Thông tin bổ sung từ Alignment
+            public double CocDau { get; set; }        // StartStation
+            public double CocCuoi { get; set; }       // EndStation
+            public string TenStyle { get; set; } = "";     // Style Name
+            public string TenSite { get; set; } = "";      // Site Name
+            public int SoDoanThang { get; set; }      // Number of tangent segments
+            public int SoDuongCong { get; set; }      // Number of curve segments
+            public double BanKinhMin { get; set; }    // Minimum radius
+            public double BanKinhMax { get; set; }    // Maximum radius
         }
     }
 }

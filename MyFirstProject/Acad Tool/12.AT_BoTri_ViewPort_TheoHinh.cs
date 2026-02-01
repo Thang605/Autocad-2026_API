@@ -195,12 +195,29 @@ namespace Civil3DCsharp
                     return;
                 }
 
-                // Bước 3: Hiển thị form nhập liệu
+                // Bước 3: Lấy danh sách Layout
+                List<string> layouts = new();
+                using (Transaction tr = db.TransactionManager.StartTransaction())
+                {
+                    DBDictionary layoutDict = (DBDictionary)tr.GetObject(db.LayoutDictionaryId, OpenMode.ForRead);
+                    foreach (DBDictionaryEntry entry in layoutDict)
+                    {
+                        if (entry.Key != "Model")
+                        {
+                            layouts.Add(entry.Key);
+                        }
+                    }
+                    tr.Commit();
+                }
+                layouts.Sort(); // Sắp xếp tên layout
+
+                // Bước 4: Hiển thị form nhập liệu
                 ScaleInfo? selectedScale;
                 ViewportArrangement arrangement;
                 PolylineSortOrder sortOrder;
-                
-                using (var form = new ViewportSettingsForm(drawingScales))
+                string selectedLayoutName = "";
+
+                using (var form = new ViewportSettingsForm(drawingScales, layouts))
                 {
                     if (form.ShowDialog() != DialogResult.OK)
                     {
@@ -211,6 +228,7 @@ namespace Civil3DCsharp
                     selectedScale = form.SelectedScale;
                     arrangement = form.Arrangement;
                     sortOrder = form.SortOrder;
+                    selectedLayoutName = form.SelectedLayout;
                 }
                 
                 if (selectedScale == null)
@@ -223,8 +241,9 @@ namespace Civil3DCsharp
                 ed.WriteMessage($"\n✅ Tỉ lệ đã chọn: {selectedScale.Name}");
                 ed.WriteMessage($"\n📏 Hướng bố trí: {arrangement}");
                 ed.WriteMessage($"\n📋 Sắp xếp: {sortOrder}");
+                ed.WriteMessage($"\n📑 Layout đích: {selectedLayoutName}");
 
-                // Bước 4: Sắp xếp polyline (nếu có nhiều)
+                // Bước 5: Sắp xếp polyline (nếu có nhiều)
                 if (polylineInfos.Count > 1)
                 {
                     polylineInfos = SortPolylines(polylineInfos, sortOrder);
@@ -236,35 +255,23 @@ namespace Civil3DCsharp
                     }
                 }
 
-                // Bước 5: Khoảng cách mặc định
+                // Bước 6: Khoảng cách mặc định
                 double spacing = 10.0;
 
-                // Bước 6: Chuyển sang Layout
-                ed.WriteMessage("\n\n📋 Chuyển sang Layout để đặt viewport...");
+                // Bước 7: Chuyển sang Layout
+                ed.WriteMessage($"\n\n📋 Chuyển sang Layout {selectedLayoutName} để đặt viewport...");
                 
                 LayoutManager layoutMgr = LayoutManager.Current;
-                if (layoutMgr.CurrentLayout == "Model")
+                if (layoutMgr.CurrentLayout != selectedLayoutName)
                 {
-                    using (Transaction tr = db.TransactionManager.StartTransaction())
-                    {
-                        DBDictionary layoutDict = (DBDictionary)tr.GetObject(db.LayoutDictionaryId, OpenMode.ForRead);
-                        foreach (DBDictionaryEntry entry in layoutDict)
-                        {
-                            if (entry.Key != "Model")
-                            {
-                                layoutMgr.CurrentLayout = entry.Key;
-                                ed.WriteMessage($"\n📋 Đã chuyển sang Layout: {entry.Key}");
-                                break;
-                            }
-                        }
-                        tr.Commit();
-                    }
+                    layoutMgr.CurrentLayout = selectedLayoutName;
+                    ed.WriteMessage($"\n📋 Đã chuyển sang Layout: {selectedLayoutName}");
                 }
 
                 doc.SendStringToExecute("REGEN ", false, false, false);
                 System.Threading.Thread.Sleep(200);
 
-                // Bước 6: Nhập khoảng cách bằng cách chọn 2 điểm trong Layout (nếu có nhiều polyline)
+                // Bước 8: Nhập khoảng cách bằng cách chọn 2 điểm trong Layout (nếu có nhiều polyline)
                 if (polylineInfos.Count > 1)
                 {
                     ed.WriteMessage("\n📏 Chọn 2 điểm trong Layout để xác định khoảng cách giữa các TopLeft viewport:");
@@ -290,7 +297,7 @@ namespace Civil3DCsharp
                     ed.WriteMessage($"\n📏 Khoảng cách: {spacing:F2} units");
                 }
 
-                // Bước 7: Cho user chọn điểm đặt viewport đầu tiên (góc trái trên)
+                // Bước 9: Cho user chọn điểm đặt viewport đầu tiên (góc trái trên)
                 PromptPointOptions ppo = new("\n Chọn góc trái trên của viewport đầu tiên trong Layout:");
                 ppo.AllowNone = false;
                 PromptPointResult ppr = ed.GetPoint(ppo);
@@ -302,7 +309,7 @@ namespace Civil3DCsharp
                 }
                 Point3d insertPoint = ppr.Value;
 
-                // Bước 8: Tạo các viewport
+                // Bước 10: Tạo các viewport
                 CreateMultipleViewports(db, ed, polylineInfos, insertPoint, customScale, arrangement, spacing);
 
                 ed.WriteMessage($"\n\n✅ Đã tạo {polylineInfos.Count} viewport thành công!");
@@ -493,202 +500,6 @@ namespace Civil3DCsharp
         }
 
         /// <summary>
-        /// Lệnh phụ: Bố trí viewport theo hình với điểm view tùy chỉnh (single polyline)
-        /// </summary>
-        [CommandMethod("AT_BoTri_ViewPort_TheoHinh_V2")]
-        public static void BoTri_ViewPort_TheoHinh_V2()
-        {
-            Document doc = Application.DocumentManager.MdiActiveDocument;
-            Database db = doc.Database;
-            Editor ed = doc.Editor;
-
-            try
-            {
-                ed.WriteMessage("\n=== BỐ TRÍ VIEWPORT THEO HÌNH (V2 - Single với View Center tùy chỉnh) ===");
-
-                if (db.TileMode == false)
-                {
-                    ed.WriteMessage("\n⚠️ Bạn đang ở Paper space. Vui lòng chuyển sang Model space.");
-                    return;
-                }
-
-                // Chọn 1 polyline
-                ObjectId polylineId = UserInput.GPolyline("\n Chọn Polyline trong Model space:");
-                if (polylineId == ObjectId.Null)
-                {
-                    ed.WriteMessage("\n❌ Không có polyline nào được chọn.");
-                    return;
-                }
-
-                // Lấy thông tin polyline
-                Point3d polylineCenter;
-                double polylineWidth, polylineHeight;
-                Point3dCollection polylinePoints = new();
-
-                using (Transaction tr = db.TransactionManager.StartTransaction())
-                {
-                    Polyline polyline = (Polyline)tr.GetObject(polylineId, OpenMode.ForRead);
-                    
-                    if (!polyline.Closed)
-                    {
-                        ed.WriteMessage("\n⚠️ Polyline phải là polyline đóng (closed).");
-                        return;
-                    }
-
-                    var extents = polyline.GeometricExtents;
-                    polylineCenter = new Point3d(
-                        (extents.MinPoint.X + extents.MaxPoint.X) / 2,
-                        (extents.MinPoint.Y + extents.MaxPoint.Y) / 2, 0);
-                    polylineWidth = extents.MaxPoint.X - extents.MinPoint.X;
-                    polylineHeight = extents.MaxPoint.Y - extents.MinPoint.Y;
-
-                    for (int i = 0; i < polyline.NumberOfVertices; i++)
-                    {
-                        polylinePoints.Add(polyline.GetPoint3dAt(i));
-                    }
-
-                    tr.Commit();
-                }
-
-                // Cho user chọn điểm view center
-                PromptPointOptions ppoView = new($"\n Chọn điểm xem trong Model [Enter để dùng tâm polyline ({polylineCenter.X:F0}, {polylineCenter.Y:F0})]:");
-                ppoView.AllowNone = true;
-                PromptPointResult pprView = ed.GetPoint(ppoView);
-                
-                Point3d viewCenter = polylineCenter;
-                if (pprView.Status == PromptStatus.OK)
-                {
-                    viewCenter = pprView.Value;
-                }
-
-                // Lấy tỉ lệ từ bản vẽ
-                List<ScaleInfo> drawingScales = GetDrawingScales(db);
-                ScaleInfo? selectedScale = GetScaleFromDrawing(ed, drawingScales);
-                
-                if (selectedScale == null)
-                {
-                    ed.WriteMessage("\n❌ Không chọn được tỉ lệ.");
-                    return;
-                }
-                
-                double customScale = selectedScale.ScaleValue;
-
-                // Chuyển sang Layout
-                LayoutManager layoutMgr = LayoutManager.Current;
-                if (layoutMgr.CurrentLayout == "Model")
-                {
-                    using (Transaction tr = db.TransactionManager.StartTransaction())
-                    {
-                        DBDictionary layoutDict = (DBDictionary)tr.GetObject(db.LayoutDictionaryId, OpenMode.ForRead);
-                        foreach (DBDictionaryEntry entry in layoutDict)
-                        {
-                            if (entry.Key != "Model")
-                            {
-                                layoutMgr.CurrentLayout = entry.Key;
-                                break;
-                            }
-                        }
-                        tr.Commit();
-                    }
-                }
-
-                doc.SendStringToExecute("REGEN ", false, false, false);
-                System.Threading.Thread.Sleep(200);
-
-                // Chọn điểm đặt viewport
-                PromptPointOptions ppo = new("\n Chọn điểm đặt viewport trong Layout:");
-                PromptPointResult ppr = ed.GetPoint(ppo);
-                
-                if (ppr.Status != PromptStatus.OK)
-                {
-                    ed.WriteMessage("\n❌ Không có điểm nào được chọn.");
-                    return;
-                }
-
-                // Tạo viewport
-                CreateSingleViewportWithCustomView(db, ed, polylineId, viewCenter, polylinePoints,
-                    polylineWidth, polylineHeight, ppr.Value, customScale);
-
-                ed.WriteMessage("\n\n✅ Đã tạo viewport thành công!");
-            }
-            catch (System.Exception ex)
-            {
-                ed.WriteMessage($"\n❌ Lỗi: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Tạo viewport với view center tùy chỉnh
-        /// </summary>
-        private static void CreateSingleViewportWithCustomView(Database db, Editor ed,
-            ObjectId modelPolylineId, Point3d viewCenter, Point3dCollection modelPoints,
-            double modelWidth, double modelHeight, Point3d paperInsertPoint, double customScale)
-        {
-            using (Transaction tr = db.TransactionManager.StartTransaction())
-            {
-                try
-                {
-                    LayoutManager layoutMgr = LayoutManager.Current;
-                    Layout layout = (Layout)tr.GetObject(layoutMgr.GetLayoutId(layoutMgr.CurrentLayout), OpenMode.ForRead);
-                    BlockTableRecord paperSpace = (BlockTableRecord)tr.GetObject(layout.BlockTableRecordId, OpenMode.ForWrite);
-
-                    double paperWidth = modelWidth * customScale;
-                    double paperHeight = modelHeight * customScale;
-
-                    // Tính tâm của polyline trong Model space
-                    Polyline modelPoly = (Polyline)tr.GetObject(modelPolylineId, OpenMode.ForRead);
-                    var extents = modelPoly.GeometricExtents;
-                    Point3d polyCenter = new Point3d(
-                        (extents.MinPoint.X + extents.MaxPoint.X) / 2,
-                        (extents.MinPoint.Y + extents.MaxPoint.Y) / 2, 0);
-
-                    Viewport viewport = new()
-                    {
-                        CenterPoint = new Point3d(paperInsertPoint.X, paperInsertPoint.Y, 0),
-                        Width = paperWidth,
-                        Height = paperHeight,
-                        CustomScale = customScale,
-                        ViewCenter = new Point2d(viewCenter.X, viewCenter.Y)
-                    };
-
-                    ObjectId viewportId = paperSpace.AppendEntity(viewport);
-                    tr.AddNewlyCreatedDBObject(viewport, true);
-                    viewport.On = true;
-
-                    // Tạo clipping polyline
-                    Polyline clipPolyline = new();
-                    for (int i = 0; i < modelPoints.Count; i++)
-                    {
-                        Point3d modelPoint = modelPoints[i];
-                        double paperX = paperInsertPoint.X + (modelPoint.X - polyCenter.X) * customScale;
-                        double paperY = paperInsertPoint.Y + (modelPoint.Y - polyCenter.Y) * customScale;
-                        clipPolyline.AddVertexAt(i, new Point2d(paperX, paperY), 0, 0, 0);
-                    }
-                    clipPolyline.Closed = true;
-
-                    ObjectId clipPolylineId = paperSpace.AppendEntity(clipPolyline);
-                    tr.AddNewlyCreatedDBObject(clipPolyline, true);
-
-                    viewport.NonRectClipEntityId = clipPolylineId;
-                    viewport.NonRectClipOn = true;
-                    viewport.Locked = true;
-
-                    ed.WriteMessage($"\n📐 Viewport đã được tạo:");
-                    ed.WriteMessage($"\n   - View Center: ({viewCenter.X:F2}, {viewCenter.Y:F2})");
-                    ed.WriteMessage($"\n   - Tỉ lệ: {1.0 / customScale:F0}");
-
-                    tr.Commit();
-                }
-                catch (System.Exception ex)
-                {
-                    ed.WriteMessage($"\n❌ Lỗi: {ex.Message}");
-                    tr.Abort();
-                    throw;
-                }
-            }
-        }
-
-        /// <summary>
         /// Sắp xếp danh sách polyline theo tiêu chí được chọn
         /// </summary>
         private static List<PolylineInfo> SortPolylines(List<PolylineInfo> polylines, PolylineSortOrder sortOrder)
@@ -727,28 +538,32 @@ namespace Civil3DCsharp
         public ScaleInfo? SelectedScale { get; private set; }
         public ViewportArrangement Arrangement { get; private set; } = ViewportArrangement.Horizontal;
         public PolylineSortOrder SortOrder { get; private set; } = PolylineSortOrder.TopToBottom;
+        public string SelectedLayout { get; private set; } = "";
 
         // Controls
         private ComboBox cmbScale = null!;
         private RadioButton rbHorizontal = null!;
         private RadioButton rbVertical = null!;
         private ComboBox cmbSortOrder = null!;
+        private ComboBox cmbLayout = null!;
         private Button btnOK = null!;
         private Button btnCancel = null!;
 
         private List<ScaleInfo> _scales;
+        private List<string> _layouts;
 
-        public ViewportSettingsForm(List<ScaleInfo> scales)
+        public ViewportSettingsForm(List<ScaleInfo> scales, List<string> layouts)
         {
             _scales = scales;
+            _layouts = layouts;
             InitializeComponent();
-            LoadScales();
+            LoadData();
         }
 
         private void InitializeComponent()
         {
             this.Text = "Bố Trí Viewport Theo Hình";
-            this.Size = new Size(400, 280);
+            this.Size = new Size(400, 320); // Tăng chiều cao để chứa thêm layout
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -770,6 +585,25 @@ namespace Civil3DCsharp
 
             // ComboBox Tỉ lệ
             cmbScale = new ComboBox
+            {
+                Location = new Point(controlX, y),
+                Size = new Size(controlWidth, 25),
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+
+            y += 40;
+
+            // Label Layout
+            var lblLayout = new Label
+            {
+                Text = "Layout đích:",
+                Location = new Point(20, y + 3),
+                Size = new Size(labelWidth, 23),
+                AutoSize = false
+            };
+
+            // ComboBox Layout
+            cmbLayout = new ComboBox
             {
                 Location = new Point(controlX, y),
                 Size = new Size(controlWidth, 25),
@@ -855,6 +689,7 @@ namespace Civil3DCsharp
             this.Controls.AddRange(new Control[]
             {
                 lblScale, cmbScale,
+                lblLayout, cmbLayout,
                 lblArrangement, rbHorizontal, rbVertical,
                 lblSort, cmbSortOrder,
                 btnOK, btnCancel
@@ -864,26 +699,38 @@ namespace Civil3DCsharp
             this.CancelButton = btnCancel;
         }
 
-        private void LoadScales()
+        private void LoadData()
         {
+            // Load Scales
             cmbScale.Items.Clear();
-            
             int defaultIndex = 0;
             for (int i = 0; i < _scales.Count; i++)
             {
                 cmbScale.Items.Add(_scales[i].Name);
-                
-                // Tìm 1:100 làm mặc định
                 if (_scales[i].Name == "1:100" || _scales[i].DrawingUnits == 100)
                 {
                     defaultIndex = i;
                 }
             }
-
             if (cmbScale.Items.Count > 0)
             {
                 cmbScale.SelectedIndex = defaultIndex;
             }
+
+            // Load Layouts
+            cmbLayout.Items.Clear();
+            foreach (var layout in _layouts)
+            {
+                cmbLayout.Items.Add(layout);
+            }
+            
+            // Tìm layout hiện tại hoặc layout đầu tiên
+            string currentLayout = Application.DocumentManager.MdiActiveDocument.Database.LayoutDictionaryId.Database.TileMode ? "" : LayoutManager.Current.CurrentLayout;
+            int layoutIndex = _layouts.IndexOf(currentLayout);
+            if (layoutIndex >= 0)
+                cmbLayout.SelectedIndex = layoutIndex;
+            else if (cmbLayout.Items.Count > 0)
+                cmbLayout.SelectedIndex = 0;
         }
 
         private void BtnOK_Click(object? sender, EventArgs e)
@@ -892,6 +739,12 @@ namespace Civil3DCsharp
             if (cmbScale.SelectedIndex >= 0 && cmbScale.SelectedIndex < _scales.Count)
             {
                 SelectedScale = _scales[cmbScale.SelectedIndex];
+            }
+
+            // Lấy layout đã chọn
+            if (cmbLayout.SelectedItem != null)
+            {
+                SelectedLayout = cmbLayout.SelectedItem.ToString() ?? "";
             }
 
             // Lấy hướng bố trí

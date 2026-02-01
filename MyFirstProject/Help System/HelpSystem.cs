@@ -527,14 +527,7 @@ namespace Civil3DCsharp.HelpSystem
                 VideoLink = "https://www.youtube.com/watch?v=Zhh56engsA4"
             });
 
-            AddCommand(new CommandInfo
-            {
-                Name = "AT_BoTri_ViewPort_TheoHinh_V2",
-                Category = "CAD - Viewport",
-                Description = "Bố trí Viewport theo hình (V2)",
-                Usage = "AT_BoTri_ViewPort_TheoHinh_V2",
-                VideoLink = "https://www.youtube.com/watch?v=Zhh56engsA4"
-            });
+
 
             // 13. AT_Xoay_ViewPortHienHanh_Theo2Diem.cs
             AddCommand(new CommandInfo
@@ -696,6 +689,42 @@ namespace Civil3DCsharp.HelpSystem
                 Description = "Tạo Parcel các loại nhà",
                 Usage = "CTPA_TaoParcel_CacLoaiNha"
             });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTPA_DoiTen_Parcel",
+                Category = "Civil - Parcel",
+                Description = "Đổi tên Parcel theo mẫu (prefix + số thứ tự)",
+                Usage = "CTPA_DoiTen_Parcel",
+                Steps = new[] {
+                    "1. Gõ lệnh CTPA_DoiTen_Parcel",
+                    "2. Form Name Template hiện ra",
+                    "3. Chọn trường thuộc tính và nhấn Chèn để thêm vào mẫu tên",
+                    "4. Nhập mẫu tên (VD: Lô <[Next Counter]>)",
+                    "5. Chọn kiểu đánh số, số bắt đầu, bước nhảy",
+                    "6. Nhấn OK, chọn từng Parcel để đổi tên"
+                },
+                Notes = new[] {
+                    "Hỗ trợ nhiều kiểu đánh số: 1,2,3 hoặc I,II,III hoặc A,B,C...",
+                    "Tên Parcel sẽ thay đổi ngay lập tức khi chọn",
+                    "Có thể chèn thuộc tính: Parcel Name, Number, Area vào mẫu tên"
+                }
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTPA_DoiTen_Parcel_Nhanh",
+                Category = "Civil - Parcel",
+                Description = "Đổi tên nhanh Parcel - nhập trực tiếp tên mới",
+                Usage = "CTPA_DoiTen_Parcel_Nhanh",
+                Steps = new[] {
+                    "1. Gõ lệnh CTPA_DoiTen_Parcel_Nhanh",
+                    "2. Chọn Parcel cần đổi tên",
+                    "3. Nhập tên mới trực tiếp",
+                    "4. Tên Parcel sẽ được cập nhật ngay"
+                }
+            });
+
 
             // 04. Pipe and Structures
             AddCommand(new CommandInfo

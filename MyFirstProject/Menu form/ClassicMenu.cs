@@ -99,7 +99,12 @@ namespace MyFirstProject
             AddMenuItem(subMenuCorridor, "Tạo Multiple Corridor Surface", "CTSV_TaoCorridorSurfaceMultiple ");
             AddMenuItem(subMenuCorridor, "Tạo Single Corridor Surface", "CTSV_TaoCorridorSurfaceSingle ");
 
-            // Pipe Network
+            // Parcel
+            dynamic subMenuParcel = menu.AddSubMenu(menu.Count + 1, "Parcel");
+            AddMenuItem(subMenuParcel, "Tạo Parcel Các Loại Nhà", "CTPA_TaoParcel_CacLoaiNha ");
+            AddMenuItem(subMenuParcel, "Đổi Tên Parcel (Template)", "CTPA_DoiTen_Parcel ");
+            AddMenuItem(subMenuParcel, "Đổi Tên Parcel (Nhanh)", "CTPA_DoiTen_Parcel_Nhanh ");
+
             dynamic subMenuPipe = menu.AddSubMenu(menu.Count + 1, "Pipe Network");
             AddHeader(subMenuPipe, "--- Thay đổi thông số ---");
             AddMenuItem(subMenuPipe, "Thay Đổi Đường Kính Cống", "CTPI_ThayDoi_DuongKinhCong ");
@@ -284,7 +289,7 @@ namespace MyFirstProject
             // Viewport
             dynamic subMenuViewport = menu.AddSubMenu(menu.Count + 1, "Viewport");
             AddMenuItem(subMenuViewport, "Bố Trí ViewPort Theo Hình", "AT_BoTri_ViewPort_TheoHinh ");
-            AddMenuItem(subMenuViewport, "Bố Trí ViewPort Theo Hình (V2)", "AT_BoTri_ViewPort_TheoHinh_V2 ");
+
             AddMenuItem(subMenuViewport, "Xoay VP Hiện Hành (2 Điểm)", "AT_Xoay_ViewPortHienHanh_Theo2Diem ");
             AddMenuItem(subMenuViewport, "Xoay VP Hiện Hành (Góc)", "AT_Xoay_ViewPortHienHanh_TheoGoc ");
             AddMenuItem(subMenuViewport, "Reset Góc Xoay VP", "AT_Xoay_ViewPortHienHanh_Reset ");
