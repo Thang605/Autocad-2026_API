@@ -22,6 +22,7 @@ namespace Civil3DCsharp
     public class CTSV_XuatKhoiLuongRaExcel_Commands
     {
         private static string? _lastExportDirectory;
+        private static List<string> _currentQTOMaterialOrder = new();
         
         [CommandMethod("CTSV_XuatKhoiLuongRaExcel")]
         public static void CTSVXuatKhoiLuongRaExcel()
@@ -73,7 +74,7 @@ namespace Civil3DCsharp
                         SampleLineGroup? sampleLineGroup = tr.GetObject(slgInfo.SampleLineGroupId, OpenMode.ForRead) as SampleLineGroup;
                         if (sampleLineGroup == null) continue;
 
-                        List<MaterialVolumeInfo> materialInfoList = CollectMaterialVolumeInformation(sampleLineGroup, tr);
+                        List<MaterialVolumeInfo> materialInfoList = CollectMaterialVolumeInformation(sampleLineGroup, tr, selectionForm.UseShoelace);
                         
                         if (materialInfoList.Count > 0)
                         {
@@ -83,7 +84,8 @@ namespace Civil3DCsharp
                                 AlignmentName = alignmentInfo.AlignmentName,
                                 SampleLineGroupName = slgInfo.SampleLineGroupName,
                                 SampleLineGroupCount = alignmentInfo.SampleLineGroupCount,
-                                MaterialInfoList = materialInfoList
+                                MaterialInfoList = materialInfoList,
+                                QTOMaterialOrder = new List<string>(_currentQTOMaterialOrder) // Lưu copy của order hiện tại
                             };
                             allSheetData.Add(sheetData);
                             A.Ed.WriteMessage($"\n  ✓ Thu thập được {materialInfoList.Count} mục khối lượng");
@@ -128,7 +130,7 @@ namespace Civil3DCsharp
 
                 // Step 5: Xuất ra Excel với nhiều sheet
                 A.Ed.WriteMessage("\n\n🎯 BƯỚC 5: Xuất dữ liệu ra Excel");
-                ExportMultipleSheetsToExcel(allSheetData, exportPath);
+                ExportMultipleSheetsToExcel(allSheetData, exportPath, selectionForm.UseDefaultSorting);
 
                 A.Ed.WriteMessage($"\n\n✅ ===== HOÀN THÀNH =====");
                 A.Ed.WriteMessage($"\n📁 File đã được lưu tại: {exportPath}");
@@ -259,7 +261,7 @@ namespace Civil3DCsharp
             return sheetName;
         }
 
-        private static void ExportMultipleSheetsToExcel(List<SheetData> allSheetData, string filePath)
+        private static void ExportMultipleSheetsToExcel(List<SheetData> allSheetData, string filePath, bool useDefaultSorting)
         {
             try
             {
@@ -277,7 +279,7 @@ namespace Civil3DCsharp
                     A.Ed.WriteMessage($"\n  📄 Tạo sheet: {sheetData.SheetName}");
                     
                     // Xử lý dữ liệu cho sheet này - truyền thêm thông tin alignment, SampleLineGroup và số lượng SLG
-                    var pivotData = CreatePivotTableData(sheetData.MaterialInfoList, sheetData.AlignmentName, sheetData.SampleLineGroupName, sheetData.SampleLineGroupCount);
+                    var pivotData = CreatePivotTableData(sheetData.MaterialInfoList, sheetData.AlignmentName, sheetData.SampleLineGroupName, sheetData.SampleLineGroupCount, sheetData.QTOMaterialOrder, useDefaultSorting);
                     
                     // Tạo worksheet
                     var worksheet = workbook.Worksheets.Add(sheetData.SheetName);
@@ -342,8 +344,8 @@ namespace Civil3DCsharp
             {
                 int currentRow = 1;
                 
-                // Sắp xếp vật liệu theo thứ tự ưu tiên
-                var orderedMaterials = SortMaterialsByPriority(materialTypes);
+                // Sắp xếp vật liệu theo thứ tự từ Material List (QTO)
+                var orderedMaterials = SortMaterialsByPriority(materialTypes, _currentQTOMaterialOrder);
                 int materialCount = orderedMaterials.Count;
                 int totalCols = 1 + materialCount; // Tên đường + các cột khối lượng
 
@@ -690,12 +692,21 @@ namespace Civil3DCsharp
             }
         }
 
-        private static List<MaterialVolumeInfo> CollectMaterialVolumeInformation(SampleLineGroup sampleLineGroup, Transaction tr)
+        private static List<MaterialVolumeInfo> CollectMaterialVolumeInformation(SampleLineGroup sampleLineGroup, Transaction tr, bool useShoelace)
         {
             List<MaterialVolumeInfo> materialInfoList = new();
 
             try
             {
+                // ===== Lấy thứ tự materials từ QTOMaterialList =====
+                _currentQTOMaterialOrder = GetMaterialOrderFromQTO(sampleLineGroup);
+                if (_currentQTOMaterialOrder.Count > 0)
+                {
+                    A.Ed.WriteMessage($"\n  📋 Thứ tự vật liệu từ Material List: {string.Join(", ", _currentQTOMaterialOrder)}");
+                }
+                // ===================================
+
+
                 // Lấy tất cả sample lines trong group
                 ObjectIdCollection sampleLineIds = sampleLineGroup.GetSampleLineIds();
                 A.Ed.WriteMessage($"\n  - Tìm thấy {sampleLineIds.Count} sample lines trong group.");
@@ -713,9 +724,35 @@ namespace Civil3DCsharp
                         
                         A.Ed.WriteMessage($"\n  📍 Xử lý cọc: {stakeName} (Station: {FormatStation(station)})");
 
+                        // Tìm SectionView cho SampleLine này
+                        SectionView? sectionView = null;
+                        try
+                        {
+                            BlockTable bt = tr.GetObject(A.Db.BlockTableId, OpenMode.ForRead) as BlockTable;
+                            BlockTableRecord btr = tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForRead) as BlockTableRecord;
+                            foreach (ObjectId entId in btr)
+                            {
+                                try
+                                {
+                                    if (tr.GetObject(entId, OpenMode.ForRead) is SectionView sv)
+                                    {
+                                        if (sv.SampleLineId == sampleLineId)
+                                        {
+                                            sectionView = sv;
+                                            break;
+                                        }
+                                    }
+                                }
+                                catch { }
+                            }
+                        }
+                        catch { }
+
                         // Lấy tất cả Section IDs từ SampleLine
                         ObjectIdCollection sectionIds = sampleLine.GetSectionIds();
                         A.Ed.WriteMessage($"\n     - Tìm thấy {sectionIds.Count} sections");
+                        if (sectionView != null)
+                            A.Ed.WriteMessage($" (SectionView found)");
 
                         // Dictionary để lưu MaterialSection duy nhất cho mỗi material name
                         Dictionary<string, (double Area, string SourceName)> uniqueMaterials = new();
@@ -732,7 +769,7 @@ namespace Civil3DCsharp
                                 {
                                     string sourceName = materialSection.SourceName ?? "Không có tên";
                                     string materialName = ExtractMaterialNameFromSource(sourceName);
-                                    double area = CalculateAreaFromSectionPoints(materialSection.SectionPoints);
+                                    double area = GetMaterialSectionArea(materialSection, useShoelace);
 
                                     // Chỉ thêm hoặc cập nhật nếu chưa có hoặc diện tích lớn hơn
                                     if (!uniqueMaterials.ContainsKey(materialName))
@@ -829,46 +866,121 @@ namespace Civil3DCsharp
             }
         }
 
-        private static double CalculateAreaFromSectionPoints(SectionPointCollection sectionPoints)
+
+        /// <summary>
+        /// Lấy diện tích từ MaterialSection bằng Double Explode → Block → Hatch → Hatch.Area
+        /// </summary>
+        /// <summary>
+        /// Lấy diện tích từ MaterialSection bằng Double Explode → Block → Hatch → Hatch.Area
+        /// Nếu thất bại và useShoelace=true thì dùng công thức Shoelace với SectionPoints
+        /// </summary>
+        private static double GetMaterialSectionArea(MaterialSection materialSection, bool useShoelace)
         {
             try
             {
-                if (sectionPoints == null || sectionPoints.Count < 3)
-                    return 0.0;
-
-                List<Autodesk.AutoCAD.Geometry.Point2d> points = new();
+                // Double Explode: MaterialSection → Block → Hatch
+                DBObjectCollection firstExplode = new DBObjectCollection();
+                materialSection.Explode(firstExplode);
                 
-                for (int i = 0; i < sectionPoints.Count; i++)
+                foreach (Autodesk.AutoCAD.DatabaseServices.DBObject obj1 in firstExplode)
                 {
-                    SectionPoint sectionPoint = sectionPoints[i];
-                    Autodesk.AutoCAD.Geometry.Point3d location = sectionPoint.Location;
-                    points.Add(new Autodesk.AutoCAD.Geometry.Point2d(location.X, location.Y));
+                    try
+                    {
+                        // Nếu là BlockReference, explode tiếp để lấy Hatch
+                        if (obj1 is BlockReference blockRef)
+                        {
+                            DBObjectCollection secondExplode = new DBObjectCollection();
+                            blockRef.Explode(secondExplode);
+                            
+                            foreach (Autodesk.AutoCAD.DatabaseServices.DBObject obj2 in secondExplode)
+                            {
+                                try
+                                {
+                                    if (obj2 is Hatch hatch)
+                                    {
+                                        double hatchArea = hatch.Area;
+                                        if (hatchArea > 0.001)
+                                        {
+                                            // Dispose tất cả objects
+                                            foreach (var remaining in secondExplode)
+                                                ((Autodesk.AutoCAD.DatabaseServices.DBObject)remaining).Dispose();
+                                            foreach (var remaining in firstExplode)
+                                                ((Autodesk.AutoCAD.DatabaseServices.DBObject)remaining).Dispose();
+                                            
+                                            return hatchArea;
+                                        }
+                                    }
+                                }
+                                catch { }
+                            }
+                            
+                            // Dispose secondExplode nếu không tìm thấy Hatch
+                            foreach (var obj in secondExplode)
+                                ((Autodesk.AutoCAD.DatabaseServices.DBObject)obj).Dispose();
+                        }
+                        // Nếu trực tiếp là Hatch
+                        else if (obj1 is Hatch hatchDirect)
+                        {
+                            double hatchArea = hatchDirect.Area;
+                            if (hatchArea > 0.001)
+                            {
+                                foreach (var remaining in firstExplode)
+                                    ((Autodesk.AutoCAD.DatabaseServices.DBObject)remaining).Dispose();
+                                return hatchArea;
+                            }
+                        }
+                    }
+                    catch { }
+                }
+                
+                // Dispose firstExplode nếu không tìm thấy
+                foreach (var obj in firstExplode)
+                    ((Autodesk.AutoCAD.DatabaseServices.DBObject)obj).Dispose();
+                
+                if (useShoelace)
+                {
+                    return CalculateShoelaceArea(materialSection);
                 }
 
-                return CalculatePolygonArea(points);
-            }
-            catch (System.Exception ex)
-            {
-                A.Ed.WriteMessage($"\n⚠️  Lỗi tính diện tích từ section points: {ex.Message}");
                 return 0.0;
             }
-        }
-
-        private static double CalculatePolygonArea(List<Autodesk.AutoCAD.Geometry.Point2d> points)
-        {
-            if (points.Count < 3) return 0.0;
-
-            double area = 0.0;
-            int n = points.Count;
-
-            for (int i = 0; i < n; i++)
+            catch
             {
-                int j = (i + 1) % n;
-                area += points[i].X * points[j].Y;
-                area -= points[j].X * points[i].Y;
+                return 0.0;
             }
 
-            return Math.Abs(area) / 2.0;
+        }
+
+        private static double CalculateShoelaceArea(MaterialSection materialSection)
+        {
+            try
+            {
+                // Thử lấy SectionPoints
+                // Note: Cần kiểm tra kỹ xem SectionPoints có phải là Offset/Elevation không.
+                // Đối với SectionView, các exploded entities có tọa độ bản vẽ. 
+                // Đối với SectionPoints của MaterialSection, thường là Offset/Elevation.
+                
+                var points = materialSection.SectionPoints;
+                if (points == null || points.Count < 3) return 0.0;
+
+                double area = 0.0;
+                int n = points.Count;
+
+                for (int i = 0; i < n; i++)
+                {
+                    var p1 = points[i].Location;
+                    var p2 = points[(i + 1) % n].Location;
+                    
+                    // Giả sử Location.X là Offset và Location.Y là Elevation
+                    area += (p1.X * p2.Y) - (p2.X * p1.Y);
+                }
+
+                return Math.Abs(area) / 2.0;
+            }
+            catch
+            {
+                return 0.0;
+            }
         }
 
         private static string FormatStation(double station)
@@ -878,7 +990,7 @@ namespace Civil3DCsharp
             return $"Km{km}+{meters:F3}";
         }
 
-        private static PivotTableData CreatePivotTableData(List<MaterialVolumeInfo> materialInfoList, string alignmentName = "", string sampleLineGroupName = "", int sampleLineGroupCount = 0)
+        private static PivotTableData CreatePivotTableData(List<MaterialVolumeInfo> materialInfoList, string alignmentName = "", string sampleLineGroupName = "", int sampleLineGroupCount = 0, List<string>? qtoOrder = null, bool useDefaultSorting = false)
         {
             var pivotData = new PivotTableData();
             
@@ -887,7 +999,10 @@ namespace Civil3DCsharp
                 .Distinct()
                 .ToList();
 
-            var (orderedMaterials, decimalPlaces, additionalValues) = GetUserOrderedMaterialsAndDecimalPlaces(allMaterialTypes, alignmentName, sampleLineGroupName);
+            // Sử dụng qtoOrder được truyền vào (của riêng sheet này), nếu null thì fallback về static (để an toàn)
+            var orderToUse = qtoOrder ?? _currentQTOMaterialOrder;
+
+            var (orderedMaterials, decimalPlaces, additionalValues) = GetUserOrderedMaterialsAndDecimalPlaces(allMaterialTypes, alignmentName, sampleLineGroupName, sampleLineGroupCount, orderToUse, useDefaultSorting);
             pivotData.MaterialTypes = orderedMaterials;
             pivotData.DecimalPlaces = decimalPlaces;
             pivotData.MaterialAdditionalValues = additionalValues;
@@ -937,12 +1052,24 @@ namespace Civil3DCsharp
             return pivotData;
         }
 
-        private static (List<string> materials, int decimalPlaces, Dictionary<string, double> additionalValues) GetUserOrderedMaterialsAndDecimalPlaces(List<string> materialTypes, string alignmentName = "", string sampleLineGroupName = "", int sampleLineGroupCount = 0)
+        private static (List<string> materials, int decimalPlaces, Dictionary<string, double> additionalValues) GetUserOrderedMaterialsAndDecimalPlaces(List<string> materialTypes, string alignmentName = "", string sampleLineGroupName = "", int sampleLineGroupCount = 0, List<string>? qtoOrder = null, bool useDefaultSorting = false)
         {
             try
             {
-                var defaultOrderedMaterials = SortMaterialsByPriority(materialTypes);
+                var defaultOrderedMaterials = SortMaterialsByPriority(materialTypes, qtoOrder);
                 
+                // Nếu người dùng chọn dùng default sorting, bỏ qua form
+                if (useDefaultSorting)
+                {
+                    A.Ed.WriteMessage("\n  - Sử dụng tùy chọn Mặc định: Bỏ qua sắp xếp thủ công.");
+                    var defaultAdditionalValues = new Dictionary<string, double>();
+                    foreach (var material in defaultOrderedMaterials)
+                    {
+                        defaultAdditionalValues[material] = 0.0;
+                    }
+                    return (defaultOrderedMaterials, 2, defaultAdditionalValues);
+                }
+
                 A.Ed.WriteMessage($"\n  - Tìm thấy {materialTypes.Count} loại vật liệu. Hiển thị form sắp xếp...");
                 
                 // Tạo form với thông tin alignment, SampleLineGroup và số lượng SLG
@@ -979,7 +1106,7 @@ namespace Civil3DCsharp
             catch (System.Exception ex)
             {
                 A.Ed.WriteMessage($"\n⚠️  Lỗi hiển thị form sắp xếp: {ex.Message}");
-                var defaultOrderedMaterials = SortMaterialsByPriority(materialTypes);
+                var defaultOrderedMaterials = SortMaterialsByPriority(materialTypes, _currentQTOMaterialOrder);
                 var defaultAdditionalValues = new Dictionary<string, double>();
                 foreach (var material in defaultOrderedMaterials)
                 {
@@ -989,8 +1116,45 @@ namespace Civil3DCsharp
             }
         }
 
-        private static List<string> SortMaterialsByPriority(List<string> materialTypes)
+        /// <summary>
+        /// Sắp xếp materials theo thứ tự từ Material List (QTOMaterialList)
+        /// </summary>
+        private static List<string> SortMaterialsByPriority(List<string> materialTypes, List<string>? materialOrderFromQTO = null)
         {
+            // Nếu có thứ tự từ QTOMaterialList, ưu tiên sử dụng
+            if (materialOrderFromQTO != null && materialOrderFromQTO.Count > 0)
+            {
+                // Tạo dictionary với index từ QTO order
+                var orderDict = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < materialOrderFromQTO.Count; i++)
+                {
+                    string materialName = ExtractMaterialNameFromSource(materialOrderFromQTO[i]);
+                    if (!orderDict.ContainsKey(materialName))
+                    {
+                        orderDict[materialName] = i;
+                    }
+                }
+
+                return materialTypes
+                    .OrderBy(material =>
+                    {
+                        // Tìm trong orderDict (so sánh không phân biệt hoa thường)
+                        foreach (var kvp in orderDict)
+                        {
+                            if (material.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase) ||
+                                material.ToLower().Contains(kvp.Key.ToLower()) ||
+                                kvp.Key.ToLower().Contains(material.ToLower()))
+                            {
+                                return kvp.Value;
+                            }
+                        }
+                        return 1000; // Các material không có trong list sẽ ở cuối
+                    })
+                    .ThenBy(material => material)
+                    .ToList();
+            }
+
+            // Fallback: Sử dụng priority mặc định nếu không có QTO order
             var materialPriority = new Dictionary<string, int>
             {
                 { "Đào đất", 1 }, { "Dao dat", 1 },
@@ -1026,6 +1190,46 @@ namespace Civil3DCsharp
                 .ToList();
         }
 
+        /// <summary>
+        /// Lấy thứ tự materials từ QTOMaterialList của SampleLineGroup
+        /// </summary>
+        private static List<string> GetMaterialOrderFromQTO(SampleLineGroup sampleLineGroup)
+        {
+            List<string> materialOrder = new();
+
+            try
+            {
+                var materialLists = sampleLineGroup.MaterialLists;
+                if (materialLists == null || materialLists.Count == 0)
+                    return materialOrder;
+
+                // Lấy Material List đầu tiên (thường là list chính)
+                foreach (Autodesk.Civil.DatabaseServices.QTOMaterialList qtoList in materialLists)
+                {
+                    try
+                    {
+                        // Duyệt qua từng material trong list theo thứ tự
+                        for (int i = 0; i < qtoList.Count; i++)
+                        {
+                            var material = qtoList[i];
+                            if (material != null && !string.IsNullOrEmpty(material.Name))
+                            {
+                                materialOrder.Add(material.Name);
+                            }
+                        }
+                        
+                        // Chỉ lấy từ list đầu tiên
+                        if (materialOrder.Count > 0)
+                            break;
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+
+            return materialOrder;
+        }
+
         // Helper classes
         private class SheetData
         {
@@ -1034,6 +1238,7 @@ namespace Civil3DCsharp
             public string SampleLineGroupName { get; set; } = "";
             public int SampleLineGroupCount { get; set; } = 0;
             public List<MaterialVolumeInfo> MaterialInfoList { get; set; } = new();
+            public List<string> QTOMaterialOrder { get; set; } = new();
         }
 
         private class MaterialVolumeInfo

@@ -13,6 +13,8 @@ namespace MyFirstProject.Civil_Tool
         private CheckedListBox checkedListBoxAlignments;
         private Button btnSelectAll;
         private Button btnDeselectAll;
+        private CheckBox chkUseShoelace; // Checkbox mới
+        private CheckBox chkUseDefaultSorting; // Checkbox mới: Sử dụng mặc định sắp xếp
         private Button btnOK;
         private Button btnCancel;
         private Label lblInstructions;
@@ -22,6 +24,8 @@ namespace MyFirstProject.Civil_Tool
         public List<AlignmentInfo> AvailableAlignments { get; set; } = new();
         public List<AlignmentInfo> SelectedAlignments { get; private set; } = new();
         public bool DialogResult_OK { get; private set; } = false;
+        public bool UseShoelace { get; private set; } = false; // Property mới
+        public bool UseDefaultSorting { get; private set; } = false; // Property mới
 
         public AlignmentSelectionForm()
         {
@@ -38,8 +42,11 @@ namespace MyFirstProject.Civil_Tool
         private void InitializeComponent()
         {
             this.checkedListBoxAlignments = new CheckedListBox();
+            this.checkedListBoxAlignments = new CheckedListBox();
             this.btnSelectAll = new Button();
             this.btnDeselectAll = new Button();
+            this.chkUseShoelace = new CheckBox(); // Init checkbox
+            this.chkUseDefaultSorting = new CheckBox(); // Init checkbox
             this.btnOK = new Button();
             this.btnCancel = new Button();
             this.lblInstructions = new Label();
@@ -49,7 +56,7 @@ namespace MyFirstProject.Civil_Tool
 
             // Form - Tăng kích thước
             this.Text = "Chọn Alignment để xuất khối lượng";
-            this.Size = new Size(700, 600);
+            this.Size = new Size(700, 700);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -99,6 +106,24 @@ namespace MyFirstProject.Civil_Tool
             this.lblCount.TextAlign = ContentAlignment.MiddleLeft;
             currentY += 35;
 
+            // chkUseShoelace - Checkbox tùy chọn Shoelace
+            this.chkUseShoelace.Location = new Point(leftMargin, currentY);
+            this.chkUseShoelace.Size = new Size(500, 24);
+            this.chkUseShoelace.Text = "Tính diện tích cọc không có trắc ngang bằng công thức Shoelace";
+            this.chkUseShoelace.Font = new Font("Segoe UI", 10F, FontStyle.Regular);
+            this.chkUseShoelace.AutoSize = true;
+            this.chkUseShoelace.Checked = false;
+            currentY += 35;
+
+            // chkUseDefaultSorting
+            this.chkUseDefaultSorting.Location = new Point(leftMargin, currentY);
+            this.chkUseDefaultSorting.Size = new Size(500, 24);
+            this.chkUseDefaultSorting.Text = "Sử dụng mặc định thứ tự vật liệu và giá trị cộng thêm (Không hiện bảng sắp xếp)";
+            this.chkUseDefaultSorting.Font = new Font("Segoe UI", 10F, FontStyle.Regular);
+            this.chkUseDefaultSorting.AutoSize = true;
+            this.chkUseDefaultSorting.Checked = false;
+            currentY += 35;
+
             // Buttons - Tăng kích thước và khoảng cách
             this.btnSelectAll.Location = new Point(leftMargin, currentY);
             this.btnSelectAll.Size = new Size(130, 38);
@@ -139,6 +164,9 @@ namespace MyFirstProject.Civil_Tool
             this.Controls.Add(this.lblCount);
             this.Controls.Add(this.btnSelectAll);
             this.Controls.Add(this.btnDeselectAll);
+            this.Controls.Add(this.btnDeselectAll);
+            this.Controls.Add(this.chkUseShoelace); // Add to controls
+            this.Controls.Add(this.chkUseDefaultSorting); // Add to controls
             this.Controls.Add(this.btnOK);
             this.Controls.Add(this.btnCancel);
 
@@ -209,6 +237,8 @@ namespace MyFirstProject.Civil_Tool
                 return;
             }
 
+            UseShoelace = chkUseShoelace.Checked; // Lưu trạng thái
+            UseDefaultSorting = chkUseDefaultSorting.Checked; // Lưu trạng thái
             DialogResult_OK = true;
             this.Close();
         }
