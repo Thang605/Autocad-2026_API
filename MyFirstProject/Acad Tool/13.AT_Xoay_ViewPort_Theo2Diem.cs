@@ -18,7 +18,7 @@ using Application = Autodesk.AutoCAD.ApplicationServices.Application;
 using DrawingFont = System.Drawing.Font;
 
 // This line is not mandatory, but improves loading performances
-[assembly: CommandClass(typeof(Civil3DCsharp.AT_Xoay_ViewPortHienHanh_Theo2Diem))]
+[assembly: CommandClass(typeof(Civil3DCsharp.AT_Xoay_ViewPort_Theo2Diem))]
 
 namespace Civil3DCsharp
 {
@@ -34,13 +34,13 @@ namespace Civil3DCsharp
     /// <summary>
     /// Class chứa lệnh xoay viewport hiện hành theo 2 điểm
     /// </summary>
-    public class AT_Xoay_ViewPortHienHanh_Theo2Diem
+    public class AT_Xoay_ViewPort_Theo2Diem
     {
         /// <summary>
         /// Lệnh chính: Xoay viewport hiện hành theo 2 điểm chọn
         /// </summary>
-        [CommandMethod("AT_Xoay_ViewPortHienHanh_Theo2Diem")]
-        public static void Xoay_ViewPortHienHanh_Theo2Diem()
+        [CommandMethod("AT_Xoay_ViewPort_Theo2Diem")]
+        public static void Xoay_ViewPort_Theo2Diem()
         {
             Document doc = Application.DocumentManager.MdiActiveDocument;
             Database db = doc.Database;
@@ -48,7 +48,7 @@ namespace Civil3DCsharp
 
             try
             {
-                ed.WriteMessage("\n=== XOAY VIEWPORT HIỆN HÀNH THEO 2 ĐIỂM ===");
+                ed.WriteMessage("\n=== XOAY VIEWPORT THEO 2 ĐIỂM ===");
 
                 // Kiểm tra xem đang ở Paper space không
                 if (db.TileMode == true)
@@ -58,13 +58,31 @@ namespace Civil3DCsharp
                     return;
                 }
 
-                // Lấy viewport hiện hành
-                ObjectId currentViewportId = GetCurrentLayoutViewportId(db);
+                // Cho phép user chọn viewport từ layout
+                ObjectId currentViewportId = SelectViewportFromLayout(ed, db);
                 if (currentViewportId == ObjectId.Null)
                 {
-                    ed.WriteMessage("\n❌ Không tìm thấy viewport hiện hành. Vui lòng double-click vào viewport cần xoay.");
+                    ed.WriteMessage("\n❌ Không có viewport nào được chọn. Lệnh đã hủy.");
                     return;
                 }
+
+                // Reset góc xoay viewport về 0 trước khi chọn điểm
+                using (Transaction tr = db.TransactionManager.StartTransaction())
+                {
+                    Viewport vp = (Viewport)tr.GetObject(currentViewportId, OpenMode.ForWrite);
+                    if (vp.TwistAngle != 0)
+                    {
+                        double oldAngle = vp.TwistAngle * 180.0 / Math.PI;
+                        vp.TwistAngle = 0;
+                        ed.WriteMessage($"\n🔄 Đã reset góc xoay viewport từ {oldAngle:F2}° về 0°");
+                    }
+                    tr.Commit();
+                }
+
+                // Regen để cập nhật hiển thị viewport
+                doc.SendStringToExecute("REGEN ", false, false, false);
+
+                ed.WriteMessage("\n✓ Đã chọn viewport. Hãy chọn 2 điểm trong LAYOUT.");
 
                 // Hiển thị form chọn hướng xoay
                 ViewportRotationDirection rotationDirection;
@@ -116,13 +134,11 @@ namespace Civil3DCsharp
                 if (rotationDirection == ViewportRotationDirection.Horizontal)
                 {
                     // Xoay để 2 điểm nằm ngang (song song trục X)
-                    // Góc twist = -góc của đường thẳng
                     twistAngle = -angle;
                 }
                 else
                 {
                     // Xoay để 2 điểm nằm dọc (song song trục Y)
-                    // Góc twist = -(góc của đường thẳng - 90°)
                     twistAngle = -(angle - Math.PI / 2);
                 }
 
@@ -135,7 +151,7 @@ namespace Civil3DCsharp
                     try
                     {
                         Viewport viewport = (Viewport)tr.GetObject(currentViewportId, OpenMode.ForWrite);
-                        
+
                         // Cập nhật góc twist của viewport
                         viewport.TwistAngle = twistAngle;
 
@@ -164,122 +180,6 @@ namespace Civil3DCsharp
             }
         }
 
-        /// <summary>
-        /// Lệnh phụ: Xoay viewport với góc nhập trực tiếp
-        /// </summary>
-        [CommandMethod("AT_Xoay_ViewPortHienHanh_TheoGoc")]
-        public static void Xoay_ViewPortHienHanh_TheoGoc()
-        {
-            Document doc = Application.DocumentManager.MdiActiveDocument;
-            Database db = doc.Database;
-            Editor ed = doc.Editor;
-
-            try
-            {
-                ed.WriteMessage("\n=== XOAY VIEWPORT HIỆN HÀNH THEO GÓC ===");
-
-                // Kiểm tra xem đang ở Paper space không
-                if (db.TileMode == true)
-                {
-                    ed.WriteMessage("\n⚠️ Bạn đang ở Model space. Vui lòng chuyển sang Layout (Paper space).");
-                    return;
-                }
-
-                // Lấy viewport hiện hành
-                ObjectId currentViewportId = GetCurrentLayoutViewportId(db);
-                if (currentViewportId == ObjectId.Null)
-                {
-                    ed.WriteMessage("\n❌ Không tìm thấy viewport hiện hành.");
-                    return;
-                }
-
-                // Lấy góc xoay hiện tại
-                double currentAngle = 0;
-                using (Transaction tr = db.TransactionManager.StartTransaction())
-                {
-                    Viewport viewport = (Viewport)tr.GetObject(currentViewportId, OpenMode.ForRead);
-                    currentAngle = viewport.TwistAngle * 180.0 / Math.PI;
-                    tr.Commit();
-                }
-
-                // Nhập góc xoay
-                PromptDoubleOptions pdo = new($"\n Nhập góc xoay (độ) [Góc hiện tại: {currentAngle:F2}°]:");
-                pdo.DefaultValue = 0;
-                pdo.AllowNegative = true;
-                pdo.AllowZero = true;
-                PromptDoubleResult pdr = ed.GetDouble(pdo);
-
-                if (pdr.Status != PromptStatus.OK)
-                {
-                    ed.WriteMessage("\n❌ Đã hủy lệnh.");
-                    return;
-                }
-
-                double angleDegrees = pdr.Value;
-                double angleRadians = angleDegrees * Math.PI / 180.0;
-
-                // Áp dụng góc xoay
-                using (Transaction tr = db.TransactionManager.StartTransaction())
-                {
-                    Viewport viewport = (Viewport)tr.GetObject(currentViewportId, OpenMode.ForWrite);
-                    viewport.TwistAngle = angleRadians;
-                    tr.Commit();
-
-                    ed.WriteMessage($"\n✅ Đã xoay viewport {angleDegrees:F2}°");
-                }
-
-                doc.SendStringToExecute("REGEN ", false, false, false);
-            }
-            catch (System.Exception ex)
-            {
-                ed.WriteMessage($"\n❌ Lỗi: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Lệnh phụ: Đặt lại góc xoay viewport về 0
-        /// </summary>
-        [CommandMethod("AT_Xoay_ViewPortHienHanh_Reset")]
-        public static void Xoay_ViewPortHienHanh_Reset()
-        {
-            Document doc = Application.DocumentManager.MdiActiveDocument;
-            Database db = doc.Database;
-            Editor ed = doc.Editor;
-
-            try
-            {
-                ed.WriteMessage("\n=== ĐẶT LẠI GÓC XOAY VIEWPORT ===");
-
-                if (db.TileMode == true)
-                {
-                    ed.WriteMessage("\n⚠️ Bạn đang ở Model space. Vui lòng chuyển sang Layout.");
-                    return;
-                }
-
-                ObjectId currentViewportId = GetCurrentLayoutViewportId(db);
-                if (currentViewportId == ObjectId.Null)
-                {
-                    ed.WriteMessage("\n❌ Không tìm thấy viewport hiện hành.");
-                    return;
-                }
-
-                using (Transaction tr = db.TransactionManager.StartTransaction())
-                {
-                    Viewport viewport = (Viewport)tr.GetObject(currentViewportId, OpenMode.ForWrite);
-                    double oldAngle = viewport.TwistAngle * 180.0 / Math.PI;
-                    viewport.TwistAngle = 0;
-                    tr.Commit();
-
-                    ed.WriteMessage($"\n✅ Đã đặt lại góc xoay từ {oldAngle:F2}° về 0°");
-                }
-
-                doc.SendStringToExecute("REGEN ", false, false, false);
-            }
-            catch (System.Exception ex)
-            {
-                ed.WriteMessage($"\n❌ Lỗi: {ex.Message}");
-            }
-        }
 
         /// <summary>
         /// Lấy ObjectId của viewport hiện hành trong Layout
@@ -301,7 +201,7 @@ namespace Civil3DCsharp
                         LayoutManager layoutMgr = LayoutManager.Current;
                         Layout layout = (Layout)tr.GetObject(
                             layoutMgr.GetLayoutId(layoutMgr.CurrentLayout), OpenMode.ForRead);
-                        
+
                         // Duyệt qua các entity trong layout để tìm viewport
                         BlockTableRecord layoutBtr = (BlockTableRecord)tr.GetObject(
                             layout.BlockTableRecordId, OpenMode.ForRead);
@@ -338,6 +238,58 @@ namespace Civil3DCsharp
             while (angle < -Math.PI)
                 angle += 2 * Math.PI;
             return angle;
+        }
+
+        /// <summary>
+        /// Cho phép user chọn viewport từ layout
+        /// </summary>
+        private static ObjectId SelectViewportFromLayout(Editor ed, Database db)
+        {
+            ObjectId viewportId = ObjectId.Null;
+
+            try
+            {
+                // Tạo selection filter chỉ cho phép chọn Viewport
+                TypedValue[] filter = new TypedValue[]
+                {
+                    new TypedValue((int)DxfCode.Start, "VIEWPORT")
+                };
+                SelectionFilter selFilter = new SelectionFilter(filter);
+
+                // Prompt chọn viewport
+                PromptSelectionOptions pso = new PromptSelectionOptions();
+                pso.MessageForAdding = "\nChọn viewport cần xoay:";
+                pso.SingleOnly = true;
+                pso.SinglePickInSpace = true;
+
+                PromptSelectionResult psr = ed.GetSelection(pso, selFilter);
+
+                if (psr.Status == PromptStatus.OK && psr.Value.Count > 0)
+                {
+                    ObjectId selectedId = psr.Value.GetObjectIds()[0];
+
+                    // Kiểm tra viewport không phải là Paper space viewport (Number = 1)
+                    using (Transaction tr = db.TransactionManager.StartTransaction())
+                    {
+                        Viewport vp = (Viewport)tr.GetObject(selectedId, OpenMode.ForRead);
+                        if (vp.Number > 1)
+                        {
+                            viewportId = selectedId;
+                        }
+                        else
+                        {
+                            ed.WriteMessage("\n⚠️ Viewport này là viewport chính của Paper space, không thể xoay.");
+                        }
+                        tr.Commit();
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                ed.WriteMessage($"\n❌ Lỗi khi chọn viewport: {ex.Message}");
+            }
+
+            return viewportId;
         }
     }
 
@@ -481,8 +433,8 @@ namespace Civil3DCsharp
 
         private void BtnOK_Click(object? sender, EventArgs e)
         {
-            RotationDirection = rbHorizontal.Checked 
-                ? ViewportRotationDirection.Horizontal 
+            RotationDirection = rbHorizontal.Checked
+                ? ViewportRotationDirection.Horizontal
                 : ViewportRotationDirection.Vertical;
 
             this.DialogResult = DialogResult.OK;

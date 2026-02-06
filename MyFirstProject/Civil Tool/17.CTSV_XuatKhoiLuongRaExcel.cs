@@ -23,7 +23,7 @@ namespace Civil3DCsharp
     {
         private static string? _lastExportDirectory;
         private static List<string> _currentQTOMaterialOrder = new();
-        
+
         [CommandMethod("CTSV_XuatKhoiLuongRaExcel")]
         public static void CTSVXuatKhoiLuongRaExcel()
         {
@@ -62,20 +62,20 @@ namespace Civil3DCsharp
                 // Step 3: Thu thập thông tin từ tất cả các SampleLineGroups
                 A.Ed.WriteMessage("\n\n🎯 BƯỚC 3: Thu thập thông tin khối lượng vật liệu");
                 List<SheetData> allSheetData = new();
-                
+
                 foreach (var alignmentInfo in selectionForm.SelectedAlignments)
                 {
                     A.Ed.WriteMessage($"\n\n📍 Xử lý Alignment: {alignmentInfo.AlignmentName}");
-                    
+
                     foreach (var slgInfo in alignmentInfo.SampleLineGroups)
                     {
                         A.Ed.WriteMessage($"\n  - SampleLineGroup: {slgInfo.SampleLineGroupName}");
-                        
+
                         SampleLineGroup? sampleLineGroup = tr.GetObject(slgInfo.SampleLineGroupId, OpenMode.ForRead) as SampleLineGroup;
                         if (sampleLineGroup == null) continue;
 
                         List<MaterialVolumeInfo> materialInfoList = CollectMaterialVolumeInformation(sampleLineGroup, tr, selectionForm.UseShoelace);
-                        
+
                         if (materialInfoList.Count > 0)
                         {
                             var sheetData = new SheetData
@@ -130,29 +130,18 @@ namespace Civil3DCsharp
 
                 // Step 5: Xuất ra Excel với nhiều sheet
                 A.Ed.WriteMessage("\n\n🎯 BƯỚC 5: Xuất dữ liệu ra Excel");
-                ExportMultipleSheetsToExcel(allSheetData, exportPath, selectionForm.UseDefaultSorting);
+                ExportMultipleSheetsToExcel(allSheetData, exportPath, selectionForm.UseDefaultSorting, selectionForm.DecimalPlaces);
 
                 A.Ed.WriteMessage($"\n\n✅ ===== HOÀN THÀNH =====");
                 A.Ed.WriteMessage($"\n📁 File đã được lưu tại: {exportPath}");
                 A.Ed.WriteMessage($"\n📊 Đã tạo {allSheetData.Count} sheet(s) trong file Excel");
-                
-                // Hỏi người dùng có muốn mở file không
-                PromptKeywordOptions pko = new("\nBạn có muốn mở file Excel không?")
+
+                // Tự động mở file Excel
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                 {
-                    Keywords = { "Yes", "No" },
-                    AllowNone = false
-                };
-                pko.Keywords.Default = "Yes";
-                
-                PromptResult pr = A.Ed.GetKeywords(pko);
-                if (pr.Status == PromptStatus.OK && pr.StringResult == "Yes")
-                {
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = exportPath,
-                        UseShellExecute = true
-                    });
-                }
+                    FileName = exportPath,
+                    UseShellExecute = true
+                });
 
                 tr.Commit();
             }
@@ -189,7 +178,7 @@ namespace Civil3DCsharp
                         if (tr.GetObject(entityId, OpenMode.ForRead) is Alignment alignment)
                         {
                             ObjectIdCollection sampleLineGroupIds = alignment.GetSampleLineGroupIds();
-                            
+
                             if (sampleLineGroupIds.Count > 0)
                             {
                                 var alignmentInfo = new AlignmentInfo
@@ -244,7 +233,7 @@ namespace Civil3DCsharp
         {
             // Excel sheet name có giới hạn 31 ký tự
             string sheetName = $"{alignmentName}_{sampleLineGroupName}";
-            
+
             // Loại bỏ các ký tự không hợp lệ
             char[] invalidChars = { '\\', '/', '*', '?', ':', '[', ']' };
             foreach (char c in invalidChars)
@@ -261,7 +250,7 @@ namespace Civil3DCsharp
             return sheetName;
         }
 
-        private static void ExportMultipleSheetsToExcel(List<SheetData> allSheetData, string filePath, bool useDefaultSorting)
+        private static void ExportMultipleSheetsToExcel(List<SheetData> allSheetData, string filePath, bool useDefaultSorting, int decimalPlaces)
         {
             try
             {
@@ -270,30 +259,30 @@ namespace Civil3DCsharp
                 // Dictionary để lưu tổng khối lượng của từng đường/sheet
                 // Key: SheetName, Value: Dictionary<MaterialType, TotalVolume>
                 var summaryData = new List<SummaryRowData>();
-                
+
                 // Lấy danh sách tất cả các loại vật liệu từ tất cả các sheet
                 var allMaterialTypes = new HashSet<string>();
 
                 foreach (var sheetData in allSheetData)
                 {
                     A.Ed.WriteMessage($"\n  📄 Tạo sheet: {sheetData.SheetName}");
-                    
+
                     // Xử lý dữ liệu cho sheet này - truyền thêm thông tin alignment, SampleLineGroup và số lượng SLG
                     var pivotData = CreatePivotTableData(sheetData.MaterialInfoList, sheetData.AlignmentName, sheetData.SampleLineGroupName, sheetData.SampleLineGroupCount, sheetData.QTOMaterialOrder, useDefaultSorting);
-                    
+
                     // Tạo worksheet
                     var worksheet = workbook.Worksheets.Add(sheetData.SheetName);
-                    
+
                     // Xuất dữ liệu vào sheet
-                    ExportSheetData(worksheet, pivotData, sheetData.AlignmentName, sheetData.SampleLineGroupName);
-                    
+                    ExportSheetData(worksheet, pivotData, sheetData.AlignmentName, sheetData.SampleLineGroupName, decimalPlaces);
+
                     A.Ed.WriteMessage($"\n  ✓ Sheet '{sheetData.SheetName}': {pivotData.StakeInfos.Count} cọc, {pivotData.MaterialTypes.Count} vật liệu");
-                    
+
                     // Thu thập dữ liệu tổng hợp cho sheet TỔNG HỢP
-                    // Dòng tổng cộng trong sheet chi tiết = Header row (2) + số cọc + 1
-                    int totalRowInSheet = 2 + pivotData.StakeInfos.Count + 1;
+                    // Dòng tổng cộng trong sheet chi tiết = 2 dòng thông tin (Dự án, Địa điểm) + Title row + Header row + số cọc + 1
+                    int totalRowInSheet = 4 + pivotData.StakeInfos.Count + 1;
                     int volumeStartColInSheet = 4 + pivotData.MaterialTypes.Count;
-                    
+
                     var rowData = new SummaryRowData
                     {
                         AlignmentName = sheetData.AlignmentName,
@@ -302,7 +291,7 @@ namespace Civil3DCsharp
                         TotalRowNumber = totalRowInSheet,
                         MaterialColumnMapping = new Dictionary<string, int>()
                     };
-                    
+
                     // Lưu vị trí cột của từng loại vật liệu (cột khối lượng)
                     for (int i = 0; i < pivotData.MaterialTypes.Count; i++)
                     {
@@ -311,7 +300,7 @@ namespace Civil3DCsharp
                         // Cột khối lượng = volumeStartCol + i
                         rowData.MaterialColumnMapping[materialType] = volumeStartColInSheet + i;
                     }
-                    
+
                     summaryData.Add(rowData);
                 }
 
@@ -320,11 +309,11 @@ namespace Civil3DCsharp
                 {
                     A.Ed.WriteMessage($"\n  📄 Tạo sheet: TỔNG HỢP");
                     var summarySheet = workbook.Worksheets.Add("TỔNG HỢP");
-                    ExportSummarySheet(summarySheet, summaryData, allMaterialTypes.ToList());
-                    
+                    ExportSummarySheet(summarySheet, summaryData, allMaterialTypes.ToList(), decimalPlaces);
+
                     // Di chuyển sheet TỔNG HỢP lên đầu
                     summarySheet.Position = 1;
-                    
+
                     A.Ed.WriteMessage($"\n  ✓ Sheet 'TỔNG HỢP': {summaryData.Count} đường");
                 }
 
@@ -338,16 +327,25 @@ namespace Civil3DCsharp
             }
         }
 
-        private static void ExportSummarySheet(IXLWorksheet worksheet, List<SummaryRowData> summaryData, List<string> materialTypes)
+        private static void ExportSummarySheet(IXLWorksheet worksheet, List<SummaryRowData> summaryData, List<string> materialTypes, int decimalPlaces)
         {
             try
             {
                 int currentRow = 1;
-                
+
                 // Sắp xếp vật liệu theo thứ tự từ Material List (QTO)
                 var orderedMaterials = SortMaterialsByPriority(materialTypes, _currentQTOMaterialOrder);
                 int materialCount = orderedMaterials.Count;
                 int totalCols = 1 + materialCount; // Tên đường + các cột khối lượng
+
+                // ===== THÔNG TIN DỰ ÁN =====
+                worksheet.Cell(currentRow, 1).Value = "Dự án:";
+                worksheet.Cell(currentRow, 1).Style.Font.Italic = true;
+                currentRow++;
+
+                worksheet.Cell(currentRow, 1).Value = "Địa điểm:";
+                worksheet.Cell(currentRow, 1).Style.Font.Italic = true;
+                currentRow++;
 
                 // ===== TITLE =====
                 worksheet.Cell(currentRow, 1).Value = "BẢNG KHỐI LƯỢNG TẤT CẢ CÁC ĐƯỜNG";
@@ -363,7 +361,7 @@ namespace Civil3DCsharp
 
                 // ===== HEADER =====
                 worksheet.Cell(currentRow, 1).Value = "Tên đường";
-                
+
                 for (int i = 0; i < materialCount; i++)
                 {
                     worksheet.Cell(currentRow, 2 + i).Value = $"{orderedMaterials[i]} (m³)";
@@ -390,25 +388,25 @@ namespace Civil3DCsharp
                     // Tên đường (Alignment - SampleLineGroup)
                     string displayName = rowData.AlignmentName;
                     worksheet.Cell(currentRow, 1).Value = displayName;
-                    
+
                     // Khối lượng từng loại vật liệu - sử dụng công thức tham chiếu
                     for (int i = 0; i < materialCount; i++)
                     {
                         string materialType = orderedMaterials[i];
-                        
+
                         // Kiểm tra xem sheet có chứa loại vật liệu này không
                         if (rowData.MaterialColumnMapping.ContainsKey(materialType))
                         {
                             int colInSheet = rowData.MaterialColumnMapping[materialType];
                             string columnLetter = GetExcelColumnLetter(colInSheet);
-                            
+
                             // Tạo công thức tham chiếu: ='SheetName'!CellRef
                             // Cần escape tên sheet nếu chứa ký tự đặc biệt
-                            string escapedSheetName = rowData.SheetName.Contains(" ") || rowData.SheetName.Contains("-") 
-                                ? $"'{rowData.SheetName}'" 
+                            string escapedSheetName = rowData.SheetName.Contains(" ") || rowData.SheetName.Contains("-")
+                                ? $"'{rowData.SheetName}'"
                                 : rowData.SheetName;
                             string formula = $"={escapedSheetName}!{columnLetter}{rowData.TotalRowNumber}";
-                            
+
                             worksheet.Cell(currentRow, 2 + i).FormulaA1 = formula;
                         }
                         else
@@ -416,7 +414,7 @@ namespace Civil3DCsharp
                             // Nếu sheet không có loại vật liệu này, đặt giá trị 0
                             worksheet.Cell(currentRow, 2 + i).Value = 0;
                         }
-                        worksheet.Cell(currentRow, 2 + i).Style.NumberFormat.Format = "0.000";
+                        worksheet.Cell(currentRow, 2 + i).Style.NumberFormat.Format = "0." + new string('0', decimalPlaces);
                     }
 
                     // Style cho data rows
@@ -436,14 +434,14 @@ namespace Civil3DCsharp
 
                 // ===== TOTAL ROW - Sử dụng công thức SUM =====
                 worksheet.Cell(currentRow, 1).Value = "TỔNG CỘNG";
-                
+
                 for (int i = 0; i < materialCount; i++)
                 {
                     // Sử dụng công thức SUM để tính tổng các ô phía trên
                     string columnLetter = GetExcelColumnLetter(2 + i);
                     string sumFormula = $"=SUM({columnLetter}{dataStartRow}:{columnLetter}{dataEndRow})";
                     worksheet.Cell(currentRow, 2 + i).FormulaA1 = sumFormula;
-                    worksheet.Cell(currentRow, 2 + i).Style.NumberFormat.Format = "0.000";
+                    worksheet.Cell(currentRow, 2 + i).Style.NumberFormat.Format = "0." + new string('0', decimalPlaces);
                 }
 
                 // Style cho total row
@@ -498,20 +496,29 @@ namespace Civil3DCsharp
             public Dictionary<string, int> MaterialColumnMapping { get; set; } = new();
         }
 
-        private static void ExportSheetData(IXLWorksheet worksheet, PivotTableData pivotData, string alignmentName, string sampleLineGroupName)
+        private static void ExportSheetData(IXLWorksheet worksheet, PivotTableData pivotData, string alignmentName, string sampleLineGroupName, int decimalPlaces)
         {
             try
             {
                 int currentRow = 1;
-                // Luôn sử dụng 3 chữ số thập phân
-                int decimalPlaces = 3;
+                string numberFormat = "0." + new string('0', decimalPlaces);
                 int materialCount = pivotData.MaterialTypes.Count;
 
-                // ===== TITLE =====
+                // ===== THÔNG TIN DỰ ÁN (tham chiếu từ sheet TỔNG HỢP) =====
                 // Tổng cột = 3 (Lý trình, Tên cọc, Khoảng cách) + số vật liệu (diện tích) + số vật liệu (khối lượng)
                 int totalCols = 3 + materialCount + materialCount;
+
+                worksheet.Cell(currentRow, 1).FormulaA1 = "='TỔNG HỢP'!A1";
+                worksheet.Cell(currentRow, 1).Style.Font.Italic = true;
+                currentRow++;
+
+                worksheet.Cell(currentRow, 1).FormulaA1 = "='TỔNG HỢP'!A2";
+                worksheet.Cell(currentRow, 1).Style.Font.Italic = true;
+                currentRow++;
+
+                // ===== TITLE =====
                 string title = $"BẢNG KHỐI LƯỢNG VẬT LIỆU - {alignmentName}";
-                
+
                 worksheet.Cell(currentRow, 1).Value = title;
                 worksheet.Range(currentRow, 1, currentRow, totalCols).Merge();
                 var titleCell = worksheet.Cell(currentRow, 1);
@@ -560,37 +567,37 @@ namespace Civil3DCsharp
 
                 // ===== DATA ROWS =====
                 int dataStartRow = currentRow;
-                
+
                 // Xử lý từng dòng dữ liệu
                 for (int rowIdx = 0; rowIdx < pivotData.StakeInfos.Count; rowIdx++)
                 {
                     var stakeInfo = pivotData.StakeInfos[rowIdx];
-                    
+
                     worksheet.Cell(currentRow, 1).Value = stakeInfo.Station;
                     worksheet.Cell(currentRow, 2).Value = stakeInfo.StakeName;
-                    
-                    // Làm tròn khoảng cách đến 3 chữ số thập phân
-                    double spacingRounded = Math.Round(stakeInfo.SpacingPrev, 3);
+
+                    // Làm tròn khoảng cách đến số chữ số thập phân đã chọn
+                    double spacingRounded = Math.Round(stakeInfo.SpacingPrev, decimalPlaces);
                     worksheet.Cell(currentRow, 3).Value = spacingRounded;
-                    worksheet.Cell(currentRow, 3).Style.NumberFormat.Format = "0.000";
+                    worksheet.Cell(currentRow, 3).Style.NumberFormat.Format = numberFormat;
 
                     // Xuất cột diện tích (m²) - giữ giá trị trực tiếp vì đây là dữ liệu gốc
                     for (int i = 0; i < materialCount; i++)
                     {
                         string materialType = pivotData.MaterialTypes[i];
                         double area = stakeInfo.MaterialAreas.ContainsKey(materialType) ? stakeInfo.MaterialAreas[materialType] : 0.0;
-                        
+
                         if (pivotData.MaterialAdditionalValues.ContainsKey(materialType))
                         {
                             area += pivotData.MaterialAdditionalValues[materialType];
                         }
 
-                        // Làm tròn đến 3 chữ số thập phân
-                        double areaRounded = Math.Round(area, 3);
-                        
+                        // Làm tròn đến số chữ số thập phân đã chọn
+                        double areaRounded = Math.Round(area, decimalPlaces);
+
                         // Luôn hiển thị giá trị số (0 thay vì "-")
                         worksheet.Cell(currentRow, 4 + i).Value = areaRounded;
-                        worksheet.Cell(currentRow, 4 + i).Style.NumberFormat.Format = "0.000";
+                        worksheet.Cell(currentRow, 4 + i).Style.NumberFormat.Format = numberFormat;
                     }
 
                     // Xuất cột khối lượng (m³) - SỬ DỤNG CÔNG THỨC EXCEL
@@ -600,7 +607,7 @@ namespace Civil3DCsharp
                         int areaCol = 4 + i; // Cột diện tích tương ứng
                         string areaColLetter = GetExcelColumnLetter(areaCol);
                         string spacingColLetter = GetExcelColumnLetter(3); // Cột C - khoảng cách
-                        
+
                         if (rowIdx == 0)
                         {
                             // Dòng đầu tiên: không có diện tích trước, khối lượng = 0
@@ -616,7 +623,7 @@ namespace Civil3DCsharp
                             string formula = $"=({areaColLetter}{prevRow}+{areaColLetter}{currentRow})/2*{spacingColLetter}{currentRow}";
                             worksheet.Cell(currentRow, volumeStartCol + i).FormulaA1 = formula;
                         }
-                        worksheet.Cell(currentRow, volumeStartCol + i).Style.NumberFormat.Format = "0.000";
+                        worksheet.Cell(currentRow, volumeStartCol + i).Style.NumberFormat.Format = numberFormat;
                     }
 
                     // Style cho data rows
@@ -635,12 +642,12 @@ namespace Civil3DCsharp
                 // ===== TOTAL ROW - SỬ DỤNG CÔNG THỨC SUM =====
                 worksheet.Cell(currentRow, 1).Value = "TỔNG CỘNG";
                 worksheet.Range(currentRow, 1, currentRow, 2).Merge();
-                
+
                 // Tổng khoảng cách - sử dụng công thức SUM
                 string spacingCol = GetExcelColumnLetter(3);
                 string sumSpacingFormula = $"=SUM({spacingCol}{dataStartRow}:{spacingCol}{dataEndRow})";
                 worksheet.Cell(currentRow, 3).FormulaA1 = sumSpacingFormula;
-                worksheet.Cell(currentRow, 3).Style.NumberFormat.Format = "0.000";
+                worksheet.Cell(currentRow, 3).Style.NumberFormat.Format = numberFormat;
 
                 // Tổng cột diện tích (m²) - sử dụng công thức SUM
                 for (int i = 0; i < materialCount; i++)
@@ -648,7 +655,7 @@ namespace Civil3DCsharp
                     string colLetter = GetExcelColumnLetter(4 + i);
                     string sumFormula = $"=SUM({colLetter}{dataStartRow}:{colLetter}{dataEndRow})";
                     worksheet.Cell(currentRow, 4 + i).FormulaA1 = sumFormula;
-                    worksheet.Cell(currentRow, 4 + i).Style.NumberFormat.Format = "0.000";
+                    worksheet.Cell(currentRow, 4 + i).Style.NumberFormat.Format = numberFormat;
                 }
 
                 // Tổng cột khối lượng (m³) - sử dụng công thức SUM
@@ -657,7 +664,7 @@ namespace Civil3DCsharp
                     string colLetter = GetExcelColumnLetter(volumeStartCol + i);
                     string sumFormula = $"=SUM({colLetter}{dataStartRow}:{colLetter}{dataEndRow})";
                     worksheet.Cell(currentRow, volumeStartCol + i).FormulaA1 = sumFormula;
-                    worksheet.Cell(currentRow, volumeStartCol + i).Style.NumberFormat.Format = "0.000";
+                    worksheet.Cell(currentRow, volumeStartCol + i).Style.NumberFormat.Format = numberFormat;
                 }
 
                 // Style cho total row - Đổi từ Medium sang Thin
@@ -721,7 +728,7 @@ namespace Civil3DCsharp
 
                         double station = sampleLine.Station;
                         string stakeName = sampleLine.Name ?? FormatStation(station);
-                        
+
                         A.Ed.WriteMessage($"\n  📍 Xử lý cọc: {stakeName} (Station: {FormatStation(station)})");
 
                         // Tìm SectionView cho SampleLine này
@@ -763,7 +770,7 @@ namespace Civil3DCsharp
                             try
                             {
                                 Autodesk.AutoCAD.DatabaseServices.DBObject dbObj = tr.GetObject(sectionId, OpenMode.ForRead);
-                                
+
                                 // Kiểm tra nếu là MaterialSection
                                 if (dbObj is MaterialSection materialSection)
                                 {
@@ -823,13 +830,13 @@ namespace Civil3DCsharp
                 materialInfoList = materialInfoList.OrderBy(x => x.StationValue).ToList();
 
                 A.Ed.WriteMessage($"\n\n  ✅ Tổng cộng: {materialInfoList.Count} mục khối lượng vật liệu đã được thu thập.");
-                
+
                 // Hiển thị thống kê
                 var materialStats = materialInfoList
                     .GroupBy(x => x.MaterialName)
                     .Select(g => new { Material = g.Key, Count = g.Count() })
                     .OrderByDescending(x => x.Count);
-                
+
                 A.Ed.WriteMessage("\n  📊 Thống kê vật liệu:");
                 foreach (var stat in materialStats)
                 {
@@ -881,7 +888,7 @@ namespace Civil3DCsharp
                 // Double Explode: MaterialSection → Block → Hatch
                 DBObjectCollection firstExplode = new DBObjectCollection();
                 materialSection.Explode(firstExplode);
-                
+
                 foreach (Autodesk.AutoCAD.DatabaseServices.DBObject obj1 in firstExplode)
                 {
                     try
@@ -891,7 +898,7 @@ namespace Civil3DCsharp
                         {
                             DBObjectCollection secondExplode = new DBObjectCollection();
                             blockRef.Explode(secondExplode);
-                            
+
                             foreach (Autodesk.AutoCAD.DatabaseServices.DBObject obj2 in secondExplode)
                             {
                                 try
@@ -906,14 +913,14 @@ namespace Civil3DCsharp
                                                 ((Autodesk.AutoCAD.DatabaseServices.DBObject)remaining).Dispose();
                                             foreach (var remaining in firstExplode)
                                                 ((Autodesk.AutoCAD.DatabaseServices.DBObject)remaining).Dispose();
-                                            
+
                                             return hatchArea;
                                         }
                                     }
                                 }
                                 catch { }
                             }
-                            
+
                             // Dispose secondExplode nếu không tìm thấy Hatch
                             foreach (var obj in secondExplode)
                                 ((Autodesk.AutoCAD.DatabaseServices.DBObject)obj).Dispose();
@@ -932,11 +939,11 @@ namespace Civil3DCsharp
                     }
                     catch { }
                 }
-                
+
                 // Dispose firstExplode nếu không tìm thấy
                 foreach (var obj in firstExplode)
                     ((Autodesk.AutoCAD.DatabaseServices.DBObject)obj).Dispose();
-                
+
                 if (useShoelace)
                 {
                     return CalculateShoelaceArea(materialSection);
@@ -959,7 +966,7 @@ namespace Civil3DCsharp
                 // Note: Cần kiểm tra kỹ xem SectionPoints có phải là Offset/Elevation không.
                 // Đối với SectionView, các exploded entities có tọa độ bản vẽ. 
                 // Đối với SectionPoints của MaterialSection, thường là Offset/Elevation.
-                
+
                 var points = materialSection.SectionPoints;
                 if (points == null || points.Count < 3) return 0.0;
 
@@ -970,7 +977,7 @@ namespace Civil3DCsharp
                 {
                     var p1 = points[i].Location;
                     var p2 = points[(i + 1) % n].Location;
-                    
+
                     // Giả sử Location.X là Offset và Location.Y là Elevation
                     area += (p1.X * p2.Y) - (p2.X * p1.Y);
                 }
@@ -993,7 +1000,7 @@ namespace Civil3DCsharp
         private static PivotTableData CreatePivotTableData(List<MaterialVolumeInfo> materialInfoList, string alignmentName = "", string sampleLineGroupName = "", int sampleLineGroupCount = 0, List<string>? qtoOrder = null, bool useDefaultSorting = false)
         {
             var pivotData = new PivotTableData();
-            
+
             var allMaterialTypes = materialInfoList
                 .Select(x => x.MaterialName)
                 .Distinct()
@@ -1057,7 +1064,7 @@ namespace Civil3DCsharp
             try
             {
                 var defaultOrderedMaterials = SortMaterialsByPriority(materialTypes, qtoOrder);
-                
+
                 // Nếu người dùng chọn dùng default sorting, bỏ qua form
                 if (useDefaultSorting)
                 {
@@ -1071,7 +1078,7 @@ namespace Civil3DCsharp
                 }
 
                 A.Ed.WriteMessage($"\n  - Tìm thấy {materialTypes.Count} loại vật liệu. Hiển thị form sắp xếp...");
-                
+
                 // Tạo form với thông tin alignment, SampleLineGroup và số lượng SLG
                 MaterialOrderForm orderForm;
                 if (!string.IsNullOrEmpty(alignmentName) || !string.IsNullOrEmpty(sampleLineGroupName))
@@ -1082,14 +1089,14 @@ namespace Civil3DCsharp
                 {
                     orderForm = new MaterialOrderForm(defaultOrderedMaterials);
                 }
-                
+
                 Autodesk.AutoCAD.ApplicationServices.Application.ShowModalDialog(orderForm);
-                
+
                 if (orderForm.DialogResult_OK && orderForm.OrderedMaterialTypes.Count > 0)
                 {
                     A.Ed.WriteMessage($"\n  - Người dùng đã sắp xếp thứ tự: {string.Join(", ", orderForm.OrderedMaterialTypes)}");
                     A.Ed.WriteMessage($"\n  - Số chữ số thập phân: {orderForm.DecimalPlaces}");
-                    
+
                     return (orderForm.OrderedMaterialTypes, orderForm.DecimalPlaces, orderForm.MaterialAdditionalValues);
                 }
                 else
@@ -1169,21 +1176,21 @@ namespace Civil3DCsharp
             };
 
             return materialTypes
-                .OrderBy(material => 
+                .OrderBy(material =>
                 {
                     if (materialPriority.ContainsKey(material))
                         return materialPriority[material];
-                    
+
                     var normalizedMaterial = material.ToLower().Trim();
                     foreach (var kvp in materialPriority)
                     {
-                        if (normalizedMaterial.Contains(kvp.Key.ToLower()) || 
+                        if (normalizedMaterial.Contains(kvp.Key.ToLower()) ||
                             kvp.Key.ToLower().Contains(normalizedMaterial))
                         {
                             return kvp.Value;
                         }
                     }
-                    
+
                     return 1000;
                 })
                 .ThenBy(material => material)
@@ -1217,7 +1224,7 @@ namespace Civil3DCsharp
                                 materialOrder.Add(material.Name);
                             }
                         }
-                        
+
                         // Chỉ lấy từ list đầu tiên
                         if (materialOrder.Count > 0)
                             break;

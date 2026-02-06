@@ -285,6 +285,7 @@ namespace MyFirstProject
             AddMenuItem(subMenuRotate, "Xoay Theo Viewport", "AT_XoayDoiTuong_TheoViewport ");
             AddMenuItem(subMenuRotate, "Xoay Theo Viewport (V2)", "AT_XoayDoiTuong_TheoViewport_V2 ");
             AddMenuItem(subMenuRotate, "Xoay Theo 2 Điểm", "AT_XoayDoiTuong_Theo2Diem ");
+            AddMenuItem(subMenuRotate, "Điều Chỉnh Map Rotation", "AdjustMapRotation ");
 
             // Viewport
             dynamic subMenuViewport = menu.AddSubMenu(menu.Count + 1, "Viewport");

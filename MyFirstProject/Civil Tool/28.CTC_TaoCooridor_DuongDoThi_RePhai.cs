@@ -31,6 +31,8 @@ namespace Civil3DCsharp
         [CommandMethod("CAC_TaoCooridor_DuongDoThi_RePhai")]
         public static void CAC_TaoCooridor_DuongDoThi_RePhai()
         {
+            if (!System.IO.File.Exists(@"C:\Windows\KeyLoadCT.txt")) return;
+
             using Transaction tr = A.Db.TransactionManager.StartTransaction();
             try
             {

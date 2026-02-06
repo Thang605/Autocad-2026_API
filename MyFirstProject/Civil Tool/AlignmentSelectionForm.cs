@@ -15,6 +15,8 @@ namespace MyFirstProject.Civil_Tool
         private Button btnDeselectAll;
         private CheckBox chkUseShoelace; // Checkbox mới
         private CheckBox chkUseDefaultSorting; // Checkbox mới: Sử dụng mặc định sắp xếp
+        private Label lblDecimalPlaces;
+        private NumericUpDown numDecimalPlaces;
         private Button btnOK;
         private Button btnCancel;
         private Label lblInstructions;
@@ -26,6 +28,7 @@ namespace MyFirstProject.Civil_Tool
         public bool DialogResult_OK { get; private set; } = false;
         public bool UseShoelace { get; private set; } = false; // Property mới
         public bool UseDefaultSorting { get; private set; } = false; // Property mới
+        public int DecimalPlaces { get; private set; } = 3; // Property số thập phân
 
         public AlignmentSelectionForm()
         {
@@ -47,6 +50,8 @@ namespace MyFirstProject.Civil_Tool
             this.btnDeselectAll = new Button();
             this.chkUseShoelace = new CheckBox(); // Init checkbox
             this.chkUseDefaultSorting = new CheckBox(); // Init checkbox
+            this.lblDecimalPlaces = new Label();
+            this.numDecimalPlaces = new NumericUpDown();
             this.btnOK = new Button();
             this.btnCancel = new Button();
             this.lblInstructions = new Label();
@@ -80,7 +85,7 @@ namespace MyFirstProject.Civil_Tool
             this.lblInstructions.Location = new Point(leftMargin, currentY);
             this.lblInstructions.Size = new Size(contentWidth, 55);
             this.lblInstructions.AutoSize = false;
-            this.lblInstructions.Text = "Chọn các Alignment có SampleLineGroup để xuất khối lượng." + Environment.NewLine + 
+            this.lblInstructions.Text = "Chọn các Alignment có SampleLineGroup để xuất khối lượng." + Environment.NewLine +
                                         "Mỗi SampleLineGroup sẽ được xuất ra một sheet riêng trong file Excel.";
             this.lblInstructions.Font = new Font("Segoe UI", 10F, FontStyle.Regular);
             this.lblInstructions.ForeColor = Color.FromArgb(51, 51, 51);
@@ -123,6 +128,22 @@ namespace MyFirstProject.Civil_Tool
             this.chkUseDefaultSorting.AutoSize = true;
             this.chkUseDefaultSorting.Checked = false;
             currentY += 35;
+
+            // lblDecimalPlaces & numDecimalPlaces - Số chữ số thập phân
+            this.lblDecimalPlaces.Location = new Point(leftMargin, currentY);
+            this.lblDecimalPlaces.Size = new Size(180, 28);
+            this.lblDecimalPlaces.Text = "Số chữ số thập phân:";
+            this.lblDecimalPlaces.Font = new Font("Segoe UI", 10F, FontStyle.Regular);
+            this.lblDecimalPlaces.TextAlign = ContentAlignment.MiddleLeft;
+
+            this.numDecimalPlaces.Location = new Point(leftMargin + 185, currentY);
+            this.numDecimalPlaces.Size = new Size(60, 28);
+            this.numDecimalPlaces.Font = new Font("Segoe UI", 10F, FontStyle.Regular);
+            this.numDecimalPlaces.Minimum = 1;
+            this.numDecimalPlaces.Maximum = 6;
+            this.numDecimalPlaces.Value = 3;
+            this.numDecimalPlaces.TextAlign = HorizontalAlignment.Center;
+            currentY += 40;
 
             // Buttons - Tăng kích thước và khoảng cách
             this.btnSelectAll.Location = new Point(leftMargin, currentY);
@@ -167,6 +188,8 @@ namespace MyFirstProject.Civil_Tool
             this.Controls.Add(this.btnDeselectAll);
             this.Controls.Add(this.chkUseShoelace); // Add to controls
             this.Controls.Add(this.chkUseDefaultSorting); // Add to controls
+            this.Controls.Add(this.lblDecimalPlaces);
+            this.Controls.Add(this.numDecimalPlaces);
             this.Controls.Add(this.btnOK);
             this.Controls.Add(this.btnCancel);
 
@@ -176,7 +199,7 @@ namespace MyFirstProject.Civil_Tool
         private void LoadAlignments()
         {
             checkedListBoxAlignments.Items.Clear();
-            
+
             foreach (var alignmentInfo in AvailableAlignments)
             {
                 checkedListBoxAlignments.Items.Add(alignmentInfo, false);
@@ -219,7 +242,7 @@ namespace MyFirstProject.Civil_Tool
         private void BtnOK_Click(object sender, EventArgs e)
         {
             SelectedAlignments.Clear();
-            
+
             foreach (var item in checkedListBoxAlignments.CheckedItems)
             {
                 if (item is AlignmentInfo alignmentInfo)
@@ -230,15 +253,16 @@ namespace MyFirstProject.Civil_Tool
 
             if (SelectedAlignments.Count == 0)
             {
-                MessageBox.Show("Vui lòng chọn ít nhất một Alignment!", 
-                    "Thông báo", 
-                    MessageBoxButtons.OK, 
+                MessageBox.Show("Vui lòng chọn ít nhất một Alignment!",
+                    "Thông báo",
+                    MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
                 return;
             }
 
             UseShoelace = chkUseShoelace.Checked; // Lưu trạng thái
             UseDefaultSorting = chkUseDefaultSorting.Checked; // Lưu trạng thái
+            DecimalPlaces = (int)numDecimalPlaces.Value; // Lưu số thập phân
             DialogResult_OK = true;
             this.Close();
         }
