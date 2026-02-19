@@ -4,6 +4,8 @@ using System.Drawing;
 using System.Windows.Forms;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.Civil.DatabaseServices;
+using Autodesk.AutoCAD.EditorInput;
+using Autodesk.AutoCAD.ApplicationServices;
 
 using WinFormsLabel = System.Windows.Forms.Label;
 using WinFormsFont = System.Drawing.Font;
@@ -35,6 +37,8 @@ namespace MyFirstProject.Civil_Tool_2
         private RadioButton radReplaceAll = null!;
         private RadioButton radReplaceInRange = null!;
         private RadioButton radAddNew = null!;
+
+        private Button btnPick = null!;
 
         private Button btnOK = null!;
         private Button btnCancel = null!;
@@ -76,6 +80,8 @@ namespace MyFirstProject.Civil_Tool_2
             this.radReplaceInRange = new RadioButton();
             this.radAddNew = new RadioButton();
 
+            this.btnPick = new Button();
+
             this.btnOK = new Button();
             this.btnCancel = new Button();
 
@@ -83,7 +89,7 @@ namespace MyFirstProject.Civil_Tool_2
 
             // Form
             this.Text = "Điều chỉnh Profile theo Polyline";
-            this.Size = new Size(500, 480);
+            this.Size = new Size(500, 530);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -128,21 +134,31 @@ namespace MyFirstProject.Civil_Tool_2
             this.grpProfiles.Text = "Chọn Profile cần điều chỉnh";
             this.grpProfiles.Font = boldFont;
             this.grpProfiles.Location = new WinFormsPoint(20, 120);
-            this.grpProfiles.Size = new Size(445, 150);
+            this.grpProfiles.Size = new Size(445, 190);
             this.grpProfiles.ForeColor = Color.Black;
 
             // Profiles ListBox
             this.lstProfiles.Location = new WinFormsPoint(15, 25);
             this.lstProfiles.Size = new Size(415, 110);
             this.lstProfiles.Font = standardFont;
-            this.lstProfiles.SelectionMode = SelectionMode.One;
+            this.lstProfiles.SelectionMode = System.Windows.Forms.SelectionMode.One;
 
             this.grpProfiles.Controls.Add(lstProfiles);
+
+            // Pick Button
+            this.btnPick.Text = "🖱️ Chọn trên bản vẽ";
+            this.btnPick.Location = new WinFormsPoint(250, 145);
+            this.btnPick.Size = new Size(180, 30);
+            this.btnPick.Font = standardFont;
+            this.btnPick.BackColor = Color.LightGray;
+            this.btnPick.Click += BtnPick_Click;
+
+            this.grpProfiles.Controls.Add(btnPick);
 
             // Options Group
             this.grpOptions.Text = "Tùy chọn điều chỉnh";
             this.grpOptions.Font = boldFont;
-            this.grpOptions.Location = new WinFormsPoint(20, 280);
+            this.grpOptions.Location = new WinFormsPoint(20, 320);
             this.grpOptions.Size = new Size(445, 110);
             this.grpOptions.ForeColor = Color.Black;
 
@@ -169,7 +185,7 @@ namespace MyFirstProject.Civil_Tool_2
 
             // OK Button
             this.btnOK.Text = "Tiếp tục";
-            this.btnOK.Location = new WinFormsPoint(270, 400);
+            this.btnOK.Location = new WinFormsPoint(270, 440);
             this.btnOK.Size = new Size(100, 35);
             this.btnOK.Font = boldFont;
             this.btnOK.BackColor = Color.FromArgb(0, 122, 204);
@@ -179,7 +195,7 @@ namespace MyFirstProject.Civil_Tool_2
 
             // Cancel Button
             this.btnCancel.Text = "Hủy";
-            this.btnCancel.Location = new WinFormsPoint(380, 400);
+            this.btnCancel.Location = new WinFormsPoint(380, 440);
             this.btnCancel.Size = new Size(85, 35);
             this.btnCancel.Font = standardFont;
             this.btnCancel.Click += BtnCancel_Click;
@@ -264,6 +280,51 @@ namespace MyFirstProject.Civil_Tool_2
             FormAccepted = false;
             this.DialogResult = DialogResult.Cancel;
             this.Close();
+        }
+
+        private void BtnPick_Click(object? sender, EventArgs e)
+        {
+            // Ẩn form để người dùng chọn trên bản vẽ
+            // Sử dụng EditorUserInteraction để xử lý việc ẩn/hiện form modal đúng cách
+            var editor = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
+            
+            using (var interaction = editor.StartUserInteraction(this))
+            {
+                var options = new PromptEntityOptions("\n>> Chọn Profile trên bản vẽ (Profile View): ");
+                options.SetRejectMessage("\nĐối tượng không phải là Profile.");
+                options.AddAllowedClass(typeof(Profile), true);
+
+                var result = editor.GetEntity(options);
+
+                if (result.Status == PromptStatus.OK)
+                {
+                    ObjectId pickedId = result.ObjectId;
+                    
+                    // Tìm trong list
+                    bool found = false;
+                    for (int i = 0; i < lstProfiles.Items.Count; i++)
+                    {
+                        if (lstProfiles.Items[i] is ProfileItem item && item.Id == pickedId)
+                        {
+                            lstProfiles.SelectedIndex = i;
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    interaction.End(); // Hiện lại form trước khi hiện thông báo
+
+                    if (!found)
+                    {
+                         MessageBox.Show("Profile được chọn không thuộc Alignment hiện tại hoặc không có trong danh sách.", 
+                            "Cảnh báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                }
+                else
+                {
+                    interaction.End(); // Hiện lại form nếu hủy chọn
+                }
+            }
         }
 
         /// <summary>

@@ -253,46 +253,35 @@ namespace Civil3DCsharp
                 double polylineStartStation = stationElevations[0].station;
                 double polylineEndStation = stationElevations[^1].station;
 
-                switch (adjustOption)
+                // Danh sách PVI cần xóa (lưu lại station và elevation để tìm lại PVI vì index sẽ thay đổi)
+                List<(double station, double elevation)> pvisToRemove = new();
+
+                if (adjustOption == 1) // Thay thế toàn bộ
                 {
-                    case 1: // Thay thế toàn bộ
-                        // Xóa tất cả PVI cũ
-                        while (targetProfile.PVIs.Count > 0)
+                    foreach (ProfilePVI pvi in targetProfile.PVIs)
+                    {
+                        pvisToRemove.Add((pvi.Station, pvi.Elevation));
+                    }
+                }
+                else if (adjustOption == 2) // Thay thế trong phạm vi
+                {
+                    foreach (ProfilePVI pvi in targetProfile.PVIs)
+                    {
+                        if (pvi.Station >= polylineStartStation && pvi.Station <= polylineEndStation)
                         {
-                            targetProfile.PVIs.RemoveAt(0);
-                            removedCount++;
+                            pvisToRemove.Add((pvi.Station, pvi.Elevation));
                         }
-                        break;
-
-                    case 2: // Thay thế trong phạm vi
-                        // Xóa các PVI trong phạm vi polyline
-                        List<int> indicesToRemove = new();
-                        for (int i = 0; i < targetProfile.PVIs.Count; i++)
-                        {
-                            ProfilePVI pvi = targetProfile.PVIs[i];
-                            if (pvi.Station >= polylineStartStation && pvi.Station <= polylineEndStation)
-                            {
-                                indicesToRemove.Add(i);
-                            }
-                        }
-                        // Xóa từ cuối về đầu để không ảnh hưởng index
-                        for (int i = indicesToRemove.Count - 1; i >= 0; i--)
-                        {
-                            targetProfile.PVIs.RemoveAt(indicesToRemove[i]);
-                            removedCount++;
-                        }
-                        break;
-
-                    case 3: // Thêm mới (không xóa gì)
-                        break;
+                    }
                 }
 
-                // 8. Thêm các điểm PVI mới
+                // 8. Thêm các điểm PVI mới TRƯỚC (để đảm bảo profile luôn hợp lệ)
+                // Lưu ý: Nếu PVI mới trùng station với PVI cũ, AddPVI sẽ tự động cập nhật elevation
                 foreach (var (station, elevation) in stationElevations)
                 {
                     try
                     {
-                        if (station >= alignment.StartingStation && station <= alignment.EndingStation)
+                        // Kiểm tra nếu nằm trong giới hạn Alignment (cho phép mở rộng 1 chút vi sai số)
+                        if (station >= alignment.StartingStation - 0.001 && station <= alignment.EndingStation + 0.001)
                         {
                             targetProfile.PVIs.AddPVI(station, elevation);
                             addedCount++;
@@ -308,10 +297,66 @@ namespace Civil3DCsharp
                     }
                 }
 
+                // 9. Xóa các PVI cũ SAU KHI đã thêm mới
+                // Cần lấy lại danh sách PVI hiện tại vì collection đã thay đổi sau khi AddPVI
+                // Tuy nhiên, ta chỉ xóa những PVI nằm trong danh sách pvisToRemove đã xác định từ trước
+                // VÀ không nằm trong danh sách mới thêm vào (stationElevations) - để tránh xóa nhầm cái vừa update
+
+                // Tạo HashSet các station mới để tra cứu nhanh
+                HashSet<double> newStations = new HashSet<double>(
+                    stationElevations.Select(x => Math.Round(x.station, 4)));
+
+                // Duyệt ngược để xóa an toàn
+                for (int i = targetProfile.PVIs.Count - 1; i >= 0; i--)
+                {
+                    ProfilePVI pvi = targetProfile.PVIs[i];
+                    double currentStation = Math.Round(pvi.Station, 4);
+                    double currentElev = Math.Round(pvi.Elevation, 4);
+
+                    // Kiểm tra xem PVI này có trong danh sách cần xóa không
+                    // So sánh gần đúng
+                    bool needsRemoval = false;
+                    
+                    // Nếu là option 1 (Toàn bộ) -> Xóa nếu không phải là điểm mới
+                    if (adjustOption == 1)
+                    {
+                         // Nếu Station này KHÔNG nằm trong danh sách điểm mới -> XÓA
+                         // Nếu Station này CÓ nằm trong danh sách điểm mới -> GIỮ (vì nó là điểm vừa được update/add)
+                         if (!newStations.Contains(currentStation))
+                         {
+                             needsRemoval = true;
+                         }
+                    }
+                    else if (adjustOption == 2) // Trong phạm vi
+                    {
+                        // Logic tương tự: Chỉ xóa nếu nằm trong phạm vi VÀ không phải là điểm mới
+                        if (pvi.Station >= polylineStartStation && pvi.Station <= polylineEndStation)
+                        {
+                             if (!newStations.Contains(currentStation))
+                             {
+                                 needsRemoval = true;
+                             }
+                        }
+                    }
+
+                    if (needsRemoval)
+                    {
+                        try
+                        {
+                            targetProfile.PVIs.RemoveAt(i);
+                            removedCount++;
+                        }
+                        catch
+                        {
+                            // Bỏ qua lỗi nếu không xóa được (ví dụ PVI đầu/cuối còn lại duy nhất)
+                        }
+                    }
+                }
+
                 A.Ed.WriteMessage($"\n\n=== KẾT QUẢ ===");
                 A.Ed.WriteMessage($"\n Profile đã điều chỉnh: {targetProfile.Name}");
-                A.Ed.WriteMessage($"\n Số PVI đã xóa: {removedCount}");
-                A.Ed.WriteMessage($"\n Số PVI đã thêm: {addedCount}/{stationElevations.Count}");
+                A.Ed.WriteMessage($"\n Số PVI đã thêm/cập nhật: {addedCount}/{stationElevations.Count}");
+                A.Ed.WriteMessage($"\n Số PVI cũ đã xóa: {removedCount}");
                 A.Ed.WriteMessage($"\n Tổng số PVI hiện tại: {targetProfile.PVIs.Count}");
 
                 tr.Commit();

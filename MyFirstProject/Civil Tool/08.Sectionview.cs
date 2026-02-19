@@ -1027,7 +1027,7 @@ namespace Civil3DCsharp
                 SampleLineGroup? sampleLineGroup = tr.GetObject(sampleLineGroupId, OpenMode.ForWrite) as SampleLineGroup;
 
 
-                //lấy sectionsource TOP
+                //lấy sectionsource theo codeSection (tìm trong tất cả source types)
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
                 SectionSourceCollection sectionSources = sampleLineGroup.GetSectionSources();
 #pragma warning restore CS8602 // Dereference of a possibly null reference.
@@ -1035,18 +1035,42 @@ namespace Civil3DCsharp
                 ObjectId sectionSource_TOP_Id = new();
                 foreach (SectionSource sectionsource in sectionSources)
                 {
-                    if ((sectionsource.SourceType == SectionSourceType.CorridorSurface) & (sectionsource.IsSampled == true))
+                    if (sectionsource.IsSampled == true)
                     {
-                        TinSurface? type = tr.GetObject(sectionsource.SourceId, OpenMode.ForRead) as TinSurface;
-#pragma warning disable CS8604 // Possible null reference argument.
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
-                        if (type.Name.Contains(codeSection, StringComparison.CurrentCultureIgnoreCase))
+                        try
                         {
-                            sectionSource_TOP_Id = sectionsource.SourceId;
+                            TinSurface? type = tr.GetObject(sectionsource.SourceId, OpenMode.ForRead) as TinSurface;
+                            if (type != null && type.Name.Contains(codeSection, StringComparison.CurrentCultureIgnoreCase))
+                            {
+                                sectionSource_TOP_Id = sectionsource.SourceId;
+                                A.Ed.WriteMessage($"\nĐã tìm thấy source: {type.Name} (Type: {sectionsource.SourceType})");
+                            }
                         }
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
-#pragma warning restore CS8604 // Possible null reference argument.
+                        catch { /* skip nếu không đọc được source */ }
                     }
+                }
+
+                // Nếu không tìm thấy source phù hợp, liệt kê tất cả source có sẵn
+                if (sectionSource_TOP_Id.IsNull || !sectionSource_TOP_Id.IsValid)
+                {
+                    A.Ed.WriteMessage($"\n\nKhông tìm thấy section source có tên chứa \"{codeSection}\".");
+                    A.Ed.WriteMessage("\nDanh sách các section source có sẵn:");
+                    foreach (SectionSource sectionsource in sectionSources)
+                    {
+                        try
+                        {
+                            TinSurface? type = tr.GetObject(sectionsource.SourceId, OpenMode.ForRead) as TinSurface;
+                            string name = type?.Name ?? "(unknown)";
+                            A.Ed.WriteMessage($"\n  - \"{name}\" (Type: {sectionsource.SourceType}, IsSampled: {sectionsource.IsSampled})");
+                        }
+                        catch
+                        {
+                            A.Ed.WriteMessage($"\n  - (không đọc được) (Type: {sectionsource.SourceType}, IsSampled: {sectionsource.IsSampled})");
+                        }
+                    }
+                    A.Ed.WriteMessage("\n\nVui lòng nhập lại Code Section cho đúng.\n");
+                    tr.Commit();
+                    return;
                 }
                 // get sectionViewIdColl
                 //SectionViewGroup sectionViewGroup = sectionView.SectionViewGroupObject();
@@ -1083,9 +1107,20 @@ namespace Civil3DCsharp
                     //sectionView1.IsElevationRangeAutomatic = true;
                     //sectionView1.IsOffsetRangeAutomatic = true;
 
+                    // GetSectionId có thể throw ArgumentException khi sample line không có section data
+                    // cho source này (ví dụ: alignment dùng lý trình cục bộ và corridor không phủ hết)
+                    ObjectId sectionTnId;
+                    try
+                    {
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
-                    ObjectId sectionTnId = sampleLine1.GetSectionId(sectionSource_TOP_Id);
+                        sectionTnId = sampleLine1.GetSectionId(sectionSource_TOP_Id);
 #pragma warning restore CS8602 // Dereference of a possibly null reference.
+                    }
+                    catch (System.ArgumentException)
+                    {
+                        A.Ed.WriteMessage($"\nCảnh báo: Section không tìm thấy cho SectionView tại station {sampleLine1?.Station}. Bỏ qua...");
+                        continue;
+                    }
                     
                     // Kiểm tra nếu sectionTnId không hợp lệ (section không tồn tại cho source này)
                     if (sectionTnId.IsNull || !sectionTnId.IsValid)
@@ -1227,11 +1262,21 @@ namespace Civil3DCsharp
                     sectionView1.IsElevationRangeAutomatic = true;
                     sectionView1.IsOffsetRangeAutomatic = true;
 
+                    // GetSectionId có thể throw ArgumentException khi sample line không có section data
+                    ObjectId sectionTnId;
+                    try
+                    {
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
-                    ObjectId sectionTnId = sampleLine1.GetSectionId(sectionSource_TOP_Id);
+                        sectionTnId = sampleLine1.GetSectionId(sectionSource_TOP_Id);
 #pragma warning restore CS8602 // Dereference of a possibly null reference.
+                    }
+                    catch (System.ArgumentException)
+                    {
+                        A.Ed.WriteMessage($"\nCảnh báo: Section không tìm thấy cho SectionView tại station {sampleLine1?.Station}. Bỏ qua...");
+                        continue;
+                    }
                     
-                    // Kiểm tra nếu sectionTnId không hợp lệ (section không tồn tại cho source này)
+                    // Kiểm tra nếu sectionTnId không hợp lệ
                     if (sectionTnId.IsNull || !sectionTnId.IsValid)
                     {
                         A.Ed.WriteMessage($"\nCảnh báo: Section không tìm thấy cho SectionView tại station {sampleLine1?.Station}");
@@ -1371,11 +1416,21 @@ namespace Civil3DCsharp
                     sectionView1.IsElevationRangeAutomatic = true;
                     sectionView1.IsOffsetRangeAutomatic = true;
 
+                    // GetSectionId có thể throw ArgumentException khi sample line không có section data
+                    ObjectId sectionTnId;
+                    try
+                    {
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
-                    ObjectId sectionTnId = sampleLine1.GetSectionId(sectionSource_TOP_Id);
+                        sectionTnId = sampleLine1.GetSectionId(sectionSource_TOP_Id);
 #pragma warning restore CS8602 // Dereference of a possibly null reference.
+                    }
+                    catch (System.ArgumentException)
+                    {
+                        A.Ed.WriteMessage($"\nCảnh báo: Section không tìm thấy cho SectionView tại station {sampleLine1?.Station}. Bỏ qua...");
+                        continue;
+                    }
                     
-                    // Kiểm tra nếu sectionTnId không hợp lệ (section không tồn tại cho source này)
+                    // Kiểm tra nếu sectionTnId không hợp lệ
                     if (sectionTnId.IsNull || !sectionTnId.IsValid)
                     {
                         A.Ed.WriteMessage($"\nCảnh báo: Section không tìm thấy cho SectionView tại station {sampleLine1?.Station}");
