@@ -1,3 +1,4 @@
 {
-    "dotnet.defaultSolution": "antigravity.sln"
+    "dotnet.defaultSolution": "antigravity.sln",
+    "git.autofetch": false
 }

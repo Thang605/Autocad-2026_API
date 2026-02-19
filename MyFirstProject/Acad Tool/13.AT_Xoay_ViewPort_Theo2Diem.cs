@@ -58,8 +58,22 @@ namespace Civil3DCsharp
                     return;
                 }
 
-                // Cho phép user chọn viewport từ layout
-                ObjectId currentViewportId = SelectViewportFromLayout(ed, db);
+                // Tự động lấy viewport nếu đang xoay trong viewport (Model Space in Layout)
+                ObjectId currentViewportId = ObjectId.Null;
+                if ((short)Application.GetSystemVariable("CVPORT") > 1)
+                {
+                    currentViewportId = GetCurrentLayoutViewportId(db);
+                    if (currentViewportId != ObjectId.Null)
+                    {
+                        ed.WriteMessage("\n✓ Đã tự động chọn viewport hiện hành.");
+                    }
+                }
+
+                // Nếu chưa có viewport (do đang ở Paper space gốc), cho phép chọn thủ công
+                if (currentViewportId == ObjectId.Null)
+                {
+                    currentViewportId = SelectViewportFromLayout(ed, db);
+                }
                 if (currentViewportId == ObjectId.Null)
                 {
                     ed.WriteMessage("\n❌ Không có viewport nào được chọn. Lệnh đã hủy.");
@@ -307,7 +321,7 @@ namespace Civil3DCsharp
         private Button btnOK = null!;
         private Button btnCancel = null!;
         private Label lblInfo = null!;
-        private PictureBox pictureBox = null!;
+
 
         public ViewportRotationForm()
         {
