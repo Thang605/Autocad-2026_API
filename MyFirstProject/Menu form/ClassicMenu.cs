@@ -82,13 +82,20 @@ namespace MyFirstProject
             dynamic subMenuAlignment = menu.AddSubMenu(menu.Count + 1, "Alignment");
             AddMenuItem(subMenuAlignment, "Offset from Alignment", "AT_OffsetAlignment ");
             AddMenuItem(subMenuAlignment, "Bảng Thống Kê Tuyến Đường", "CTA_BangThongKeCacTuyenDuong ");
+            AddMenuItem(subMenuAlignment, "Gắn Nhãn Đầu Cuối Tỷ Lệ", "CTA_GanNhan_DauCuoiTyten ");
+            AddHeader(subMenuAlignment, "--- Nút giao ---");
             AddMenuItem(subMenuAlignment, "Tạo Đường Nút Giao", "CTA_TaoDuong_ConnectedAlignment_NutGiao ");
+            AddMenuItem(subMenuAlignment, "Connected Alignment", "CTA_ConnectedAlignment ");
+            AddMenuItem(subMenuAlignment, "Connected Alignment Ngã 3", "CTA_ConnectedAlignment_Nga3 ");
+            AddMenuItem(subMenuAlignment, "Connected Alignment Ngã 4", "CTA_ConnectedAlignment_Nga4 ");
+            AddHeader(subMenuAlignment, "--- Điều chỉnh bán kính ---");
+            AddMenuItem(subMenuAlignment, "Điều Chỉnh Bán Kính Connected", "CTA_DieuChinhBanKinh_ConnectedAlignment ");
 
             // Corridor
             dynamic subMenuCorridor = menu.AddSubMenu(menu.Count + 1, "Corridor");
             AddHeader(subMenuCorridor, "--- Tạo Corridor ---");
             AddMenuItem(subMenuCorridor, "Tạo Corridor Cho Tuyến Đường", "CTC_TaoCorridor_ChoTuyenDuong ");
-            // AddMenuItem(subMenuCorridor, "Tạo Corridor Rẽ Phải", "CTCO_TaoCooridor_DuongDoThi_RePhai "); // Ẩn
+            AddMenuItem(subMenuCorridor, "Tạo Corridor Đường Đô Thị Rẽ Phải", "CAC_TaoCooridor_DuongDoThi_RePhai ");
             AddHeader(subMenuCorridor, "--- Thiết lập ---");
             AddMenuItem(subMenuCorridor, "Add All Section", "CTC_AddAllSection ");
             AddMenuItem(subMenuCorridor, "Set Corridor Targets", "CTPI_Corridor_SetTargets ");
@@ -126,6 +133,8 @@ namespace MyFirstProject
             AddHeader(subMenuPoint, "--- Quản lý/Ẩn ---");
             AddMenuItem(subMenuPoint, "Update All Point Group", "CTPO_UpdateAllPointGroup ");
             AddMenuItem(subMenuPoint, "Ẩn CogoPoint", "CTPO_An_CogoPoint ");
+            AddHeader(subMenuPoint, "--- Tạo từ nguồn khác ---");
+            AddMenuItem(subMenuPoint, "Tạo CogoPoint Từ Excel", "CTPO_TaoCogoPoint_FromExcel ");
             AddHeader(subMenuPoint, "--- Đổi tên ---");
             AddMenuItem(subMenuPoint, "Đổi Tên CogoPoint (Template)", "CTPO_DoiTen_Cogopoint ");
             AddMenuItem(subMenuPoint, "Đổi Tên CogoPoint Theo Alignment", "CTPo_DoiTen_CogoPoint_fromAlignment ");
@@ -137,7 +146,10 @@ namespace MyFirstProject
             AddMenuItem(subMenuProfile, "Vẽ Trắc Dọc Tất Cả Tuyến", "CTP_VeTracDoc_TuNhien_TatCaTuyen ");
             AddHeader(subMenuProfile, "--- Sửa/Gắn nhãn ---");
             AddMenuItem(subMenuProfile, "Sửa Đường Tự Nhiên Theo Cọc", "CTP_Fix_DuongTuNhien_TheoCoc ");
-            AddMenuItem(subMenuProfile, "Gắn Nhãn Nút Giao Lên Trắc Dộc", "CTP_GanNhanNutGiao_LenTracDoc ");
+            AddMenuItem(subMenuProfile, "Gắn Nhãn Nút Giao Lên Trắc Dọc", "CTP_GanNhanNutGiao_LenTracDoc ");
+            AddHeader(subMenuProfile, "--- Chuyển đổi ---");
+            AddMenuItem(subMenuProfile, "Polyline To Profile", "CTP_Polyline_To_Profile ");
+            AddMenuItem(subMenuProfile, "Điều Chỉnh Profile Theo Polyline", "CTP_Adjust_Profile_By_Polyline ");
             AddHeader(subMenuProfile, "--- Tạo điểm ---");
             AddMenuItem(subMenuProfile, "Tạo CogoPoint Từ PVI", "CTP_TaoCogoPointTuPVI ");
             AddHeader(subMenuProfile, "--- Band Profile ---");
@@ -169,6 +181,7 @@ namespace MyFirstProject
             AddMenuItem(subMenuSample, "Phát Sinh Cọc Theo Delta", "CTS_PhatSinhCoc_theoKhoangDelta ");
             AddMenuItem(subMenuSample, "Phát Sinh Cọc Từ CogoPoint", "CTS_PhatSinhCoc_TuCogoPoint ");
             AddMenuItem(subMenuSample, "Phát Sinh Cọc Theo Bảng", "CTS_PhatSinhCoc_TheoBang ");
+            AddMenuItem(subMenuSample, "Phát Sinh Cọc Thủ Công", "CTS_PhatSinhCoc_ThuCong ");
             AddHeader(subMenuSample, "--- Dịch/Copy/Đồng bộ ---");
             AddMenuItem(subMenuSample, "Dịch Cọc Tịnh Tiến", "CTS_DichCoc_TinhTien ");
             AddMenuItem(subMenuSample, "Copy Nhóm Cọc", "CTS_Copy_NhomCoc ");
@@ -176,10 +189,11 @@ namespace MyFirstProject
             AddMenuItem(subMenuSample, "Đồng Bộ 2 Nhóm Cọc Theo Đoạn", "CTS_DongBo_2_NhomCoc_TheoDoan ");
             AddMenuItem(subMenuSample, "Dịch Cọc 40m", "CTS_DichCoc_TinhTien40 ");
             AddMenuItem(subMenuSample, "Dịch Cọc 20m", "CTS_DichCoc_TinhTien_20 ");
-            AddHeader(subMenuSample, "--- Bề rộng Sample Line ---");
+            AddHeader(subMenuSample, "--- Bề rộng/Hiệu chỉnh ---");
             AddMenuItem(subMenuSample, "Copy Bề Rộng Sample Line", "CTS_Copy_BeRong_sampleLine ");
-            AddMenuItem(subMenuSample, "Thay Đổi Bề Rộng Sample Line", "CTS_Thaydoi_BeRong_sampleLine ");
+            AddMenuItem(subMenuSample, "Thay Đổi Bề Rộng Sample Line", "CTS_ThayDoi_BeRong_Sampleline ");
             AddMenuItem(subMenuSample, "Offset Bề Rộng Sample Line", "CTS_Offset_BeRong_sampleLine ");
+            AddMenuItem(subMenuSample, "Hiệu Chỉnh Khoảng Cách Cọc", "CTS_HieuChinh_KhoangCachCoc ");
 
             // Section View
             dynamic subMenuSection = menu.AddSubMenu(menu.Count + 1, "Section View");
@@ -208,13 +222,21 @@ namespace MyFirstProject
             AddMenuItem(subMenuSection, "Hiệu Chỉnh Section Static", "CTSV_HieuChinh_Section ");
             AddMenuItem(subMenuSection, "Hiệu Chỉnh Section Dynamic", "CTSV_HieuChinh_Section_Dynamic ");
             AddMenuItem(subMenuSection, "Điều Chỉnh Đường Tự Nhiên", "CTSV_DieuChinh_DuongTuNhien ");
+            AddMenuItem(subMenuSection, "Chọn Section Static", "CTSV_ChonSection_Static ");
             AddHeader(subMenuSection, "--- Khác ---");
             AddMenuItem(subMenuSection, "Chuyển Đổi TN-TK sang TN-TN", "CTSV_ChuyenDoi_TNTK_TNTN ");
             AddMenuItem(subMenuSection, "Thêm Vật Liệu Trên Cắt Ngang", "CTSV_ThemVatLieu_TrenCatNgang ");
+            AddMenuItem(subMenuSection, "Thêm Bảng KL Cắt Ngang", "CTSV_Them_BangKL_CatNgang ");
             AddMenuItem(subMenuSection, "Xuất Thông Tin Material Section", "CTSV_MaterialSection ");
             AddMenuItem(subMenuSection, "Tạo Polyline Từ Section", "AT_PolylineFromSection ");
+            AddHeader(subMenuSection, "--- Xuất/Khối lượng ---");
             AddMenuItem(subMenuSection, "Xuất Khối Lượng ra Excel", "CTSV_XuatKhoiLuongRaExcel ");
             AddMenuItem(subMenuSection, "Khối Lượng Cắt Ngang", "CTSV_KhoiLuongCatNgang ");
+            AddMenuItem(subMenuSection, "Xuất Bảng Sang Excel", "AT_XuatBang_SangExcel ");
+            AddHeader(subMenuSection, "--- Material ---");
+            AddMenuItem(subMenuSection, "Thêm Material List", "CTS_Them_MaterialList ");
+            AddMenuItem(subMenuSection, "Xem Material List", "CTS_Xem_MaterialList ");
+            AddMenuItem(subMenuSection, "Xóa Material List", "CTS_Xoa_MaterialList ");
 
             // Property Sets
             dynamic subMenuProp = menu.AddSubMenu(menu.Count + 1, "Property Sets");
@@ -274,11 +296,13 @@ namespace MyFirstProject
             AddMenuItem(subMenu3D, "Tạo Solid từ Polyline", "AT_Solid_frompolyline ");
             AddMenuItem(subMenu3D, "Tạo Surface từ Polyline", "AT_Surface_frompolyline ");
             AddMenuItem(subMenu3D, "Text To Solid", "AT_TextToSolid ");
+            AddMenuItem(subMenu3D, "Text To Solid (Step 2)", "AT_TextToSolid_Step2 ");
             AddMenuItem(subMenu3D, "Polys To Solid", "AT_PolysToSolid ");
 
             // Block
             dynamic subMenuBlock = menu.AddSubMenu(menu.Count + 1, "Block");
             AddMenuItem(subMenuBlock, "Tạo Block Từng Đối Tượng", "AT_TAOBLOCK_TUNGDOITUONG ");
+            AddMenuItem(subMenuBlock, "Đánh Số Thứ Tự Cho Block", "AT_DanhSoThuTu_ChoBlock ");
 
             // Xoay đối tượng
             dynamic subMenuRotate = menu.AddSubMenu(menu.Count + 1, "Xoay đối tượng");
@@ -290,7 +314,8 @@ namespace MyFirstProject
             // Viewport
             dynamic subMenuViewport = menu.AddSubMenu(menu.Count + 1, "Viewport");
             AddMenuItem(subMenuViewport, "Bố Trí ViewPort Theo Hình", "AT_BoTri_ViewPort_TheoHinh ");
-
+            AddMenuItem(subMenuViewport, "Bố Trí ViewPort Theo 2 Điểm", "AT_BoTri_ViewPort_Theo2Diem ");
+            AddMenuItem(subMenuViewport, "Xoay ViewPort Theo 2 Điểm", "AT_Xoay_ViewPort_Theo2Diem ");
             AddMenuItem(subMenuViewport, "Xoay VP Hiện Hành (2 Điểm)", "AT_Xoay_ViewPortHienHanh_Theo2Diem ");
             AddMenuItem(subMenuViewport, "Xoay VP Hiện Hành (Góc)", "AT_Xoay_ViewPortHienHanh_TheoGoc ");
             AddMenuItem(subMenuViewport, "Reset Góc Xoay VP", "AT_Xoay_ViewPortHienHanh_Reset ");
@@ -322,6 +347,8 @@ namespace MyFirstProject
             AddMenuItem(subMenuOther, "Xóa 3DSolid/Body", "AT_XoaDoiTuong_3DSolid_Body ");
             AddMenuItem(subMenuOther, "Offset 2 Bên", "AT_Offset_2Ben ");
             AddMenuItem(subMenuOther, "Annotative Scale Current Only", "AT_annotive_scale_currentOnly ");
+            AddMenuItem(subMenuOther, "Explode Text", "AT_TXTEXP ");
+            AddMenuItem(subMenuOther, "Dim Đường Cong", "AT_DIM_DUONGCONG ");
 
             // Trợ giúp
             dynamic subMenuHelp = menu.AddSubMenu(menu.Count + 1, "Trợ giúp");
