@@ -34,73 +34,81 @@ namespace Civil3DCsharp
 
             try
             {
-                // Prompt user to select an Alignment
-                PromptEntityOptions peo = new PromptEntityOptions("\nChọn Alignment cần điều chỉnh bán kính: ");
-                peo.SetRejectMessage("\nĐối tượng không phải là Alignment!");
-                peo.AddAllowedClass(typeof(Alignment), true);
+                // Prompt user to select multiple Alignments
+                PromptSelectionOptions pso = new PromptSelectionOptions();
+                pso.MessageForAdding = "\nChọn các Alignment cần điều chỉnh bán kính: ";
 
-                PromptEntityResult per = ed.GetEntity(peo);
-                if (per.Status != PromptStatus.OK)
+                SelectionFilter filter = new SelectionFilter(new TypedValue[] {
+                    new TypedValue((int)DxfCode.Start, "AECC_ALIGNMENT")
+                });
+
+                PromptSelectionResult psr = ed.GetSelection(pso, filter);
+                if (psr.Status != PromptStatus.OK || psr.Value.Count == 0)
                 {
                     ed.WriteMessage("\nĐã hủy lệnh.");
                     return;
                 }
 
-                ObjectId alignmentId = per.ObjectId;
+                ObjectId[] selectedIds = psr.Value.GetObjectIds();
+                ed.WriteMessage($"\n✅ Đã chọn {selectedIds.Length} Alignment.");
 
                 using (Transaction tr = db.TransactionManager.StartTransaction())
                 {
-                    Alignment? alignment = tr.GetObject(alignmentId, OpenMode.ForRead) as Alignment;
-                    if (alignment == null)
-                    {
-                        ed.WriteMessage("\nKhông thể đọc Alignment!");
-                        return;
-                    }
+                    List<ArcInfo> allArcList = new List<ArcInfo>();
 
-                    ed.WriteMessage($"\n✅ Đã chọn Alignment: {alignment.Name}");
-
-                    // Collect all arcs from the alignment
-                    List<ArcInfo> arcList = new List<ArcInfo>();
-                    
-                    for (int i = 0; i < alignment.Entities.Count; i++)
+                    foreach (ObjectId alignmentId in selectedIds)
                     {
-                        AlignmentEntity entity = alignment.Entities.GetEntityByOrder(i);
-                        
-                        if (entity.EntityType == AlignmentEntityType.Arc)
+                        Alignment? alignment = tr.GetObject(alignmentId, OpenMode.ForRead) as Alignment;
+                        if (alignment == null) continue;
+
+                        ed.WriteMessage($"\n\n📐 Alignment: {alignment.Name}");
+
+                        // Collect all arcs from this alignment
+                        for (int i = 0; i < alignment.Entities.Count; i++)
                         {
-                            AlignmentArc? arc = entity as AlignmentArc;
-                            if (arc != null)
-                            {
-                                ArcInfo arcInfo = new ArcInfo
-                                {
-                                    EntityId = (int)arc.EntityId,
-                                    StartStation = arc.StartStation,
-                                    EndStation = arc.EndStation,
-                                    CurrentRadius = arc.Radius,
-                                    NewRadius = arc.Radius,
-                                    AlignmentArcObjectId = alignmentId
-                                };
-                                arcList.Add(arcInfo);
+                            AlignmentEntity entity = alignment.Entities.GetEntityByOrder(i);
 
-                                ed.WriteMessage($"\n  - Arc {arc.EntityId}: Station {arc.StartStation:F2} - {arc.EndStation:F2}, R = {arc.Radius:F2}m");
+                            if (entity.EntityType == AlignmentEntityType.Arc)
+                            {
+                                AlignmentArc? arc = entity as AlignmentArc;
+                                if (arc != null)
+                                {
+                                    ArcInfo arcInfo = new ArcInfo
+                                    {
+                                        EntityId = (int)arc.EntityId,
+                                        StartStation = arc.StartStation,
+                                        EndStation = arc.EndStation,
+                                        CurrentRadius = arc.Radius,
+                                        NewRadius = arc.Radius,
+                                        AlignmentArcObjectId = alignmentId,
+                                        AlignmentName = alignment.Name
+                                    };
+                                    allArcList.Add(arcInfo);
+
+                                    ed.WriteMessage($"\n  - Arc {arc.EntityId}: Station {arc.StartStation:F2} - {arc.EndStation:F2}, R = {arc.Radius:F2}m");
+                                }
                             }
                         }
                     }
 
-                    if (arcList.Count == 0)
+                    if (allArcList.Count == 0)
                     {
-                        ed.WriteMessage("\n⚠️ Alignment này không có đường cong (Arc) nào!");
-                        MessageBox.Show("Alignment này không có đường cong (Arc) nào!",
+                        ed.WriteMessage("\n⚠️ Các Alignment được chọn không có đường cong (Arc) nào!");
+                        MessageBox.Show("Các Alignment được chọn không có đường cong (Arc) nào!",
                             "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         return;
                     }
 
-                    ed.WriteMessage($"\n📊 Tổng cộng: {arcList.Count} đường cong");
+                    ed.WriteMessage($"\n📊 Tổng cộng: {allArcList.Count} đường cong từ {selectedIds.Length} Alignment");
 
                     tr.Commit();
 
-                    // Show form
-                    DieuChinhBanKinhForm form = new DieuChinhBanKinhForm(alignment.Name, arcList);
+                    // Show form - hiển thị tên nhiều Alignment
+                    string displayName = selectedIds.Length == 1
+                        ? allArcList[0].AlignmentName
+                        : $"{selectedIds.Length} Alignments được chọn";
+
+                    DieuChinhBanKinhForm form = new DieuChinhBanKinhForm(displayName, allArcList);
                     Application.ShowModalDialog(form);
 
                     if (!form.DialogResult_OK)
@@ -109,8 +117,19 @@ namespace Civil3DCsharp
                         return;
                     }
 
-                    // Apply changes
-                    ApplyRadiusChanges(alignmentId, form.ArcList, ed);
+                    // Apply changes - nhóm theo AlignmentId
+                    var groupedByAlignment = new Dictionary<ObjectId, List<ArcInfo>>();
+                    foreach (var arcInfo in form.ArcList)
+                    {
+                        if (!groupedByAlignment.ContainsKey(arcInfo.AlignmentArcObjectId))
+                            groupedByAlignment[arcInfo.AlignmentArcObjectId] = new List<ArcInfo>();
+                        groupedByAlignment[arcInfo.AlignmentArcObjectId].Add(arcInfo);
+                    }
+
+                    foreach (var kvp in groupedByAlignment)
+                    {
+                        ApplyRadiusChanges(kvp.Key, kvp.Value, ed);
+                    }
                 }
             }
             catch (System.Exception ex)
@@ -147,14 +166,14 @@ namespace Civil3DCsharp
                         // Check if this is a Connected Alignment
                         ConnectedAlignmentInfo? connectedInfo = alignment.ConnectedAlignmentInfo;
                         bool isConnectedAlignment = connectedInfo != null;
-                        
+
                         ed.WriteMessage($"\n  📋 Loại Alignment: {(isConnectedAlignment ? "Connected Alignment" : "Alignment thường")}");
 
                         if (isConnectedAlignment && connectedInfo != null)
                         {
                             // For Connected Alignment, use ConnectedAlignmentArcInfo
                             ed.WriteMessage($"\n  ℹ️ Connected Alignment Info Type: {connectedInfo.GetType().Name}");
-                            
+
                             // Get the first arc info (arcList should only have 1 arc for connected alignment)
                             foreach (ArcInfo arcInfo in arcList)
                             {
@@ -167,10 +186,10 @@ namespace Civil3DCsharp
                                         {
                                             double oldRadius = arcConnectedInfo.CurveRadius;
                                             ed.WriteMessage($"\n  ℹ️ Connected Arc - CurveRadius hiện tại: {oldRadius:F2}m");
-                                            
+
                                             // Set new curve radius directly on the object
                                             arcConnectedInfo.CurveRadius = arcInfo.NewRadius;
-                                            
+
                                             changedCount++;
                                             ed.WriteMessage($"\n  ✅ Connected Arc: {oldRadius:F2}m → {arcInfo.NewRadius:F2}m");
                                         }
@@ -200,24 +219,24 @@ namespace Civil3DCsharp
                                         for (int i = 0; i < alignment.Entities.Count; i++)
                                         {
                                             AlignmentEntity entity = alignment.Entities.GetEntityByOrder(i);
-                                            if (entity.EntityType == AlignmentEntityType.Arc && 
+                                            if (entity.EntityType == AlignmentEntityType.Arc &&
                                                 (int)entity.EntityId == arcInfo.EntityId)
                                             {
                                                 foundArc = entity as AlignmentArc;
                                                 break;
                                             }
                                         }
-                                        
+
                                         if (foundArc != null)
                                         {
                                             double oldRadius = foundArc.Radius;
-                                            
+
                                             // Log constraint info
                                             ed.WriteMessage($"\n  ℹ️ Arc {arcInfo.EntityId} Constraint: {foundArc.Constraint1}, {foundArc.Constraint2}");
-                                            
+
                                             // Try to set radius
                                             foundArc.Radius = arcInfo.NewRadius;
-                                            
+
                                             // Verify change
                                             double newRadiusActual = foundArc.Radius;
                                             if (Math.Abs(newRadiusActual - arcInfo.NewRadius) < 0.01)
@@ -244,7 +263,7 @@ namespace Civil3DCsharp
                         }
 
                         tr.Commit();
-                        
+
                         // Force regen to update display
                         doc.Editor.Regen();
 

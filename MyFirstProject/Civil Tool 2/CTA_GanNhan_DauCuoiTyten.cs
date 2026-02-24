@@ -43,8 +43,25 @@ namespace Civil3DCsharp
         [CommandMethod("CTA_GanNhan_DauCuoiTyten")]
         public static void GanNhanDauCuoiTyten()
         {
+            // 0. Cho phép chọn Alignment trên màn hình
+            List<ObjectId> preSelectedAlignmentIds = new List<ObjectId>();
+
+            PromptSelectionOptions pso = new PromptSelectionOptions();
+            pso.MessageForAdding = "\nChọn các tuyến đường (Alignment) cần gắn nhãn: ";
+
+            // Filter chỉ chọn Alignment
+            SelectionFilter filter = new SelectionFilter(new TypedValue[] {
+                new TypedValue((int)DxfCode.Start, "AECC_ALIGNMENT")
+            });
+
+            PromptSelectionResult psr = A.Ed.GetSelection(pso, filter);
+            if (psr.Status == PromptStatus.OK)
+            {
+                preSelectedAlignmentIds.AddRange(psr.Value.GetObjectIds());
+            }
+
             // 1. Hiển thị form chọn Label Set Style và Alignments
-            var form = new MyFirstProject.DauCuoiTuyenForm();
+            var form = new MyFirstProject.DauCuoiTuyenForm(preSelectedAlignmentIds);
             var result = Application.ShowModalDialog(form);
 
             if (result != System.Windows.Forms.DialogResult.OK || !form.FormAccepted)

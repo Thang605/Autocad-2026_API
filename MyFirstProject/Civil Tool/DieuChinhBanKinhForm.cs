@@ -21,7 +21,7 @@ namespace MyFirstProject.Civil_Tool
         public string AlignmentName { get; set; } = "";
         public List<ArcInfo> ArcList { get; set; } = new();
         public bool DialogResult_OK { get; private set; } = false;
-        
+
         // Lưu bán kính đã sử dụng cho lần chạy sau
         private static double _lastUsedRadius = 0;
 
@@ -50,7 +50,7 @@ namespace MyFirstProject.Civil_Tool
 
             // Form
             this.Text = "Điều chỉnh bán kính đường cong";
-            this.Size = new Size(850, 550);
+            this.Size = new Size(1000, 550);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -58,7 +58,7 @@ namespace MyFirstProject.Civil_Tool
 
             int currentY = 15;
             int leftMargin = 20;
-            int contentWidth = 790;
+            int contentWidth = 940;
 
             // lblTitle
             this.lblTitle.Location = new Point(leftMargin, currentY);
@@ -98,6 +98,14 @@ namespace MyFirstProject.Civil_Tool
                 Name = "STT",
                 HeaderText = "STT",
                 Width = 50,
+                ReadOnly = true
+            };
+
+            var colAlignmentName = new DataGridViewTextBoxColumn
+            {
+                Name = "AlignmentName",
+                HeaderText = "Tên Alignment",
+                Width = 140,
                 ReadOnly = true
             };
 
@@ -142,7 +150,7 @@ namespace MyFirstProject.Civil_Tool
             };
 
             this.dataGridView.Columns.AddRange(new DataGridViewColumn[] {
-                colSTT, colEntityId, colStartStation, colEndStation, colCurrentRadius, colNewRadius
+                colSTT, colAlignmentName, colEntityId, colStartStation, colEndStation, colCurrentRadius, colNewRadius
             });
 
             currentY += 360;
@@ -155,7 +163,7 @@ namespace MyFirstProject.Civil_Tool
             this.btnReset.UseVisualStyleBackColor = true;
             this.btnReset.Click += new EventHandler(this.BtnReset_Click);
 
-            this.btnOK.Location = new Point(leftMargin + 530, currentY);
+            this.btnOK.Location = new Point(leftMargin + 680, currentY);
             this.btnOK.Size = new Size(120, 38);
             this.btnOK.Text = "Áp dụng";
             this.btnOK.UseVisualStyleBackColor = true;
@@ -166,7 +174,7 @@ namespace MyFirstProject.Civil_Tool
             this.btnOK.FlatAppearance.BorderSize = 0;
             this.btnOK.Click += new EventHandler(this.BtnOK_Click);
 
-            this.btnCancel.Location = new Point(leftMargin + 665, currentY);
+            this.btnCancel.Location = new Point(leftMargin + 815, currentY);
             this.btnCancel.Size = new Size(120, 38);
             this.btnCancel.Text = "Hủy";
             this.btnCancel.UseVisualStyleBackColor = true;
@@ -196,11 +204,12 @@ namespace MyFirstProject.Civil_Tool
                 var row = dataGridView.Rows[rowIndex];
 
                 row.Cells["STT"].Value = stt++;
+                row.Cells["AlignmentName"].Value = arc.AlignmentName;
                 row.Cells["EntityId"].Value = arc.EntityId;
                 row.Cells["StartStation"].Value = arc.StartStation.ToString("F2");
                 row.Cells["EndStation"].Value = arc.EndStation.ToString("F2");
                 row.Cells["CurrentRadius"].Value = arc.CurrentRadius.ToString("F2");
-                
+
                 // Sử dụng bán kính đã dùng lần trước nếu có, ngược lại dùng bán kính hiện tại
                 double newRadiusValue = _lastUsedRadius > 0 ? _lastUsedRadius : arc.CurrentRadius;
                 row.Cells["NewRadius"].Value = newRadiusValue.ToString("F2");
@@ -297,5 +306,6 @@ namespace MyFirstProject.Civil_Tool
         public double CurrentRadius { get; set; }
         public double NewRadius { get; set; }
         public ObjectId AlignmentArcObjectId { get; set; }
+        public string AlignmentName { get; set; } = "";
     }
 }

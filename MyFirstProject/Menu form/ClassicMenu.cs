@@ -83,11 +83,6 @@ namespace MyFirstProject
             AddMenuItem(subMenuAlignment, "Offset from Alignment", "AT_OffsetAlignment ");
             AddMenuItem(subMenuAlignment, "Bảng Thống Kê Tuyến Đường", "CTA_BangThongKeCacTuyenDuong ");
             AddMenuItem(subMenuAlignment, "Gắn Nhãn Đầu Cuối Tỷ Lệ", "CTA_GanNhan_DauCuoiTyten ");
-            AddHeader(subMenuAlignment, "--- Nút giao ---");
-            AddMenuItem(subMenuAlignment, "Tạo Đường Nút Giao", "CTA_TaoDuong_ConnectedAlignment_NutGiao ");
-            AddMenuItem(subMenuAlignment, "Connected Alignment", "CTA_ConnectedAlignment ");
-            AddMenuItem(subMenuAlignment, "Connected Alignment Ngã 3", "CTA_ConnectedAlignment_Nga3 ");
-            AddMenuItem(subMenuAlignment, "Connected Alignment Ngã 4", "CTA_ConnectedAlignment_Nga4 ");
             AddHeader(subMenuAlignment, "--- Điều chỉnh bán kính ---");
             AddMenuItem(subMenuAlignment, "Điều Chỉnh Bán Kính Connected", "CTA_DieuChinhBanKinh_ConnectedAlignment ");
 
@@ -98,19 +93,14 @@ namespace MyFirstProject
             AddMenuItem(subMenuCorridor, "Tạo Corridor Đường Đô Thị Rẽ Phải", "CAC_TaoCooridor_DuongDoThi_RePhai ");
             AddHeader(subMenuCorridor, "--- Thiết lập ---");
             AddMenuItem(subMenuCorridor, "Add All Section", "CTC_AddAllSection ");
-            AddMenuItem(subMenuCorridor, "Set Corridor Targets", "CTPI_Corridor_SetTargets ");
             AddHeader(subMenuCorridor, "--- Điều chỉnh ---");
             AddMenuItem(subMenuCorridor, "Điều Chỉnh Phân Đoạn", "CTC_DieuChinh_PhanDoan ");
             AddHeader(subMenuCorridor, "--- Corridor Surface ---");
             AddMenuItem(subMenuCorridor, "Tạo Corridor Surface", "CTSV_TaoCorridorSurface ");
-            AddMenuItem(subMenuCorridor, "Tạo Multiple Corridor Surface", "CTSV_TaoCorridorSurfaceMultiple ");
-            AddMenuItem(subMenuCorridor, "Tạo Single Corridor Surface", "CTSV_TaoCorridorSurfaceSingle ");
 
             // Parcel
             dynamic subMenuParcel = menu.AddSubMenu(menu.Count + 1, "Parcel");
-            AddMenuItem(subMenuParcel, "Tạo Parcel Các Loại Nhà", "CTPA_TaoParcel_CacLoaiNha ");
             AddMenuItem(subMenuParcel, "Đổi Tên Parcel (Template)", "CTPA_DoiTen_Parcel ");
-            AddMenuItem(subMenuParcel, "Đổi Tên Parcel (Nhanh)", "CTPA_DoiTen_Parcel_Nhanh ");
 
             dynamic subMenuPipe = menu.AddSubMenu(menu.Count + 1, "Pipe Network");
             AddHeader(subMenuPipe, "--- Thay đổi thông số ---");

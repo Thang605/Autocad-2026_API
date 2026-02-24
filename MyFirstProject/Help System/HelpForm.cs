@@ -17,7 +17,7 @@ namespace Civil3DCsharp.HelpSystem
         private TabControl tabControl;
         private TextBox txtSearch;
         private RichTextBox rtbDetails;
-        private SplitContainer splitContainer;
+
         private Label lblStatus;
         private Button btnCopy;
         private Button btnClose;

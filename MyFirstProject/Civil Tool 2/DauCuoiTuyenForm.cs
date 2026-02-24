@@ -29,9 +29,13 @@ namespace MyFirstProject
         private Dictionary<string, ObjectId> _labelSetDict = new Dictionary<string, ObjectId>();
         private Dictionary<string, ObjectId> _alignmentDict = new Dictionary<string, ObjectId>();
 
-        public DauCuoiTuyenForm()
+        public DauCuoiTuyenForm(List<ObjectId>? initialAlignmentIds = null)
         {
             InitializeComponent();
+            if (initialAlignmentIds != null)
+            {
+                SelectedAlignmentIds = initialAlignmentIds;
+            }
             LoadAlignmentLabelSetStyles();
             LoadAlignments();
         }
@@ -67,7 +71,7 @@ namespace MyFirstProject
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Lỗi khi load Alignment Label Set Styles: {ex.Message}", 
+                MessageBox.Show($"Lỗi khi load Alignment Label Set Styles: {ex.Message}",
                     "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -92,7 +96,10 @@ namespace MyFirstProject
                         if (alignment != null)
                         {
                             _alignmentDict[alignment.Name] = alignmentId;
-                            chkListAlignments.Items.Add(alignment.Name, true); // Mặc định chọn tất cả
+
+                            // Nếu tuyến này nằm trong danh sách được chọn trước thì check nó
+                            bool isChecked = SelectedAlignmentIds.Contains(alignmentId);
+                            chkListAlignments.Items.Add(alignment.Name, isChecked);
                         }
                     }
 
@@ -101,7 +108,7 @@ namespace MyFirstProject
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Lỗi khi load danh sách tuyến: {ex.Message}", 
+                MessageBox.Show($"Lỗi khi load danh sách tuyến: {ex.Message}",
                     "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -149,14 +156,14 @@ namespace MyFirstProject
         {
             if (cmbLabelSetStyle.SelectedItem == null)
             {
-                MessageBox.Show("Vui lòng chọn một Label Set Style.", 
+                MessageBox.Show("Vui lòng chọn một Label Set Style.",
                     "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             if (chkListAlignments.CheckedItems.Count == 0)
             {
-                MessageBox.Show("Vui lòng chọn ít nhất một tuyến.", 
+                MessageBox.Show("Vui lòng chọn ít nhất một tuyến.",
                     "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }

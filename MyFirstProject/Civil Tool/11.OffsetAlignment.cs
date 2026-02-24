@@ -27,106 +27,58 @@ namespace MyFirstProject
         public static void AT_OffsetAlignment()
         {
             var doc = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
-            var db = doc.Database;
             var ed = doc.Editor;
 
-            using Transaction tr = db.TransactionManager.StartTransaction();
             try
             {
-                var ui = new UserInputHelper();
-                var alignmentService = new AlignmentServiceHelper();
+                using var form = new OffsetAlignmentForm();
+                var result = Autodesk.AutoCAD.ApplicationServices.Application.ShowModalDialog(form);
 
-                // 1. Chọn Alignment gốc trước
-                ObjectId alignmentId = ui.GetAlignmentId("Chọn Alignment gốc để tạo offset: ");
-                if (alignmentId == ObjectId.Null)
+                if (result == System.Windows.Forms.DialogResult.OK)
                 {
-                    ed.WriteMessage("\nKhông có Alignment nào được chọn!");
-                    return;
-                }
-                Alignment alignment = (Alignment)tr.GetObject(alignmentId, OpenMode.ForRead);
+                    using Transaction tr = doc.Database.TransactionManager.StartTransaction();
 
-                // 2. Nhập bề rộng offset với tùy chọn theo chuẩn AutoCAD
-                double offsetWidth = 0;
-                var result = ui.GetDoubleResult("Nhập bề rộng offset [Pick point] <10.0>: ", ["Pick", "P"], "Pick");
-                
-                if (result.Status == Autodesk.AutoCAD.EditorInput.PromptStatus.Keyword && 
-                    (result.StringResult.Equals("PICK", StringComparison.CurrentCultureIgnoreCase) || result.StringResult.Equals("P", StringComparison.CurrentCultureIgnoreCase)))
-                {
-                    // Chọn điểm để tính khoảng cách đến alignment
-                    var pt = ui.GetPoint("Chọn điểm để đo khoảng cách đến tim đường:");
-                    double station = 0, offset = 0;
-                    alignment.StationOffset(pt.X, pt.Y, ref station, ref offset);
-                    offsetWidth = Math.Abs(offset);
-                    ed.WriteMessage($"\nKhoảng cách từ điểm đến tim đường: {offsetWidth:F3} m");
-                }
-                else if (result.Status == Autodesk.AutoCAD.EditorInput.PromptStatus.OK)
-                {
-                    offsetWidth = result.Value;
-                }
-                else
-                {
-                    // Default value
-                    offsetWidth = 10.0;
-                    ed.WriteMessage($"\nSử dụng giá trị mặc định: {offsetWidth} m");
-                }
-                
-                if (offsetWidth == 0)
-                {
-                    ed.WriteMessage("\nBề rộng offset không hợp lệ!");
-                    return;
-                }
+                    var alignmentService = new AlignmentServiceHelper();
+                    var alignment = (Alignment)tr.GetObject(form.ParentAlignmentId, OpenMode.ForRead);
 
-                // 3. Chọn điểm lấy lý trình đầu/cuối
-                ed.WriteMessage("\nChọn điểm lấy lý trình đầu:");
-                var ptStart = ui.GetPoint("Chọn điểm đầu:");
-                alignmentService.GetStationAndOffsetFromPoint(ptStart, alignment, out double startStation, out double startOffset);
+                    // Create first offset (Right/Default)
+                    string name1 = form.BothSides ? $"{form.NewAlignmentName}_Right" : form.NewAlignmentName;
+                    ObjectId offsetId1 = alignmentService.CreateOffsetAlignment(
+                        alignment,
+                        name1,
+                        form.OffsetWidth,
+                        form.StartStation,
+                        form.EndStation,
+                        form.SelectedStyleId
+                    );
 
-                ed.WriteMessage("\nChọn điểm lấy lý trình cuối:");
-                var ptEnd = ui.GetPoint("Chọn điểm cuối:");
-                alignmentService.GetStationAndOffsetFromPoint(ptEnd, alignment, out double endStation, out double endOffset);
+                    // Create second offset if requested (Left)
+                    ObjectId offsetId2 = ObjectId.Null;
+                    if (form.BothSides)
+                    {
+                        string name2 = $"{form.NewAlignmentName}_Left";
+                        offsetId2 = alignmentService.CreateOffsetAlignment(
+                            alignment,
+                            name2,
+                            -form.OffsetWidth,
+                            form.StartStation,
+                            form.EndStation,
+                            form.SelectedStyleId
+                        );
+                    }
 
-                if (startStation > endStation)
-                {
-                    (endStation, startStation) = (startStation, endStation);
+                    if (offsetId1 != ObjectId.Null || offsetId2 != ObjectId.Null)
+                    {
+                        ed.WriteMessage($"\nĐã tạo offset alignment: {form.NewAlignmentName}");
+                    }
+                    else
+                    {
+                        ed.WriteMessage("\nKhông thể tạo offset alignment!");
+                    }
+                    tr.Commit();
                 }
-                if (startStation < alignment.StartingStation || endStation > alignment.EndingStation || startStation >= endStation)
-                {
-                    ed.WriteMessage("\nLý trình không hợp lệ!");
-                    return;
-                }
-
-                // 4. Hiển thị danh sách style và chọn style theo số thứ tự
-                var styleList = alignmentService.GetAllAlignmentStyles();
-                ed.WriteMessage("\nDanh sách Alignment Style:");
-                for (int i = 0; i < styleList.Count; i++)
-                {
-                    ed.WriteMessage($"\n  {i + 1}. {styleList[i].Name}");
-                }
-                int styleIndex = (int)ui.GetDouble($"\nNhập số thứ tự style muốn chọn (1-{styleList.Count}, Enter=1): ");
-                if (styleIndex < 1 || styleIndex > styleList.Count) styleIndex = 1;
-                var styleId = styleList[styleIndex - 1].Id;
-
-                // 5. Tạo offset alignment qua service
-                string offsetName = alignment.Name + $"_Offset_{offsetWidth:F1}";
-                ObjectId offsetAlignmentId = alignmentService.CreateOffsetAlignment(
-                    alignment,
-                    offsetName,
-                    offsetWidth,
-                    startStation,
-                    endStation,
-                    styleId
-                );
-                if (offsetAlignmentId != ObjectId.Null)
-                {
-                    ed.WriteMessage($"\nĐã tạo offset alignment: {offsetName}");
-                }
-                else
-                {
-                    ed.WriteMessage("\nKhông thể tạo offset alignment!");
-                }
-                tr.Commit();
             }
-            catch (Autodesk.AutoCAD.Runtime.Exception e)
+            catch (System.Exception e)
             {
                 ed.WriteMessage($"\nLỗi: {e.Message}");
             }
@@ -278,7 +230,7 @@ namespace MyFirstProject
         /// <summary>
         /// Creates offset alignment from a parent alignment, allows passing styleId
         /// </summary>
-        public ObjectId CreateOffsetAlignment(Alignment parentAlignment, string offsetName, double offsetWidth, 
+        public ObjectId CreateOffsetAlignment(Alignment parentAlignment, string offsetName, double offsetWidth,
             double startStation, double endStation, ObjectId styleId)
         {
             ArgumentNullException.ThrowIfNull(parentAlignment);
@@ -289,28 +241,26 @@ namespace MyFirstProject
 
             Database db = parentAlignment.Database;
             ObjectId newAlignmentId = ObjectId.Null;
-            
+
+            // Ensure unique name
+            string uniqueName = GetUniqueAlignmentName(db, offsetName);
+
             using (Transaction tr = db.TransactionManager.StartTransaction())
             {
                 try
                 {
                     ObjectId offsetId = Alignment.CreateOffsetAlignment(
-                        offsetName,
+                        uniqueName,
                         parentAlignment.ObjectId,
                         offsetWidth,
                         styleId,
                         startStation,
                         endStation
                     );
-                    
+
                     if (offsetId != ObjectId.Null)
                     {
                         newAlignmentId = offsetId;
-                        Alignment? offsetAlignment = tr.GetObject(newAlignmentId, OpenMode.ForWrite) as Alignment;
-                        if (offsetAlignment != null)
-                        {
-                            offsetAlignment.Name = offsetName;
-                        }
                     }
                     tr.Commit();
                 }
@@ -323,6 +273,31 @@ namespace MyFirstProject
             return newAlignmentId;
         }
 
+        private string GetUniqueAlignmentName(Database db, string baseName)
+        {
+            CivilDocument civilDoc = CivilApplication.ActiveDocument;
+            string proposedName = baseName;
+            int counter = 1;
+
+            bool nameExists = true;
+            while (nameExists)
+            {
+                nameExists = false;
+                foreach (ObjectId alignId in civilDoc.GetAlignmentIds())
+                {
+                    using var tr = db.TransactionManager.StartTransaction();
+                    var align = (Alignment)tr.GetObject(alignId, OpenMode.ForRead);
+                    if (align.Name.Equals(proposedName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        nameExists = true;
+                        proposedName = $"{baseName} ({counter++})";
+                        break;
+                    }
+                }
+            }
+            return proposedName;
+        }
+
         /// <summary>
         /// Returns list of all Alignment Styles (Id and Name)
         /// </summary>
@@ -330,7 +305,7 @@ namespace MyFirstProject
         {
             var result = new List<(ObjectId, string)>();
             CivilDocument civilDoc = CivilApplication.ActiveDocument;
-            
+
             foreach (ObjectId id in civilDoc.Styles.AlignmentStyles)
             {
                 try

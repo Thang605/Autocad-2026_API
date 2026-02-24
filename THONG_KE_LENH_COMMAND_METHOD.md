@@ -335,8 +335,6 @@
 | STT | Lenh | Mo ta |
 |-----|------|-------|
 | 76 | `CTSV_TaoCorridorSurface` | Tao corridor surface |
-| 77 | `CTSV_TaoCorridorSurfaceMultiple` | Tao corridor surface (nhieu) |
-| 78 | `CTSV_TaoCorridorSurfaceSingle` | Tao corridor surface (don) |
 
 ### 25.CTPI_ThayDoi_CaoDo_DayCong.cs
 | STT | Lenh | Mo ta |
@@ -352,15 +350,6 @@
 | STT | Lenh | Mo ta |
 |-----|------|-------|
 | 81 | `CTPI_Corridor_SetTargets` | Corridor set targets |
-
-### 27.CTA_TaoDuong_ConnectedAlignment_NutGiao.cs (5 lenh)
-| STT | Lenh | Mo ta |
-|-----|------|-------|
-| 82 | `CTA_TaoDuong_ConnectedAlignment_NutGiao` | Tao duong connected alignment nut giao |
-| 83 | `CTA_ConnectedAlignment_Nga4` | Connected alignment nga 4 |
-| 84 | `CTA_ConnectedAlignment_Nga3` | Connected alignment nga 3 |
-| 85 | `CTA_ConnectedAlignment` | Connected alignment |
-| 86 | `CTA_ConnectedAlignment_Help` | Connected alignment - help |
 
 ### 28.CTC_TaoCooridor_DuongDoThi_RePhai.cs
 | STT | Lenh | Mo ta |

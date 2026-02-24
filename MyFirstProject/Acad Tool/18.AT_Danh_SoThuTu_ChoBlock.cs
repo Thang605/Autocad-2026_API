@@ -70,7 +70,7 @@ namespace Civil3DCsharp
         private WinFormsTextBox txtAttributeTag;
         private WinFormsLabel lblSortOrder;
         private WinFormsComboBox cmbSortOrder;
-        private WinFormsLabel lblFormat;
+
         private WinFormsTextBox txtPrefix;
         private WinFormsLabel lblSeparator;
         private WinFormsTextBox txtSeparator;

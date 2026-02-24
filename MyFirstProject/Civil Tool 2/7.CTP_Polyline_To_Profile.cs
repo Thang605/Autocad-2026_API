@@ -260,16 +260,16 @@ namespace Civil3DCsharp
                 {
                     foreach (ProfilePVI pvi in targetProfile.PVIs)
                     {
-                        pvisToRemove.Add((pvi.Station, pvi.Elevation));
+                        pvisToRemove.Add((pvi.RawStation, pvi.Elevation));
                     }
                 }
                 else if (adjustOption == 2) // Thay thế trong phạm vi
                 {
                     foreach (ProfilePVI pvi in targetProfile.PVIs)
                     {
-                        if (pvi.Station >= polylineStartStation && pvi.Station <= polylineEndStation)
+                        if (pvi.RawStation >= polylineStartStation && pvi.RawStation <= polylineEndStation)
                         {
-                            pvisToRemove.Add((pvi.Station, pvi.Elevation));
+                            pvisToRemove.Add((pvi.RawStation, pvi.Elevation));
                         }
                     }
                 }
@@ -310,7 +310,7 @@ namespace Civil3DCsharp
                 for (int i = targetProfile.PVIs.Count - 1; i >= 0; i--)
                 {
                     ProfilePVI pvi = targetProfile.PVIs[i];
-                    double currentStation = Math.Round(pvi.Station, 4);
+                    double currentStation = Math.Round(pvi.RawStation, 4);
                     double currentElev = Math.Round(pvi.Elevation, 4);
 
                     // Kiểm tra xem PVI này có trong danh sách cần xóa không
@@ -330,7 +330,7 @@ namespace Civil3DCsharp
                     else if (adjustOption == 2) // Trong phạm vi
                     {
                         // Logic tương tự: Chỉ xóa nếu nằm trong phạm vi VÀ không phải là điểm mới
-                        if (pvi.Station >= polylineStartStation && pvi.Station <= polylineEndStation)
+                        if (pvi.RawStation >= polylineStartStation && pvi.RawStation <= polylineEndStation)
                         {
                              if (!newStations.Contains(currentStation))
                              {

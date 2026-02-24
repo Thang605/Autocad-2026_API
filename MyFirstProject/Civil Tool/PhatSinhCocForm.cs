@@ -221,7 +221,7 @@ namespace MyFirstProject.Civil_Tool
                         cmbLabelStyle.SelectedIndex = 0;
                 }
             }
-            catch (System.Exception ex)
+            catch (System.Exception)
             {
                 // Fallback - add default item
                 cmbLabelStyle.Items.Add("Tên cọc");
