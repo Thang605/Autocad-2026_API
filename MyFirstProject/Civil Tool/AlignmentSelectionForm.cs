@@ -15,6 +15,9 @@ namespace MyFirstProject.Civil_Tool
         private Button btnDeselectAll;
         private CheckBox chkUseShoelace; // Checkbox mới
         private CheckBox chkUseDefaultSorting; // Checkbox mới: Sử dụng mặc định sắp xếp
+        private GroupBox grpMethod; // GroupBox chọn phương pháp
+        private RadioButton rdoMethodHatch; // Phương pháp Explode Hatch
+        private RadioButton rdoMethodText; // Phương pháp Text
         private Label lblDecimalPlaces;
         private NumericUpDown numDecimalPlaces;
         private Button btnOK;
@@ -28,6 +31,7 @@ namespace MyFirstProject.Civil_Tool
         public bool DialogResult_OK { get; private set; } = false;
         public bool UseShoelace { get; private set; } = false; // Property mới
         public bool UseDefaultSorting { get; private set; } = false; // Property mới
+        public bool UseTextMethod { get; private set; } = false; // Property phương pháp text
         public int DecimalPlaces { get; private set; } = 3; // Property số thập phân
 
         public AlignmentSelectionForm()
@@ -45,11 +49,13 @@ namespace MyFirstProject.Civil_Tool
         private void InitializeComponent()
         {
             this.checkedListBoxAlignments = new CheckedListBox();
-            this.checkedListBoxAlignments = new CheckedListBox();
             this.btnSelectAll = new Button();
             this.btnDeselectAll = new Button();
             this.chkUseShoelace = new CheckBox(); // Init checkbox
             this.chkUseDefaultSorting = new CheckBox(); // Init checkbox
+            this.grpMethod = new GroupBox();
+            this.rdoMethodHatch = new RadioButton();
+            this.rdoMethodText = new RadioButton();
             this.lblDecimalPlaces = new Label();
             this.numDecimalPlaces = new NumericUpDown();
             this.btnOK = new Button();
@@ -61,7 +67,7 @@ namespace MyFirstProject.Civil_Tool
 
             // Form - Tăng kích thước
             this.Text = "Chọn Alignment để xuất khối lượng";
-            this.Size = new Size(700, 700);
+            this.Size = new Size(700, 780);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -129,6 +135,30 @@ namespace MyFirstProject.Civil_Tool
             this.chkUseDefaultSorting.Checked = false;
             currentY += 35;
 
+            // grpMethod - GroupBox chọn phương pháp tính
+            this.grpMethod.Location = new Point(leftMargin, currentY);
+            this.grpMethod.Size = new Size(contentWidth, 75);
+            this.grpMethod.Text = "Phương pháp tính diện tích";
+            this.grpMethod.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            this.grpMethod.ForeColor = Color.FromArgb(0, 51, 153);
+
+            this.rdoMethodHatch.Location = new Point(15, 25);
+            this.rdoMethodHatch.Size = new Size(600, 22);
+            this.rdoMethodHatch.Text = "Tính từ MaterialSection (Explode → Hatch.Area)";
+            this.rdoMethodHatch.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
+            this.rdoMethodHatch.ForeColor = Color.Black;
+            this.rdoMethodHatch.Checked = true; // Mặc định
+
+            this.rdoMethodText.Location = new Point(15, 48);
+            this.rdoMethodText.Size = new Size(600, 22);
+            this.rdoMethodText.Text = "Tính từ Text (QTO Table → Text + Text vàng trong SectionView)";
+            this.rdoMethodText.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
+            this.rdoMethodText.ForeColor = Color.Black;
+
+            this.grpMethod.Controls.Add(this.rdoMethodHatch);
+            this.grpMethod.Controls.Add(this.rdoMethodText);
+            currentY += 85;
+
             // lblDecimalPlaces & numDecimalPlaces - Số chữ số thập phân
             this.lblDecimalPlaces.Location = new Point(leftMargin, currentY);
             this.lblDecimalPlaces.Size = new Size(180, 28);
@@ -188,6 +218,7 @@ namespace MyFirstProject.Civil_Tool
             this.Controls.Add(this.btnDeselectAll);
             this.Controls.Add(this.chkUseShoelace); // Add to controls
             this.Controls.Add(this.chkUseDefaultSorting); // Add to controls
+            this.Controls.Add(this.grpMethod); // Add GroupBox phương pháp
             this.Controls.Add(this.lblDecimalPlaces);
             this.Controls.Add(this.numDecimalPlaces);
             this.Controls.Add(this.btnOK);
@@ -262,6 +293,7 @@ namespace MyFirstProject.Civil_Tool
 
             UseShoelace = chkUseShoelace.Checked; // Lưu trạng thái
             UseDefaultSorting = chkUseDefaultSorting.Checked; // Lưu trạng thái
+            UseTextMethod = rdoMethodText.Checked; // Lưu phương pháp
             DecimalPlaces = (int)numDecimalPlaces.Value; // Lưu số thập phân
             DialogResult_OK = true;
             this.Close();

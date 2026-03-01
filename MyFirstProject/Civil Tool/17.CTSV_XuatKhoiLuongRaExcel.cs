@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 
 using Autodesk.AutoCAD.Runtime;
@@ -58,9 +59,11 @@ namespace Civil3DCsharp
                 }
 
                 A.Ed.WriteMessage($"\n✓ Đã chọn {selectionForm.SelectedAlignments.Count} alignment(s)");
+                bool useTextMethod = selectionForm.UseTextMethod;
 
                 // Step 3: Thu thập thông tin từ tất cả các SampleLineGroups
                 A.Ed.WriteMessage("\n\n🎯 BƯỚC 3: Thu thập thông tin khối lượng vật liệu");
+                A.Ed.WriteMessage($"\n  📐 Phương pháp: {(useTextMethod ? "Text (QTO Table + Text vàng)" : "MaterialSection (Explode → Hatch.Area)")}");
                 List<SheetData> allSheetData = new();
 
                 foreach (var alignmentInfo in selectionForm.SelectedAlignments)
@@ -74,7 +77,15 @@ namespace Civil3DCsharp
                         SampleLineGroup? sampleLineGroup = tr.GetObject(slgInfo.SampleLineGroupId, OpenMode.ForRead) as SampleLineGroup;
                         if (sampleLineGroup == null) continue;
 
-                        List<MaterialVolumeInfo> materialInfoList = CollectMaterialVolumeInformation(sampleLineGroup, tr, selectionForm.UseShoelace);
+                        List<MaterialVolumeInfo> materialInfoList;
+                        if (useTextMethod)
+                        {
+                            materialInfoList = CollectMaterialVolumeFromText(sampleLineGroup, tr);
+                        }
+                        else
+                        {
+                            materialInfoList = CollectMaterialVolumeInformation(sampleLineGroup, tr);
+                        }
 
                         if (materialInfoList.Count > 0)
                         {
@@ -95,7 +106,7 @@ namespace Civil3DCsharp
 
                 if (allSheetData.Count == 0)
                 {
-                    A.Ed.WriteMessage("\n❌ Không tìm thấy thông tin material section nào.");
+                    A.Ed.WriteMessage("\n❌ Không tìm thấy thông tin khối lượng vật liệu nào.");
                     tr.Abort();
                     return;
                 }
@@ -504,15 +515,31 @@ namespace Civil3DCsharp
                 string numberFormat = "0." + new string('0', decimalPlaces);
                 int materialCount = pivotData.MaterialTypes.Count;
 
-                // ===== THÔNG TIN DỰ ÁN (tham chiếu từ sheet TỔNG HỢP) =====
+                // ===== THÔNG TIN DỰ ÁN =====
                 // Tổng cột = 3 (Lý trình, Tên cọc, Khoảng cách) + số vật liệu (diện tích) + số vật liệu (khối lượng)
                 int totalCols = 3 + materialCount + materialCount;
 
-                worksheet.Cell(currentRow, 1).FormulaA1 = "='TỔNG HỢP'!A1";
+                // Chỉ tham chiếu sheet TỔNG HỢP nếu nó tồn tại (khi có > 1 sheet)
+                bool hasSummarySheet = worksheet.Workbook.Worksheets.Any(ws => ws.Name == "TỔNG HỢP");
+                if (hasSummarySheet)
+                {
+                    worksheet.Cell(currentRow, 1).FormulaA1 = "='TỔNG HỢP'!A1";
+                }
+                else
+                {
+                    worksheet.Cell(currentRow, 1).Value = "Dự án:";
+                }
                 worksheet.Cell(currentRow, 1).Style.Font.Italic = true;
                 currentRow++;
 
-                worksheet.Cell(currentRow, 1).FormulaA1 = "='TỔNG HỢP'!A2";
+                if (hasSummarySheet)
+                {
+                    worksheet.Cell(currentRow, 1).FormulaA1 = "='TỔNG HỢP'!A2";
+                }
+                else
+                {
+                    worksheet.Cell(currentRow, 1).Value = "Địa điểm:";
+                }
                 worksheet.Cell(currentRow, 1).Style.Font.Italic = true;
                 currentRow++;
 
@@ -582,12 +609,13 @@ namespace Civil3DCsharp
                     worksheet.Cell(currentRow, 3).Style.NumberFormat.Format = numberFormat;
 
                     // Xuất cột diện tích (m²) - giữ giá trị trực tiếp vì đây là dữ liệu gốc
+                    // MaterialAdditionalValues chỉ cộng vào dòng ĐẦU TIÊN (rowIdx == 0) để tránh cộng trùng
                     for (int i = 0; i < materialCount; i++)
                     {
                         string materialType = pivotData.MaterialTypes[i];
                         double area = stakeInfo.MaterialAreas.ContainsKey(materialType) ? stakeInfo.MaterialAreas[materialType] : 0.0;
 
-                        if (pivotData.MaterialAdditionalValues.ContainsKey(materialType))
+                        if (rowIdx == 0 && pivotData.MaterialAdditionalValues.ContainsKey(materialType))
                         {
                             area += pivotData.MaterialAdditionalValues[materialType];
                         }
@@ -699,7 +727,7 @@ namespace Civil3DCsharp
             }
         }
 
-        private static List<MaterialVolumeInfo> CollectMaterialVolumeInformation(SampleLineGroup sampleLineGroup, Transaction tr, bool useShoelace)
+        private static List<MaterialVolumeInfo> CollectMaterialVolumeInformation(SampleLineGroup sampleLineGroup, Transaction tr)
         {
             List<MaterialVolumeInfo> materialInfoList = new();
 
@@ -731,35 +759,9 @@ namespace Civil3DCsharp
 
                         A.Ed.WriteMessage($"\n  📍 Xử lý cọc: {stakeName} (Station: {FormatStation(station)})");
 
-                        // Tìm SectionView cho SampleLine này
-                        SectionView? sectionView = null;
-                        try
-                        {
-                            BlockTable bt = tr.GetObject(A.Db.BlockTableId, OpenMode.ForRead) as BlockTable;
-                            BlockTableRecord btr = tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForRead) as BlockTableRecord;
-                            foreach (ObjectId entId in btr)
-                            {
-                                try
-                                {
-                                    if (tr.GetObject(entId, OpenMode.ForRead) is SectionView sv)
-                                    {
-                                        if (sv.SampleLineId == sampleLineId)
-                                        {
-                                            sectionView = sv;
-                                            break;
-                                        }
-                                    }
-                                }
-                                catch { }
-                            }
-                        }
-                        catch { }
-
                         // Lấy tất cả Section IDs từ SampleLine
                         ObjectIdCollection sectionIds = sampleLine.GetSectionIds();
                         A.Ed.WriteMessage($"\n     - Tìm thấy {sectionIds.Count} sections");
-                        if (sectionView != null)
-                            A.Ed.WriteMessage($" (SectionView found)");
 
                         // Dictionary để lưu MaterialSection duy nhất cho mỗi material name
                         Dictionary<string, (double Area, string SourceName)> uniqueMaterials = new();
@@ -776,7 +778,7 @@ namespace Civil3DCsharp
                                 {
                                     string sourceName = materialSection.SourceName ?? "Không có tên";
                                     string materialName = ExtractMaterialNameFromSource(sourceName);
-                                    double area = GetMaterialSectionArea(materialSection, useShoelace);
+                                    double area = GetMaterialSectionArea(materialSection, useShoelace: true);
 
                                     // Chỉ thêm hoặc cập nhật nếu chưa có hoặc diện tích lớn hơn
                                     if (!uniqueMaterials.ContainsKey(materialName))
@@ -874,9 +876,692 @@ namespace Civil3DCsharp
         }
 
 
+        #region ===== TEXT-BASED QUANTITY COLLECTION =====
+
         /// <summary>
-        /// Lấy diện tích từ MaterialSection bằng Double Explode → Block → Hatch → Hatch.Area
+        /// Thu thập khối lượng vật liệu từ Text (Dạng 1: QTO Table explode + Dạng 2: Text vàng)
         /// </summary>
+        private static List<MaterialVolumeInfo> CollectMaterialVolumeFromText(SampleLineGroup sampleLineGroup, Transaction tr)
+        {
+            List<MaterialVolumeInfo> materialInfoList = new();
+
+            try
+            {
+                // Lấy thứ tự materials từ QTOMaterialList
+                _currentQTOMaterialOrder = GetMaterialOrderFromQTO(sampleLineGroup);
+                if (_currentQTOMaterialOrder.Count > 0)
+                {
+                    A.Ed.WriteMessage($"\n  📋 Thứ tự vật liệu từ Material List: {string.Join(", ", _currentQTOMaterialOrder)}");
+                }
+
+                // ===== Build SectionView map từ SectionViewGroup API (chính xác cho multi-group) =====
+                var sectionViewMap = new Dictionary<ObjectId, SectionView>();
+
+                SectionViewGroupCollection sectionViewGroupCollection = sampleLineGroup.SectionViewGroups;
+                A.Ed.WriteMessage($"\n  📊 Tìm thấy {sectionViewGroupCollection.Count} SectionViewGroup(s)");
+
+                // Duyệt tất cả SectionViewGroups để tìm SectionViews
+                foreach (SectionViewGroup svGroup in sectionViewGroupCollection)
+                {
+                    ObjectIdCollection sectionViewIds = svGroup.GetSectionViewIds();
+                    foreach (ObjectId svId in sectionViewIds)
+                    {
+                        try
+                        {
+                            SectionView? sv = tr.GetObject(svId, OpenMode.ForRead) as SectionView;
+                            if (sv != null)
+                            {
+                                // Nếu đã có SectionView cho SampleLine này, giữ cái đầu tiên
+                                if (!sectionViewMap.ContainsKey(sv.SampleLineId))
+                                {
+                                    sectionViewMap[sv.SampleLineId] = sv;
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
+                A.Ed.WriteMessage($"\n  📊 Mapped {sectionViewMap.Count} SectionViews cho {sampleLineGroup.GetSampleLineIds().Count} sample lines");
+
+                // ===== Thu thập AECC_TABLE entities và text vàng từ ModelSpace =====
+                BlockTable? bt = tr.GetObject(A.Db.BlockTableId, OpenMode.ForRead) as BlockTable;
+                if (bt == null) return materialInfoList;
+                BlockTableRecord? btr = tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForRead) as BlockTableRecord;
+                if (btr == null) return materialInfoList;
+
+                var allAeccTables = new List<Autodesk.AutoCAD.DatabaseServices.Entity>();
+                var allYellowTexts = new List<(string Text, double X, double Y)>();
+
+                foreach (ObjectId entityId in btr)
+                {
+                    try
+                    {
+                        var dbObj = tr.GetObject(entityId, OpenMode.ForRead);
+                        if (dbObj is Autodesk.AutoCAD.DatabaseServices.Entity ent && ent.GetRXClass().DxfName.Contains("AECC") && ent.GetRXClass().DxfName.Contains("TABLE"))
+                        {
+                            allAeccTables.Add(ent);
+                        }
+                        // Thu thập text vàng (ColorIndex = 2)
+                        else if (dbObj is DBText dbText && dbText.ColorIndex == 2)
+                        {
+                            allYellowTexts.Add((dbText.TextString ?? "", dbText.Position.X, dbText.Position.Y));
+                        }
+                        else if (dbObj is MText mText && mText.ColorIndex == 2)
+                        {
+                            string cleanText = CleanMTextFormatting(mText.Contents ?? "");
+                            allYellowTexts.Add((cleanText, mText.Location.X, mText.Location.Y));
+                        }
+                    }
+                    catch { }
+                }
+
+                A.Ed.WriteMessage($"\n  📊 ModelSpace: {allAeccTables.Count} AECC Tables, {allYellowTexts.Count} text vàng");
+
+                // ===== DẠNG 1: Pre-explode tất cả QTO Tables lần 1 → lấy blocks =====
+                var allBlocksFromTables = new List<(BlockReference Block, double CenterX, double CenterY)>();
+
+                foreach (var tableEntity in allAeccTables)
+                {
+                    try
+                    {
+                        DBObjectCollection firstExplode = new();
+                        tableEntity.Explode(firstExplode);
+
+                        foreach (Autodesk.AutoCAD.DatabaseServices.DBObject obj in firstExplode)
+                        {
+                            try
+                            {
+                                if (obj is BlockReference blockRef)
+                                {
+                                    var blockBounds = blockRef.GeometricExtents;
+                                    double cx = (blockBounds.MinPoint.X + blockBounds.MaxPoint.X) / 2.0;
+                                    double cy = (blockBounds.MinPoint.Y + blockBounds.MaxPoint.Y) / 2.0;
+                                    allBlocksFromTables.Add((blockRef, cx, cy));
+                                }
+                                else
+                                {
+                                    obj.Dispose();
+                                }
+                            }
+                            catch
+                            {
+                                try { obj.Dispose(); } catch { }
+                            }
+                        }
+                    }
+                    catch (System.Exception ex)
+                    {
+                        A.Ed.WriteMessage($"\n  ⚠️ Lỗi explode QTO Table: {ex.Message}");
+                    }
+                }
+
+                A.Ed.WriteMessage($"\n  📦 Explode lần 1: {allBlocksFromTables.Count} blocks từ {allAeccTables.Count} QTO Tables");
+
+                // ===== Duyệt từng SampleLine =====
+                ObjectIdCollection sampleLineIds = sampleLineGroup.GetSampleLineIds();
+                A.Ed.WriteMessage($"\n  - Tìm thấy {sampleLineIds.Count} sample lines trong group.");
+
+                foreach (ObjectId sampleLineId in sampleLineIds)
+                {
+                    try
+                    {
+                        SampleLine? sampleLine = tr.GetObject(sampleLineId, OpenMode.ForRead) as SampleLine;
+                        if (sampleLine == null) continue;
+
+                        double station = sampleLine.Station;
+                        string stakeName = sampleLine.Name ?? FormatStation(station);
+
+                        A.Ed.WriteMessage($"\n  📍 Xử lý cọc: {stakeName} (Station: {FormatStation(station)})");
+
+                        // Tìm SectionView tương ứng từ map đã build từ SectionViewGroup
+                        if (!sectionViewMap.TryGetValue(sampleLineId, out SectionView? sectionView) || sectionView == null)
+                        {
+                            A.Ed.WriteMessage($"\n     ⚠️  Không tìm thấy SectionView cho cọc này → bỏ qua");
+                            continue;
+                        }
+
+                        // Lấy bounding box của SectionView (mở rộng 10% dự phòng)
+                        var svBounds = sectionView.GeometricExtents;
+                        double svWidth = svBounds.MaxPoint.X - svBounds.MinPoint.X;
+                        double svHeight = svBounds.MaxPoint.Y - svBounds.MinPoint.Y;
+                        double marginX = svWidth * 0.10;
+                        double marginY = svHeight * 0.10;
+                        double svMinX = svBounds.MinPoint.X - marginX;
+                        double svMinY = svBounds.MinPoint.Y - marginY;
+                        double svMaxX = svBounds.MaxPoint.X + marginX;
+                        double svMaxY = svBounds.MaxPoint.Y + marginY;
+
+                        // Ordered list để giữ thứ tự theo Y (trên → dưới)
+                        var materialAreas = new Dictionary<string, double>();
+                        var materialOrder = new List<string>(); // Thứ tự vật liệu theo Y (trên → dưới)
+                        var materialSourceType = new Dictionary<string, int>(); // 1 = Dạng 1 (QTO Table), 2 = Dạng 2 (Text vàng)
+
+                        // ===== DẠNG 1: Tìm blocks nằm trong SectionView → explode lần 2 → 2 texts =====
+                        int qtoCount = 0;
+                        // Thu thập blocks trong SV kèm Y position để sắp xếp
+                        var blocksInSV = new List<(BlockReference Block, double CenterY)>();
+                        foreach (var (blockRef, cx, cy) in allBlocksFromTables)
+                        {
+                            if (cx >= svMinX && cx <= svMaxX && cy >= svMinY && cy <= svMaxY)
+                            {
+                                blocksInSV.Add((blockRef, cy));
+                            }
+                        }
+                        // Sắp xếp blocks theo Y giảm dần (trên → dưới)
+                        blocksInSV = blocksInSV.OrderByDescending(b => b.CenterY).ToList();
+
+                        foreach (var (blockRef, _) in blocksInSV)
+                        {
+                            // Kiểm tra block nằm trong bounding box mở rộng của SectionView
+                            {
+                                try
+                                {
+                                    // Explode block lần 2 → 2 texts
+                                    DBObjectCollection secondExplode = new();
+                                    blockRef.Explode(secondExplode);
+
+                                    var texts = new List<(string Text, double X)>();
+                                    foreach (Autodesk.AutoCAD.DatabaseServices.DBObject obj2 in secondExplode)
+                                    {
+                                        try
+                                        {
+                                            if (obj2 is MText mtext)
+                                            {
+                                                string text = CleanMTextFormatting(mtext.Contents ?? "");
+                                                if (!string.IsNullOrWhiteSpace(text))
+                                                    texts.Add((text.Trim(), mtext.Location.X));
+                                            }
+                                            else if (obj2 is DBText dbtext)
+                                            {
+                                                string text = dbtext.TextString ?? "";
+                                                if (!string.IsNullOrWhiteSpace(text))
+                                                    texts.Add((text.Trim(), dbtext.Position.X));
+                                            }
+                                        }
+                                        catch { }
+                                    }
+
+                                    foreach (Autodesk.AutoCAD.DatabaseServices.DBObject obj in secondExplode)
+                                    {
+                                        try { obj.Dispose(); } catch { }
+                                    }
+
+                                    // Cần ít nhất 2 text: tên vật liệu + giá trị
+                                    if (texts.Count >= 2)
+                                    {
+                                        // Sắp xếp theo X: text trái = tên, text phải = giá trị
+                                        texts = texts.OrderBy(t => t.X).ToList();
+                                        string nameText = texts[0].Text;
+                                        string valueText = texts[texts.Count - 1].Text;
+
+                                        var (numValue, unit) = ExtractNumberAndUnit(valueText);
+                                        if (numValue > 0)
+                                        {
+                                            string materialName = nameText.TrimEnd(':', '=', ' ');
+
+                                            if (materialAreas.ContainsKey(materialName))
+                                                materialAreas[materialName] += numValue;
+                                            else
+                                            {
+                                                materialAreas[materialName] = numValue;
+                                                materialOrder.Add(materialName); // Giữ thứ tự theo Y
+                                                materialSourceType[materialName] = 1; // Dạng 1: QTO Table
+                                            }
+                                            qtoCount++;
+
+                                            A.Ed.WriteMessage($"\n     📝 [{materialName}] = {numValue} {unit}");
+                                        }
+                                    }
+                                    else if (texts.Count == 1)
+                                    {
+                                        // Trường hợp 1 text chứa cả tên và giá trị: "Đào đất: 5.23 m²"
+                                        var parsed = TryParseYellowText(texts[0].Text);
+                                        if (parsed.HasValue)
+                                        {
+                                            if (materialAreas.ContainsKey(parsed.Value.Name))
+                                                materialAreas[parsed.Value.Name] += parsed.Value.Value;
+                                            else
+                                            {
+                                                materialAreas[parsed.Value.Name] = parsed.Value.Value;
+                                                materialOrder.Add(parsed.Value.Name);
+                                                materialSourceType[parsed.Value.Name] = 1; // Dạng 1: QTO Table
+                                            }
+                                            qtoCount++;
+
+                                            A.Ed.WriteMessage($"\n     📝 [{parsed.Value.Name}] = {parsed.Value.Value}");
+                                        }
+                                    }
+                                }
+                                catch { }
+                            }
+                        }
+
+                        if (qtoCount > 0)
+                        {
+                            A.Ed.WriteMessage($"\n     ✓ Dạng 1 (QTO Table): {qtoCount} giá trị từ {materialAreas.Count} vật liệu");
+                        }
+                        else
+                        {
+                            A.Ed.WriteMessage($"\n     ℹ️  Không tìm thấy QTO Table block trong SectionView này");
+                        }
+
+                        // ===== DẠNG 2: Text vàng trong SectionView (bổ sung) =====
+                        // Yellow text có thể là:
+                        // - 1 entity: "Rọ đá: 21.00 m2" (tên + giá trị cùng text)
+                        // - 2 entities: "Rọ đá:" + "21.00 m2" (riêng biệt, cùng dòng Y)
+                        int yellowCount = 0;
+
+                        // Thu thập yellow texts trong bounds (đã mở rộng 10%)
+                        var yellowTextsInSV = new List<(string Text, double X, double Y)>();
+                        foreach (var (text, x, y) in allYellowTexts)
+                        {
+                            if (string.IsNullOrWhiteSpace(text)) continue;
+                            if (x < svMinX || x > svMaxX) continue;
+                            if (y < svMinY || y > svMaxY) continue;
+                            yellowTextsInSV.Add((text, x, y));
+                        }
+
+                        if (yellowTextsInSV.Count > 0)
+                        {
+                            A.Ed.WriteMessage($"\n     🔍 Tìm thấy {yellowTextsInSV.Count} text vàng trong SectionView");
+
+                            // ===== PASS 1: Thử parse từng text riêng lẻ (format "Tên: Giá_trị đơn_vị") =====
+                            var usedIndices = new HashSet<int>();
+                            var pass1Results = new List<(string Name, double Value, double Y)>();
+
+                            for (int i = 0; i < yellowTextsInSV.Count; i++)
+                            {
+                                var parsed = TryParseYellowText(yellowTextsInSV[i].Text);
+                                if (parsed.HasValue && parsed.Value.Name != "Text vàng") // Chỉ chấp nhận nếu có tên thực
+                                {
+                                    pass1Results.Add((parsed.Value.Name, parsed.Value.Value, yellowTextsInSV[i].Y));
+                                    usedIndices.Add(i);
+                                    A.Ed.WriteMessage($"\n     📗 Pass1: [{parsed.Value.Name}] = {parsed.Value.Value}");
+                                }
+                            }
+
+                            // ===== PASS 2: Ghép cặp texts còn lại (name text + value text gần nhau theo Y) =====
+                            var nameTexts = new List<(string Text, double X, double Y, int Index)>();
+                            var valueTexts = new List<(double Value, double X, double Y, int Index)>();
+
+                            for (int i = 0; i < yellowTextsInSV.Count; i++)
+                            {
+                                if (usedIndices.Contains(i)) continue;
+                                string t = yellowTextsInSV[i].Text.Trim();
+
+                                // Text bắt đầu bằng số → value text
+                                var (numVal, _) = ExtractNumberAndUnit(t);
+                                if (numVal > 0)
+                                {
+                                    valueTexts.Add((numVal, yellowTextsInSV[i].X, yellowTextsInSV[i].Y, i));
+                                }
+                                else
+                                {
+                                    // Không phải số → name text
+                                    string cleanName = t.TrimEnd(':', '=', ' ');
+                                    if (!string.IsNullOrWhiteSpace(cleanName))
+                                    {
+                                        nameTexts.Add((cleanName, yellowTextsInSV[i].X, yellowTextsInSV[i].Y, i));
+                                    }
+                                }
+                            }
+
+                            // Ghép mỗi value text với name text gần nhất theo Y
+                            foreach (var vt in valueTexts)
+                            {
+                                (string Text, double X, double Y, int Index) bestName = default;
+                                double bestDist = double.MaxValue;
+
+                                foreach (var nt in nameTexts)
+                                {
+                                    if (usedIndices.Contains(nt.Index)) continue;
+                                    double yDist = Math.Abs(nt.Y - vt.Y);
+                                    if (yDist < bestDist)
+                                    {
+                                        bestDist = yDist;
+                                        bestName = nt;
+                                    }
+                                }
+
+                                if (bestDist < 5.0 && !string.IsNullOrWhiteSpace(bestName.Text))
+                                {
+                                    pass1Results.Add((bestName.Text, vt.Value, Math.Max(bestName.Y, vt.Y)));
+                                    usedIndices.Add(vt.Index);
+                                    usedIndices.Add(bestName.Index);
+                                    A.Ed.WriteMessage($"\n     📘 Pass2: [{bestName.Text}] = {vt.Value} (ghép cặp, Y gap={bestDist:F1})");
+                                }
+                                else
+                                {
+                                    // Value không ghép được → dùng tên "Text vàng"
+                                    pass1Results.Add(("Text vàng", vt.Value, vt.Y));
+                                    usedIndices.Add(vt.Index);
+                                    A.Ed.WriteMessage($"\n     📙 Pass2: [Text vàng] = {vt.Value} (không tìm thấy tên)");
+                                }
+                            }
+
+                            // Sắp xếp kết quả theo Y giảm dần (trên → dưới)
+                            var sortedResults = pass1Results.OrderByDescending(r => r.Y).ToList();
+
+                            foreach (var (matName, matValue, _) in sortedResults)
+                            {
+                                // Chỉ thêm nếu Dạng 1 chưa có vật liệu này
+                                if (!materialAreas.ContainsKey(matName))
+                                {
+                                    materialAreas[matName] = matValue;
+                                    materialOrder.Add(matName);
+                                    materialSourceType[matName] = 2; // Dạng 2: Text vàng
+                                    yellowCount++;
+                                    A.Ed.WriteMessage($"\n     🟡 [{matName}] = {matValue} (text vàng)");
+                                }
+                                else
+                                {
+                                    A.Ed.WriteMessage($"\n     ℹ️  Bỏ qua [{matName}] = {matValue} (đã có từ Dạng 1)");
+                                }
+                            }
+                        }
+
+                        if (yellowCount > 0)
+                        {
+                            A.Ed.WriteMessage($"\n     ✓ Dạng 2 (Text vàng): {yellowCount} giá trị bổ sung");
+                        }
+
+                        // Chỉ thêm vào kết quả nếu có dữ liệu
+                        if (materialAreas.Count > 0)
+                        {
+                            // Thêm theo thứ tự materialOrder (trên → dưới)
+                            foreach (var matName in materialOrder)
+                            {
+                                if (materialAreas.TryGetValue(matName, out double area))
+                                {
+                                    // Xác định SourceType: 1 = QTO Table (Dạng 1), 2 = Text vàng (Dạng 2)
+                                    int sourceType = materialSourceType.ContainsKey(matName) ? materialSourceType[matName] : 1;
+                                    materialInfoList.Add(new MaterialVolumeInfo
+                                    {
+                                        StakeName = stakeName,
+                                        Station = FormatStation(station),
+                                        StationValue = station,
+                                        MaterialName = matName,
+                                        Area = area,
+                                        SourceName = "Text",
+                                        SourceType = sourceType
+                                    });
+                                }
+                            }
+                            A.Ed.WriteMessage($"\n     → Tổng: {materialAreas.Count} loại vật liệu");
+                        }
+                        else
+                        {
+                            A.Ed.WriteMessage($"\n     ⚠️  Không có dữ liệu khối lượng cho cọc này (không có QTO Table hoặc text vàng)");
+                        }
+                    }
+                    catch (System.Exception ex)
+                    {
+                        A.Ed.WriteMessage($"\n  ❌ Lỗi xử lý sample line: {ex.Message}");
+                        continue;
+                    }
+                }
+
+                // Cleanup blocks
+                foreach (var (blockRef, _, _) in allBlocksFromTables)
+                {
+                    try { blockRef.Dispose(); } catch { }
+                }
+
+                // Sắp xếp theo lý trình
+                materialInfoList = materialInfoList.OrderBy(x => x.StationValue).ToList();
+
+                A.Ed.WriteMessage($"\n\n  ✅ Tổng cộng: {materialInfoList.Count} mục khối lượng vật liệu đã được thu thập (phương pháp Text).");
+
+                // Hiển thị thống kê
+                var materialStats = materialInfoList
+                    .GroupBy(x => x.MaterialName)
+                    .Select(g => new { Material = g.Key, Count = g.Count() })
+                    .OrderByDescending(x => x.Count);
+
+                A.Ed.WriteMessage("\n  📊 Thống kê vật liệu:");
+                foreach (var stat in materialStats)
+                {
+                    A.Ed.WriteMessage($"\n     - {stat.Material}: {stat.Count} cọc");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                A.Ed.WriteMessage($"\n❌ Lỗi khi thu thập thông tin material từ text: {ex.Message}");
+            }
+
+            return materialInfoList;
+        }
+
+
+        /// <summary>
+        /// Explode AECC Table 2 lần để lấy cặp text (tên vật liệu + giá trị)
+        /// </summary>
+        private static List<(string Name, double Value, string Unit)> ParseQTOTableTexts(Autodesk.AutoCAD.DatabaseServices.Entity tableEntity)
+        {
+            var results = new List<(string Name, double Value, string Unit)>();
+
+            try
+            {
+                // Thu thập tất cả text từ explode
+                var allTexts = new List<(string Text, double X, double Y)>();
+
+                DBObjectCollection firstExplode = new();
+                tableEntity.Explode(firstExplode);
+
+                foreach (Autodesk.AutoCAD.DatabaseServices.DBObject obj1 in firstExplode)
+                {
+                    try
+                    {
+                        if (obj1 is MText mtext)
+                        {
+                            string text = CleanMTextFormatting(mtext.Contents ?? "");
+                            if (!string.IsNullOrWhiteSpace(text))
+                                allTexts.Add((text.Trim(), Math.Round(mtext.Location.X, 2), Math.Round(mtext.Location.Y, 2)));
+                        }
+                        else if (obj1 is DBText dbtext)
+                        {
+                            string text = dbtext.TextString ?? "";
+                            if (!string.IsNullOrWhiteSpace(text))
+                                allTexts.Add((text.Trim(), Math.Round(dbtext.Position.X, 2), Math.Round(dbtext.Position.Y, 2)));
+                        }
+                        else if (obj1 is Autodesk.AutoCAD.DatabaseServices.Entity subEntity)
+                        {
+                            // Explode lần 2
+                            DBObjectCollection secondExplode = new();
+                            subEntity.Explode(secondExplode);
+
+                            foreach (Autodesk.AutoCAD.DatabaseServices.DBObject obj2 in secondExplode)
+                            {
+                                try
+                                {
+                                    if (obj2 is MText mtext2)
+                                    {
+                                        string text = CleanMTextFormatting(mtext2.Contents ?? "");
+                                        if (!string.IsNullOrWhiteSpace(text))
+                                            allTexts.Add((text.Trim(), Math.Round(mtext2.Location.X, 2), Math.Round(mtext2.Location.Y, 2)));
+                                    }
+                                    else if (obj2 is DBText dbtext2)
+                                    {
+                                        string text = dbtext2.TextString ?? "";
+                                        if (!string.IsNullOrWhiteSpace(text))
+                                            allTexts.Add((text.Trim(), Math.Round(dbtext2.Position.X, 2), Math.Round(dbtext2.Position.Y, 2)));
+                                    }
+                                }
+                                catch { }
+                            }
+
+                            foreach (var obj in secondExplode)
+                                ((Autodesk.AutoCAD.DatabaseServices.DBObject)obj).Dispose();
+                        }
+                    }
+                    catch { }
+                }
+
+                foreach (var obj in firstExplode)
+                    ((Autodesk.AutoCAD.DatabaseServices.DBObject)obj).Dispose();
+
+                if (allTexts.Count == 0) return results;
+
+                // Nhóm texts theo Y (cùng hàng) với tolerance
+                double tolerance = 1.0;
+                var rows = allTexts
+                    .GroupBy(t => Math.Round(t.Y / tolerance) * tolerance)
+                    .OrderByDescending(g => g.Key)
+                    .ToList();
+
+                // Mỗi hàng: text bên trái = tên vật liệu, text bên phải = giá trị
+                foreach (var row in rows)
+                {
+                    var sortedCells = row.OrderBy(t => t.X).ToList();
+                    if (sortedCells.Count < 2) continue;
+
+                    string nameText = sortedCells[0].Text;
+                    string valueText = sortedCells[sortedCells.Count - 1].Text;
+
+                    // Bỏ qua header row (không chứa số)
+                    var (numValue, unit) = ExtractNumberAndUnit(valueText);
+                    if (numValue <= 0) continue;
+
+                    // Trích xuất tên vật liệu (bỏ phần trước dấu "-" nếu có)
+                    string materialName = ExtractMaterialNameFromSource(nameText);
+
+                    results.Add((materialName, numValue, unit));
+                }
+            }
+            catch (System.Exception ex)
+            {
+                A.Ed.WriteMessage($"\n     ⚠️  Lỗi parse QTO table: {ex.Message}");
+            }
+
+            return results;
+        }
+
+        /// <summary>
+        /// Thử parse text vàng: hỗ trợ các format:
+        /// "Rọ đá: 21.00 m2", "Vải địa: 11.00 m", "5.23 m2"
+        /// </summary>
+        private static (string Name, double Value)? TryParseYellowText(string text)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(text)) return null;
+
+                text = text.Trim();
+
+                // Pattern 1: "Tên: giá_trị đơn_vị" hoặc "Tên = giá_trị đơn_vị"
+                // Ví dụ: "Rọ đá: 21.00 m2", "Vải địa: 11.00 m", "Đào đất = 5.23 m²"
+                var match = Regex.Match(text, @"^(.+?)\s*[:=]\s*([\d.,]+)\s*(m[²2]|m)?\s*$", RegexOptions.IgnoreCase);
+                if (match.Success)
+                {
+                    string name = match.Groups[1].Value.Trim();
+                    string numStr = match.Groups[2].Value.Replace(",", ".");
+                    if (double.TryParse(numStr,
+                        System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out double val) && val > 0)
+                    {
+                        return (name, val);
+                    }
+                }
+
+                // Pattern 2: "giá_trị đơn_vị" (chỉ số, không có tên)
+                // Ví dụ: "21.00 m2", "11.00 m"
+                var match2 = Regex.Match(text, @"^([\d.,]+)\s*(m[²2]|m)?\s*$", RegexOptions.IgnoreCase);
+                if (match2.Success)
+                {
+                    string numStr = match2.Groups[1].Value.Replace(",", ".");
+                    if (double.TryParse(numStr,
+                        System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out double val) && val > 0)
+                    {
+                        return ("Text vàng", val);
+                    }
+                }
+
+                // Pattern 3: "Tên vật_liệu\ngiá_trị m2" (multiline)
+                var lines = text.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                if (lines.Length >= 2)
+                {
+                    string namePart = lines[0].Trim();
+                    var (numVal, _) = ExtractNumberAndUnit(lines[lines.Length - 1].Trim());
+                    if (numVal > 0)
+                    {
+                        return (namePart, numVal);
+                    }
+                }
+
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Trích xuất số và đơn vị từ text (ví dụ: "5.230 m²" → (5.23, "m²"))
+        /// </summary>
+        private static (double Value, string Unit) ExtractNumberAndUnit(string text)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(text)) return (0, "");
+
+                // Tìm số trong text
+                var match = Regex.Match(text, @"([\d.,]+)\s*(m[²2]?|m|sq\.m)?", RegexOptions.IgnoreCase);
+                if (match.Success)
+                {
+                    string numStr = match.Groups[1].Value.Replace(",", ".");
+                    string unit = match.Groups[2].Value;
+
+                    // Normalize unit
+                    if (unit.Contains("2") || unit.Contains("²")) unit = "m²";
+                    else if (unit.Equals("m", StringComparison.OrdinalIgnoreCase)) unit = "m";
+                    else unit = "m²"; // Default
+
+                    if (double.TryParse(numStr,
+                        System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out double val))
+                    {
+                        return (val, unit);
+                    }
+                }
+
+                return (0, "");
+            }
+            catch
+            {
+                return (0, "");
+            }
+        }
+
+        /// <summary>
+        /// Clean MText formatting codes
+        /// </summary>
+        private static string CleanMTextFormatting(string content)
+        {
+            if (string.IsNullOrEmpty(content)) return "";
+
+            // Loại bỏ formatting codes MText phổ biến
+            string cleaned = content;
+            // Remove font/style codes: {\fArial|...; text}
+            cleaned = Regex.Replace(cleaned, @"\{\\[fFpPqQwWaAcChHoOlLkK][^;]*;", "");
+            // Remove \P (paragraph break) → space
+            cleaned = cleaned.Replace("\\P", " ");
+            // Remove closing braces
+            cleaned = cleaned.Replace("}", "");
+            // Remove other formatting: \S, \U+, etc.
+            cleaned = Regex.Replace(cleaned, @"\\[A-Za-z][^;\\]*[;]?", "");
+            // Remove Unicode: \U+XXXX
+            cleaned = Regex.Replace(cleaned, @"\\U\+[0-9A-Fa-f]{4}", "");
+            // Clean multiple spaces
+            cleaned = Regex.Replace(cleaned, @"\s+", " ");
+
+            return cleaned.Trim();
+        }
+
+        #endregion
+
         /// <summary>
         /// Lấy diện tích từ MaterialSection bằng Double Explode → Block → Hatch → Hatch.Area
         /// Nếu thất bại và useShoelace=true thì dùng công thức Shoelace với SectionPoints
@@ -1006,10 +1691,20 @@ namespace Civil3DCsharp
                 .Distinct()
                 .ToList();
 
+            // Build sourceType map: material name -> SourceType (1 = Dạng 1, 2 = Dạng 2)
+            var sourceTypeMap = new Dictionary<string, int>();
+            foreach (var item in materialInfoList)
+            {
+                if (!sourceTypeMap.ContainsKey(item.MaterialName) || item.SourceType < sourceTypeMap[item.MaterialName])
+                {
+                    sourceTypeMap[item.MaterialName] = item.SourceType;
+                }
+            }
+
             // Sử dụng qtoOrder được truyền vào (của riêng sheet này), nếu null thì fallback về static (để an toàn)
             var orderToUse = qtoOrder ?? _currentQTOMaterialOrder;
 
-            var (orderedMaterials, decimalPlaces, additionalValues) = GetUserOrderedMaterialsAndDecimalPlaces(allMaterialTypes, alignmentName, sampleLineGroupName, sampleLineGroupCount, orderToUse, useDefaultSorting);
+            var (orderedMaterials, decimalPlaces, additionalValues) = GetUserOrderedMaterialsAndDecimalPlaces(allMaterialTypes, alignmentName, sampleLineGroupName, sampleLineGroupCount, orderToUse, useDefaultSorting, sourceTypeMap);
             pivotData.MaterialTypes = orderedMaterials;
             pivotData.DecimalPlaces = decimalPlaces;
             pivotData.MaterialAdditionalValues = additionalValues;
@@ -1059,11 +1754,11 @@ namespace Civil3DCsharp
             return pivotData;
         }
 
-        private static (List<string> materials, int decimalPlaces, Dictionary<string, double> additionalValues) GetUserOrderedMaterialsAndDecimalPlaces(List<string> materialTypes, string alignmentName = "", string sampleLineGroupName = "", int sampleLineGroupCount = 0, List<string>? qtoOrder = null, bool useDefaultSorting = false)
+        private static (List<string> materials, int decimalPlaces, Dictionary<string, double> additionalValues) GetUserOrderedMaterialsAndDecimalPlaces(List<string> materialTypes, string alignmentName = "", string sampleLineGroupName = "", int sampleLineGroupCount = 0, List<string>? qtoOrder = null, bool useDefaultSorting = false, Dictionary<string, int>? sourceTypeMap = null)
         {
             try
             {
-                var defaultOrderedMaterials = SortMaterialsByPriority(materialTypes, qtoOrder);
+                var defaultOrderedMaterials = SortMaterialsByPriority(materialTypes, qtoOrder, sourceTypeMap);
 
                 // Nếu người dùng chọn dùng default sorting, bỏ qua form
                 if (useDefaultSorting)
@@ -1113,7 +1808,7 @@ namespace Civil3DCsharp
             catch (System.Exception ex)
             {
                 A.Ed.WriteMessage($"\n⚠️  Lỗi hiển thị form sắp xếp: {ex.Message}");
-                var defaultOrderedMaterials = SortMaterialsByPriority(materialTypes, _currentQTOMaterialOrder);
+                var defaultOrderedMaterials = SortMaterialsByPriority(materialTypes, _currentQTOMaterialOrder, sourceTypeMap);
                 var defaultAdditionalValues = new Dictionary<string, double>();
                 foreach (var material in defaultOrderedMaterials)
                 {
@@ -1124,76 +1819,21 @@ namespace Civil3DCsharp
         }
 
         /// <summary>
-        /// Sắp xếp materials theo thứ tự từ Material List (QTOMaterialList)
+        /// Sắp xếp materials: Dạng 1 trước, Dạng 2 sau, giữ nguyên thứ tự từ trên xuống dưới (Y position)
         /// </summary>
-        private static List<string> SortMaterialsByPriority(List<string> materialTypes, List<string>? materialOrderFromQTO = null)
+        private static List<string> SortMaterialsByPriority(List<string> materialTypes, List<string>? materialOrderFromQTO = null, Dictionary<string, int>? sourceTypeMap = null)
         {
-            // Nếu có thứ tự từ QTOMaterialList, ưu tiên sử dụng
-            if (materialOrderFromQTO != null && materialOrderFromQTO.Count > 0)
-            {
-                // Tạo dictionary với index từ QTO order
-                var orderDict = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-                for (int i = 0; i < materialOrderFromQTO.Count; i++)
-                {
-                    string materialName = ExtractMaterialNameFromSource(materialOrderFromQTO[i]);
-                    if (!orderDict.ContainsKey(materialName))
-                    {
-                        orderDict[materialName] = i;
-                    }
-                }
-
-                return materialTypes
-                    .OrderBy(material =>
-                    {
-                        // Tìm trong orderDict (so sánh không phân biệt hoa thường)
-                        foreach (var kvp in orderDict)
-                        {
-                            if (material.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase) ||
-                                material.ToLower().Contains(kvp.Key.ToLower()) ||
-                                kvp.Key.ToLower().Contains(material.ToLower()))
-                            {
-                                return kvp.Value;
-                            }
-                        }
-                        return 1000; // Các material không có trong list sẽ ở cuối
-                    })
-                    .ThenBy(material => material)
-                    .ToList();
-            }
-
-            // Fallback: Sử dụng priority mặc định nếu không có QTO order
-            var materialPriority = new Dictionary<string, int>
-            {
-                { "Đào đất", 1 }, { "Dao dat", 1 },
-                { "Đắp đất", 2 }, { "Dap dat", 2 },
-                { "Đất đào", 3 }, { "Dat dao", 3 },
-                { "Đất đắp", 4 }, { "Dat dap", 4 },
-                { "BTN hạt mịn", 10 },
-                { "Bê tông nhựa", 14 },
-                { "CPDD loại 1", 20 },
-                { "Cấp phối đá dăm", 23 },
-                { "Bóc hữu cơ", 50 }, { "Boc huu co", 50 }
-            };
-
+            // Sắp xếp theo: SourceType (Dạng 1 trước, Dạng 2 sau) → giữ nguyên thứ tự gốc (visual Y position)
+            // materialTypes đã có thứ tự đúng từ trên xuống dưới khi thu thập từ SectionView
             return materialTypes
                 .OrderBy(material =>
                 {
-                    if (materialPriority.ContainsKey(material))
-                        return materialPriority[material];
-
-                    var normalizedMaterial = material.ToLower().Trim();
-                    foreach (var kvp in materialPriority)
-                    {
-                        if (normalizedMaterial.Contains(kvp.Key.ToLower()) ||
-                            kvp.Key.ToLower().Contains(normalizedMaterial))
-                        {
-                            return kvp.Value;
-                        }
-                    }
-
-                    return 1000;
+                    // Dạng 1 (QTO Table) trước, Dạng 2 (Text vàng) sau
+                    if (sourceTypeMap != null && sourceTypeMap.ContainsKey(material))
+                        return sourceTypeMap[material];
+                    return 1; // Mặc định là Dạng 1
                 })
-                .ThenBy(material => material)
+                .ThenBy(material => materialTypes.IndexOf(material)) // Giữ thứ tự gốc từ trên xuống dưới
                 .ToList();
         }
 
@@ -1256,6 +1896,7 @@ namespace Civil3DCsharp
             public string MaterialName { get; set; } = "";
             public double Area { get; set; }
             public string SourceName { get; set; } = "";
+            public int SourceType { get; set; } = 1; // 1 = Dạng 1 (QTO Table), 2 = Dạng 2 (Text vàng)
         }
 
         private class PivotTableData
