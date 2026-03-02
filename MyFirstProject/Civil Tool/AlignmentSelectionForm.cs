@@ -31,8 +31,8 @@ namespace MyFirstProject.Civil_Tool
         public bool DialogResult_OK { get; private set; } = false;
         public bool UseShoelace { get; private set; } = false; // Property mới
         public bool UseDefaultSorting { get; private set; } = false; // Property mới
-        public bool UseTextMethod { get; private set; } = false; // Property phương pháp text
-        public int DecimalPlaces { get; private set; } = 3; // Property số thập phân
+        public bool UseTextMethod { get; private set; } = true; // Property phương pháp text
+        public int DecimalPlaces { get; private set; } = 2; // Property số thập phân
 
         public AlignmentSelectionForm()
         {
@@ -147,13 +147,14 @@ namespace MyFirstProject.Civil_Tool
             this.rdoMethodHatch.Text = "Tính từ MaterialSection (Explode → Hatch.Area)";
             this.rdoMethodHatch.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
             this.rdoMethodHatch.ForeColor = Color.Black;
-            this.rdoMethodHatch.Checked = true; // Mặc định
+            this.rdoMethodHatch.Checked = false;
 
             this.rdoMethodText.Location = new Point(15, 48);
             this.rdoMethodText.Size = new Size(600, 22);
             this.rdoMethodText.Text = "Tính từ Text (QTO Table → Text + Text vàng trong SectionView)";
             this.rdoMethodText.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
             this.rdoMethodText.ForeColor = Color.Black;
+            this.rdoMethodText.Checked = true; // Mặc định
 
             this.grpMethod.Controls.Add(this.rdoMethodHatch);
             this.grpMethod.Controls.Add(this.rdoMethodText);
@@ -171,7 +172,7 @@ namespace MyFirstProject.Civil_Tool
             this.numDecimalPlaces.Font = new Font("Segoe UI", 10F, FontStyle.Regular);
             this.numDecimalPlaces.Minimum = 1;
             this.numDecimalPlaces.Maximum = 6;
-            this.numDecimalPlaces.Value = 3;
+            this.numDecimalPlaces.Value = 2;
             this.numDecimalPlaces.TextAlign = HorizontalAlignment.Center;
             currentY += 40;
 

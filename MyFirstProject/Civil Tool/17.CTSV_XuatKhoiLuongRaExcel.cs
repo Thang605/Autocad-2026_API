@@ -292,7 +292,7 @@ namespace Civil3DCsharp
                     // Thu thập dữ liệu tổng hợp cho sheet TỔNG HỢP
                     // Dòng tổng cộng trong sheet chi tiết = 2 dòng thông tin (Dự án, Địa điểm) + Title row + Header row + số cọc + 1
                     int totalRowInSheet = 4 + pivotData.StakeInfos.Count + 1;
-                    int volumeStartColInSheet = 4 + pivotData.MaterialTypes.Count;
+                    int volumeStartColInSheet = 3 + pivotData.MaterialTypes.Count;
 
                     var rowData = new SummaryRowData
                     {
@@ -516,8 +516,8 @@ namespace Civil3DCsharp
                 int materialCount = pivotData.MaterialTypes.Count;
 
                 // ===== THÔNG TIN DỰ ÁN =====
-                // Tổng cột = 3 (Lý trình, Tên cọc, Khoảng cách) + số vật liệu (diện tích) + số vật liệu (khối lượng)
-                int totalCols = 3 + materialCount + materialCount;
+                // Tổng cột = 2 (Tên cọc, Khoảng cách) + số vật liệu (diện tích) + số vật liệu (khối lượng)
+                int totalCols = 2 + materialCount + materialCount;
 
                 // Chỉ tham chiếu sheet TỔNG HỢP nếu nó tồn tại (khi có > 1 sheet)
                 bool hasSummarySheet = worksheet.Workbook.Worksheets.Any(ws => ws.Name == "TỔNG HỢP");
@@ -561,18 +561,17 @@ namespace Civil3DCsharp
 
                 // ===== HEADER =====
                 int headerRow = currentRow;
-                worksheet.Cell(currentRow, 1).Value = "Lý trình";
-                worksheet.Cell(currentRow, 2).Value = "Tên cọc";
-                worksheet.Cell(currentRow, 3).Value = "Khoảng cách lẻ (m)";
+                worksheet.Cell(currentRow, 1).Value = "Tên cọc";
+                worksheet.Cell(currentRow, 2).Value = "Khoảng cách lẻ (m)";
 
                 // Cột diện tích (m²)
                 for (int i = 0; i < materialCount; i++)
                 {
-                    worksheet.Cell(currentRow, 4 + i).Value = $"{pivotData.MaterialTypes[i]} (m²)";
+                    worksheet.Cell(currentRow, 3 + i).Value = $"{pivotData.MaterialTypes[i]} (m²)";
                 }
 
                 // Cột khối lượng (m³)
-                int volumeStartCol = 4 + materialCount;
+                int volumeStartCol = 3 + materialCount;
                 for (int i = 0; i < materialCount; i++)
                 {
                     worksheet.Cell(currentRow, volumeStartCol + i).Value = $"{pivotData.MaterialTypes[i]} (m³)";
@@ -600,13 +599,12 @@ namespace Civil3DCsharp
                 {
                     var stakeInfo = pivotData.StakeInfos[rowIdx];
 
-                    worksheet.Cell(currentRow, 1).Value = stakeInfo.Station;
-                    worksheet.Cell(currentRow, 2).Value = stakeInfo.StakeName;
+                    worksheet.Cell(currentRow, 1).Value = stakeInfo.StakeName;
 
                     // Làm tròn khoảng cách đến số chữ số thập phân đã chọn
                     double spacingRounded = Math.Round(stakeInfo.SpacingPrev, decimalPlaces);
-                    worksheet.Cell(currentRow, 3).Value = spacingRounded;
-                    worksheet.Cell(currentRow, 3).Style.NumberFormat.Format = numberFormat;
+                    worksheet.Cell(currentRow, 2).Value = spacingRounded;
+                    worksheet.Cell(currentRow, 2).Style.NumberFormat.Format = numberFormat;
 
                     // Xuất cột diện tích (m²) - giữ giá trị trực tiếp vì đây là dữ liệu gốc
                     // MaterialAdditionalValues chỉ cộng vào dòng ĐẦU TIÊN (rowIdx == 0) để tránh cộng trùng
@@ -624,17 +622,17 @@ namespace Civil3DCsharp
                         double areaRounded = Math.Round(area, decimalPlaces);
 
                         // Luôn hiển thị giá trị số (0 thay vì "-")
-                        worksheet.Cell(currentRow, 4 + i).Value = areaRounded;
-                        worksheet.Cell(currentRow, 4 + i).Style.NumberFormat.Format = numberFormat;
+                        worksheet.Cell(currentRow, 3 + i).Value = areaRounded;
+                        worksheet.Cell(currentRow, 3 + i).Style.NumberFormat.Format = numberFormat;
                     }
 
                     // Xuất cột khối lượng (m³) - SỬ DỤNG CÔNG THỨC EXCEL
                     // Công thức: =(Diện tích trước + Diện tích sau) / 2 * Khoảng cách
                     for (int i = 0; i < materialCount; i++)
                     {
-                        int areaCol = 4 + i; // Cột diện tích tương ứng
+                        int areaCol = 3 + i; // Cột diện tích tương ứng
                         string areaColLetter = GetExcelColumnLetter(areaCol);
-                        string spacingColLetter = GetExcelColumnLetter(3); // Cột C - khoảng cách
+                        string spacingColLetter = GetExcelColumnLetter(2); // Cột B - khoảng cách
 
                         if (rowIdx == 0)
                         {
@@ -669,21 +667,20 @@ namespace Civil3DCsharp
 
                 // ===== TOTAL ROW - SỬ DỤNG CÔNG THỨC SUM =====
                 worksheet.Cell(currentRow, 1).Value = "TỔNG CỘNG";
-                worksheet.Range(currentRow, 1, currentRow, 2).Merge();
 
                 // Tổng khoảng cách - sử dụng công thức SUM
-                string spacingCol = GetExcelColumnLetter(3);
+                string spacingCol = GetExcelColumnLetter(2);
                 string sumSpacingFormula = $"=SUM({spacingCol}{dataStartRow}:{spacingCol}{dataEndRow})";
-                worksheet.Cell(currentRow, 3).FormulaA1 = sumSpacingFormula;
-                worksheet.Cell(currentRow, 3).Style.NumberFormat.Format = numberFormat;
+                worksheet.Cell(currentRow, 2).FormulaA1 = sumSpacingFormula;
+                worksheet.Cell(currentRow, 2).Style.NumberFormat.Format = numberFormat;
 
                 // Tổng cột diện tích (m²) - sử dụng công thức SUM
                 for (int i = 0; i < materialCount; i++)
                 {
-                    string colLetter = GetExcelColumnLetter(4 + i);
+                    string colLetter = GetExcelColumnLetter(3 + i);
                     string sumFormula = $"=SUM({colLetter}{dataStartRow}:{colLetter}{dataEndRow})";
-                    worksheet.Cell(currentRow, 4 + i).FormulaA1 = sumFormula;
-                    worksheet.Cell(currentRow, 4 + i).Style.NumberFormat.Format = numberFormat;
+                    worksheet.Cell(currentRow, 3 + i).FormulaA1 = sumFormula;
+                    worksheet.Cell(currentRow, 3 + i).Style.NumberFormat.Format = numberFormat;
                 }
 
                 // Tổng cột khối lượng (m³) - sử dụng công thức SUM
@@ -709,10 +706,9 @@ namespace Civil3DCsharp
                 worksheet.Row(currentRow).Height = 22;
 
                 // ===== COLUMN WIDTHS =====
-                worksheet.Column(1).Width = 15;
-                worksheet.Column(2).Width = 12;
-                worksheet.Column(3).Width = 15;
-                for (int i = 4; i <= totalCols; i++)
+                worksheet.Column(1).Width = 12;
+                worksheet.Column(2).Width = 15;
+                for (int i = 3; i <= totalCols; i++)
                 {
                     worksheet.Column(i).Width = 15;
                 }
