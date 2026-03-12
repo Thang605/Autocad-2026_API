@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -18,10 +18,17 @@ namespace MyFirstProject.Civil_Tool
         private GroupBox grpMethod; // GroupBox chọn phương pháp
         private RadioButton rdoMethodHatch; // Phương pháp Explode Hatch
         private RadioButton rdoMethodText; // Phương pháp Text
+        private GroupBox grpHeight; // GroupBox chiều cao phạm vi
+        private Label lblOffsetX;
+        private Label lblOffsetY;
+        private NumericUpDown numOffsetX;
+        private NumericUpDown numOffsetY;
+        private CheckBox chkDrawRangePolyline;
         private Label lblDecimalPlaces;
         private NumericUpDown numDecimalPlaces;
         private Button btnOK;
         private Button btnCancel;
+        private Button btnHelp;
         private Label lblInstructions;
         private Label lblCount;
         private Label lblTitle;
@@ -33,6 +40,9 @@ namespace MyFirstProject.Civil_Tool
         public bool UseDefaultSorting { get; private set; } = false; // Property mới
         public bool UseTextMethod { get; private set; } = true; // Property phương pháp text
         public int DecimalPlaces { get; private set; } = 2; // Property số thập phân
+        public double OffsetX { get; private set; } = 5; // Offset phương X (%)
+        public double OffsetY { get; private set; } = 15; // Offset phương Y (%)
+        public bool DrawRangePolyline { get; private set; } = false; // Vẽ polyline phạm vi
 
         public AlignmentSelectionForm()
         {
@@ -56,6 +66,12 @@ namespace MyFirstProject.Civil_Tool
             this.grpMethod = new GroupBox();
             this.rdoMethodHatch = new RadioButton();
             this.rdoMethodText = new RadioButton();
+            this.grpHeight = new GroupBox();
+            this.lblOffsetX = new Label();
+            this.lblOffsetY = new Label();
+            this.numOffsetX = new NumericUpDown();
+            this.numOffsetY = new NumericUpDown();
+            this.chkDrawRangePolyline = new CheckBox();
             this.lblDecimalPlaces = new Label();
             this.numDecimalPlaces = new NumericUpDown();
             this.btnOK = new Button();
@@ -67,7 +83,7 @@ namespace MyFirstProject.Civil_Tool
 
             // Form - Tăng kích thước
             this.Text = "Chọn Alignment để xuất khối lượng";
-            this.Size = new Size(700, 780);
+            this.Size = new Size(700, 800);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -99,13 +115,13 @@ namespace MyFirstProject.Civil_Tool
 
             // checkedListBoxAlignments - Tăng kích thước
             this.checkedListBoxAlignments.Location = new Point(leftMargin, currentY);
-            this.checkedListBoxAlignments.Size = new Size(contentWidth, 340);
+            this.checkedListBoxAlignments.Size = new Size(contentWidth, 180);
             this.checkedListBoxAlignments.Font = new Font("Segoe UI", 10F, FontStyle.Regular);
             this.checkedListBoxAlignments.CheckOnClick = true;
             this.checkedListBoxAlignments.ItemHeight = 24;
             this.checkedListBoxAlignments.BorderStyle = BorderStyle.FixedSingle;
             this.checkedListBoxAlignments.ItemCheck += new ItemCheckEventHandler(this.CheckedListBoxAlignments_ItemCheck);
-            currentY += 350;
+            currentY += 190;
 
             // lblCount - Tăng kích thước
             this.lblCount.Location = new Point(leftMargin, currentY);
@@ -160,6 +176,55 @@ namespace MyFirstProject.Civil_Tool
             this.grpMethod.Controls.Add(this.rdoMethodText);
             currentY += 85;
 
+            // grpHeight - GroupBox chiều cao phạm vi mặt cắt
+            this.grpHeight.Location = new Point(leftMargin, currentY);
+            this.grpHeight.Size = new Size(contentWidth, 105);
+            this.grpHeight.Text = "Chiều cao phạm vi mặt cắt (dùng lọc Text)";
+            this.grpHeight.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            this.grpHeight.ForeColor = Color.FromArgb(0, 51, 153);
+
+            this.lblOffsetX.Location = new Point(15, 28);
+            this.lblOffsetX.Size = new Size(200, 22);
+            this.lblOffsetX.Text = "Mở rộng phương X (%):";
+            this.lblOffsetX.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
+            this.lblOffsetX.ForeColor = Color.Black;
+
+            this.numOffsetX.Location = new Point(220, 25);
+            this.numOffsetX.Size = new Size(70, 25);
+            this.numOffsetX.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
+            this.numOffsetX.Minimum = 0;
+            this.numOffsetX.Maximum = 100;
+            this.numOffsetX.Value = 5;
+            this.numOffsetX.TextAlign = HorizontalAlignment.Center;
+
+            this.lblOffsetY.Location = new Point(320, 28);
+            this.lblOffsetY.Size = new Size(200, 22);
+            this.lblOffsetY.Text = "Mở rộng phương Y (%):";
+            this.lblOffsetY.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
+            this.lblOffsetY.ForeColor = Color.Black;
+
+            this.numOffsetY.Location = new Point(525, 25);
+            this.numOffsetY.Size = new Size(70, 25);
+            this.numOffsetY.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
+            this.numOffsetY.Minimum = 0;
+            this.numOffsetY.Maximum = 100;
+            this.numOffsetY.Value = 15;
+            this.numOffsetY.TextAlign = HorizontalAlignment.Center;
+
+            this.chkDrawRangePolyline.Location = new Point(15, 60);
+            this.chkDrawRangePolyline.Size = new Size(600, 30);
+            this.chkDrawRangePolyline.Text = "Vẽ Polyline thể hiện phạm vi lọc Text (màu Cyan)";
+            this.chkDrawRangePolyline.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
+            this.chkDrawRangePolyline.ForeColor = Color.Black;
+            this.chkDrawRangePolyline.Checked = false;
+
+            this.grpHeight.Controls.Add(this.lblOffsetX);
+            this.grpHeight.Controls.Add(this.numOffsetX);
+            this.grpHeight.Controls.Add(this.lblOffsetY);
+            this.grpHeight.Controls.Add(this.numOffsetY);
+            this.grpHeight.Controls.Add(this.chkDrawRangePolyline);
+            currentY += 115;
+
             // lblDecimalPlaces & numDecimalPlaces - Số chữ số thập phân
             this.lblDecimalPlaces.Location = new Point(leftMargin, currentY);
             this.lblDecimalPlaces.Size = new Size(180, 28);
@@ -175,6 +240,21 @@ namespace MyFirstProject.Civil_Tool
             this.numDecimalPlaces.Value = 2;
             this.numDecimalPlaces.TextAlign = HorizontalAlignment.Center;
             currentY += 40;
+
+            // Nút Help
+            this.btnHelp = new Button();
+            this.btnHelp.Location = new Point(leftMargin, currentY);
+            this.btnHelp.Size = new Size(contentWidth, 38);
+            this.btnHelp.Text = "❓ Hướng dẫn sử dụng (Yêu cầu về Text khối lượng)";
+            this.btnHelp.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
+            this.btnHelp.ForeColor = Color.FromArgb(0, 51, 153);
+            this.btnHelp.FlatStyle = FlatStyle.Flat;
+            this.btnHelp.FlatAppearance.BorderColor = Color.FromArgb(0, 122, 204);
+            this.btnHelp.FlatAppearance.BorderSize = 1;
+            this.btnHelp.TextAlign = ContentAlignment.MiddleCenter;
+            this.btnHelp.Cursor = Cursors.Help;
+            this.btnHelp.Click += new EventHandler(this.BtnHelp_Click);
+            currentY += 48;
 
             // Buttons - Tăng kích thước và khoảng cách
             this.btnSelectAll.Location = new Point(leftMargin, currentY);
@@ -220,9 +300,11 @@ namespace MyFirstProject.Civil_Tool
             this.Controls.Add(this.chkUseShoelace); // Add to controls
             this.Controls.Add(this.chkUseDefaultSorting); // Add to controls
             this.Controls.Add(this.grpMethod); // Add GroupBox phương pháp
+            this.Controls.Add(this.grpHeight); // Add GroupBox chiều cao phạm vi
             this.Controls.Add(this.lblDecimalPlaces);
             this.Controls.Add(this.numDecimalPlaces);
             this.Controls.Add(this.btnOK);
+            this.Controls.Add(this.btnHelp);
             this.Controls.Add(this.btnCancel);
 
             this.ResumeLayout(false);
@@ -296,6 +378,9 @@ namespace MyFirstProject.Civil_Tool
             UseDefaultSorting = chkUseDefaultSorting.Checked; // Lưu trạng thái
             UseTextMethod = rdoMethodText.Checked; // Lưu phương pháp
             DecimalPlaces = (int)numDecimalPlaces.Value; // Lưu số thập phân
+            OffsetX = (double)numOffsetX.Value; // Lưu offset phương X
+            OffsetY = (double)numOffsetY.Value; // Lưu offset phương Y
+            DrawRangePolyline = chkDrawRangePolyline.Checked; // Lưu tùy chọn vẽ polyline
             DialogResult_OK = true;
             this.Close();
         }
@@ -304,6 +389,51 @@ namespace MyFirstProject.Civil_Tool
         {
             DialogResult_OK = false;
             this.Close();
+        }
+
+        private void BtnHelp_Click(object sender, EventArgs e)
+        {
+            string helpText =
+                "HƯỚNG DẪN SỬ DỤNG - XUẤT KHỐI LƯỢNG VẬT LIỆU\n" +
+                "═══════════════════════════════════════════\n\n" +
+                "📌 YÊU CẦU VỀ TEXT KHỐI LƯỢNG CỤC BỘ:\n" +
+                "─────────────────────────────────────────\n" +
+                "• Text khối lượng cục bộ (không nằm trong QTO Table)\n" +
+                "  cần được đặt MÀU VÀNG (Yellow) để chương trình nhận diện.\n\n" +
+                "📌 VỊ TRÍ TEXT TÊN VẬT LIỆU VÀ GIÁ TRỊ:\n" +
+                "─────────────────────────────────────────\n" +
+                "• Các text tên vật liệu (kết thúc bằng dấu \":\")\n" +
+                "  phải có cùng tọa độ X (thẳng hàng theo cột dọc).\n\n" +
+                "• Text tên vật liệu và text giá trị tương ứng\n" +
+                "  phải có cùng tọa độ Y (nằm trên cùng một dòng ngang).\n\n" +
+                "• Ví dụ đúng:\n" +
+                "    Đào đất:          5.23 m²    ← cùng Y\n" +
+                "    Đắp đất:          3.15 m²    ← cùng Y\n" +
+                "    Rọ đá:            8.00 m²    ← cùng Y\n" +
+                "    ↑ cùng X\n\n" +
+                "• Hoặc viết gộp trong 1 text: \"Rọ đá: 21.00 m²\"\n\n" +
+                "📌 HAI DẠNG DỮ LIỆU ĐƯỢC HỖ TRỢ:\n" +
+                "─────────────────────────────────────────\n" +
+                "• Dạng 1 (QTO Table): Dữ liệu từ bảng Quantity Takeoff\n" +
+                "  được explode ra thành text. Chương trình tự động\n" +
+                "  nhận diện và ghép cặp tên-giá trị theo tọa độ.\n\n" +
+                "• Dạng 2 (Text vàng): Text màu vàng đặt trong\n" +
+                "  SectionView, dùng để bổ sung khối lượng cục bộ\n" +
+                "  mà QTO Table không có.\n\n" +
+                "⚠️ LƯU Ý QUAN TRỌNG:\n" +
+                "─────────────────────────────────────────\n" +
+                "• Khoảng cách giữa các dòng KHÔNG ảnh hưởng\n" +
+                "  đến việc nhận diện (sử dụng tọa độ tuyệt đối).\n\n" +
+                "• Text giá trị phải bắt đầu bằng SỐ (ví dụ: 5.23 m²).\n\n" +
+                "• Nếu Dạng 1 đã có vật liệu, Dạng 2 sẽ KHÔNG\n" +
+                "  ghi đè mà bỏ qua vật liệu trùng tên.\n\n" +
+                "• Text phải nằm trong vùng bounding box\n" +
+                "  của SectionView (mở rộng 10% dự phòng).";
+
+            MessageBox.Show(helpText,
+                "Hướng dẫn sử dụng",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
         }
     }
 

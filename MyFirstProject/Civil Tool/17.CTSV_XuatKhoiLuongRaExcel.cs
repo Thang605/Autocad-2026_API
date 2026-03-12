@@ -10,6 +10,7 @@ using System.Windows.Forms;
 using Autodesk.AutoCAD.Runtime;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
+using Autodesk.AutoCAD.Geometry;
 using Autodesk.Civil.DatabaseServices;
 using MyFirstProject.Extensions;
 using ClosedXML.Excel;
@@ -80,7 +81,7 @@ namespace Civil3DCsharp
                         List<MaterialVolumeInfo> materialInfoList;
                         if (useTextMethod)
                         {
-                            materialInfoList = CollectMaterialVolumeFromText(sampleLineGroup, tr);
+                            materialInfoList = CollectMaterialVolumeFromText(sampleLineGroup, tr, selectionForm.OffsetX, selectionForm.OffsetY, selectionForm.DrawRangePolyline);
                         }
                         else
                         {
@@ -877,7 +878,7 @@ namespace Civil3DCsharp
         /// <summary>
         /// Thu thập khối lượng vật liệu từ Text (Dạng 1: QTO Table explode + Dạng 2: Text vàng)
         /// </summary>
-        private static List<MaterialVolumeInfo> CollectMaterialVolumeFromText(SampleLineGroup sampleLineGroup, Transaction tr)
+        private static List<MaterialVolumeInfo> CollectMaterialVolumeFromText(SampleLineGroup sampleLineGroup, Transaction tr, double offsetXPercent = 5, double offsetYPercent = 15, bool drawRangePolyline = false)
         {
             List<MaterialVolumeInfo> materialInfoList = new();
 
@@ -994,16 +995,46 @@ namespace Civil3DCsharp
                             continue;
                         }
 
-                        // Lấy bounding box của SectionView (mở rộng 10% dự phòng)
+                        // Lấy bounding box của SectionView (mở rộng theo tham số)
                         var svBounds = sectionView.GeometricExtents;
                         double svWidth = svBounds.MaxPoint.X - svBounds.MinPoint.X;
                         double svHeight = svBounds.MaxPoint.Y - svBounds.MinPoint.Y;
-                        double marginX = svWidth * 0.10;
-                        double marginY = svHeight * 0.10;
+                        double marginX = svWidth * (offsetXPercent / 100.0);
+                        double marginY = svHeight * (offsetYPercent / 100.0);
                         double svMinX = svBounds.MinPoint.X - marginX;
                         double svMinY = svBounds.MinPoint.Y - marginY;
                         double svMaxX = svBounds.MaxPoint.X + marginX;
                         double svMaxY = svBounds.MaxPoint.Y + marginY;
+
+                        // Vẽ Polyline thể hiện phạm vi lọc text (nếu được bật)
+                        if (drawRangePolyline)
+                        {
+                            try
+                            {
+                                BlockTable? btPoly = tr.GetObject(A.Db.BlockTableId, OpenMode.ForRead) as BlockTable;
+                                if (btPoly != null)
+                                {
+                                    BlockTableRecord? btrPoly = tr.GetObject(btPoly[BlockTableRecord.ModelSpace], OpenMode.ForWrite) as BlockTableRecord;
+                                    if (btrPoly != null)
+                                    {
+                                        Polyline rangePoly = new Polyline();
+                                        rangePoly.AddVertexAt(0, new Point2d(svMinX, svMinY), 0, 0, 0);
+                                        rangePoly.AddVertexAt(1, new Point2d(svMaxX, svMinY), 0, 0, 0);
+                                        rangePoly.AddVertexAt(2, new Point2d(svMaxX, svMaxY), 0, 0, 0);
+                                        rangePoly.AddVertexAt(3, new Point2d(svMinX, svMaxY), 0, 0, 0);
+                                        rangePoly.Closed = true;
+                                        rangePoly.ColorIndex = 4; // Cyan
+                                        rangePoly.Layer = "0";
+                                        btrPoly.AppendEntity(rangePoly);
+                                        tr.AddNewlyCreatedDBObject(rangePoly, true);
+                                    }
+                                }
+                            }
+                            catch (System.Exception ex)
+                            {
+                                A.Ed.WriteMessage($"\n     ⚠️  Lỗi vẽ polyline phạm vi: {ex.Message}");
+                            }
+                        }
 
                         // Ordered list để giữ thứ tự theo Y (trên → dưới)
                         var materialAreas = new Dictionary<string, double>();
@@ -1021,24 +1052,25 @@ namespace Civil3DCsharp
                         {
                             A.Ed.WriteMessage($"\n     🔍 Tìm thấy {textsInSV.Count} texts từ QTO Table trong SectionView");
 
-                            // Phân loại texts thành name texts và value texts
-                            // Name texts: kết thúc bằng ":" (sau khi trim)
-                            // Value texts: bắt đầu bằng số
+                            // === BƯỚC 0: Loại bỏ text trùng lặp ===
+                            // FlattenExplodeToTexts explode 2 cấp có thể tạo ra text trùng (cùng nội dung, cùng vị trí)
+                            int beforeDedup = textsInSV.Count;
+                            textsInSV = textsInSV
+                                .GroupBy(t => (t.Text, XRound: Math.Round(t.X, 0), YRound: Math.Round(t.Y, 0)))
+                                .Select(g => g.First())
+                                .ToList();
+                            if (textsInSV.Count < beforeDedup)
+                            {
+                                A.Ed.WriteMessage($"\n     🔄 Loại bỏ {beforeDedup - textsInSV.Count} text trùng lặp → còn {textsInSV.Count}");
+                            }
+
+                            // === BƯỚC 1: Phân loại texts ===
                             var nameTexts = new List<(string Name, double X, double Y)>();
                             var valueTexts = new List<(double Value, string Unit, double X, double Y)>();
-                            var singleTexts = new List<(string Text, double X, double Y)>(); // text chứa cả tên + giá trị
 
                             foreach (var (text, x, y) in textsInSV)
                             {
                                 string trimmed = text.Trim();
-
-                                // Thử parse dạng "Tên: giá_trị đơn_vị" (1 text chứa cả tên và giá trị)
-                                var parsedSingle = TryParseYellowText(trimmed);
-                                if (parsedSingle.HasValue && parsedSingle.Value.Name != "Text vàng")
-                                {
-                                    singleTexts.Add((trimmed, x, y));
-                                    continue;
-                                }
 
                                 // Kiểm tra nếu text kết thúc bằng ":" → name text
                                 if (trimmed.EndsWith(":"))
@@ -1051,49 +1083,36 @@ namespace Civil3DCsharp
                                     continue;
                                 }
 
-                                // Kiểm tra nếu text bắt đầu bằng số → value text
-                                var (numVal, unit) = ExtractNumberAndUnit(trimmed);
-                                if (numVal > 0)
+                                // Kiểm tra nếu text bắt đầu bằng số → value text (bao gồm cả giá trị 0.00)
+                                if (Regex.IsMatch(trimmed, @"^\d"))
                                 {
+                                    var (numVal, unit) = ExtractNumberAndUnit(trimmed);
                                     valueTexts.Add((numVal, unit, x, y));
                                     continue;
                                 }
 
-                                // Text không phải name cũng không phải value → có thể là name không có ":"
-                                // Bỏ qua ký tự đặc biệt, header, etc.
+                                // Text không phải name cũng không phải value → bỏ qua
                             }
 
-                            A.Ed.WriteMessage($"\n     📊 Phân loại: {nameTexts.Count} tên, {valueTexts.Count} giá trị, {singleTexts.Count} text hỗn hợp");
+                            A.Ed.WriteMessage($"\n     📊 Phân loại: {nameTexts.Count} tên, {valueTexts.Count} giá trị");
 
-                            // === Xử lý single texts (chứa cả tên + giá trị) ===
-                            foreach (var (text, _, y) in singleTexts.OrderByDescending(t => t.Y))
+                            // === BƯỚC 2: Loại bỏ nameTexts trùng tên (giữ entry đầu tiên theo Y cao nhất) ===
+                            var uniqueNameTexts = nameTexts
+                                .OrderByDescending(n => n.Y)
+                                .GroupBy(n => n.Name)
+                                .Select(g => g.First())
+                                .OrderByDescending(n => n.Y)
+                                .ToList();
+                            if (uniqueNameTexts.Count < nameTexts.Count)
                             {
-                                var parsed = TryParseYellowText(text);
-                                if (parsed.HasValue)
-                                {
-                                    string matName = parsed.Value.Name;
-                                    if (materialAreas.ContainsKey(matName))
-                                        materialAreas[matName] += parsed.Value.Value;
-                                    else
-                                    {
-                                        materialAreas[matName] = parsed.Value.Value;
-                                        materialOrder.Add(matName);
-                                        materialSourceType[matName] = 1;
-                                    }
-                                    qtoCount++;
-                                    A.Ed.WriteMessage($"\n     📝 [{matName}] = {parsed.Value.Value} (single text)");
-                                }
+                                A.Ed.WriteMessage($"\n     🔄 Loại bỏ {nameTexts.Count - uniqueNameTexts.Count} tên trùng lặp → còn {uniqueNameTexts.Count}");
                             }
 
-                            // === Ghép cặp name-value theo cùng Y (coordinate-based) ===
-                            // Tolerance Y nhỏ vì cùng hàng thì Y gần như bằng nhau
+                            // === BƯỚC 3: Ghép cặp name-value theo cùng Y (coordinate-based) ===
                             double yTolerance = 1.0;
                             var usedValueIndices = new HashSet<int>();
 
-                            // Sắp xếp name texts theo Y giảm dần (trên → dưới)
-                            var sortedNames = nameTexts.OrderByDescending(n => n.Y).ToList();
-
-                            foreach (var (name, nameX, nameY) in sortedNames)
+                            foreach (var (name, nameX, nameY) in uniqueNameTexts)
                             {
                                 // Tìm value text có cùng Y (tolerance nhỏ), chưa được sử dụng
                                 int bestIdx = -1;
@@ -1116,14 +1135,12 @@ namespace Civil3DCsharp
                                     double numValue = valueTexts[bestIdx].Value;
                                     string unit = valueTexts[bestIdx].Unit;
 
-                                    if (materialAreas.ContainsKey(name))
-                                        materialAreas[name] += numValue;
-                                    else
+                                    if (!materialAreas.ContainsKey(name))
                                     {
-                                        materialAreas[name] = numValue;
                                         materialOrder.Add(name);
                                         materialSourceType[name] = 1;
                                     }
+                                    materialAreas[name] = numValue;
                                     qtoCount++;
                                     A.Ed.WriteMessage($"\n     📝 [{name}] = {numValue} {unit} (Y gap={bestYDist:F2})");
                                 }
@@ -1144,9 +1161,10 @@ namespace Civil3DCsharp
                         }
 
                         // ===== DẠNG 2: Text vàng trong SectionView (bổ sung) =====
-                        // Yellow text có thể là:
-                        // - 1 entity: "Rọ đá: 21.00 m2" (tên + giá trị cùng text)
-                        // - 2 entities: "Rọ đá:" + "21.00 m2" (riêng biệt, cùng dòng Y)
+                        // Dùng coordinate-based matching tương tự Dạng 1:
+                        // - Name texts: kết thúc bằng ":"
+                        // - Value texts: bắt đầu bằng số
+                        // - Single texts: chứa cả tên + giá trị (ví dụ "Rọ đá: 21.00 m2")
                         int yellowCount = 0;
 
                         // Thu thập yellow texts trong bounds (đã mở rộng 10%)
@@ -1163,84 +1181,99 @@ namespace Civil3DCsharp
                         {
                             A.Ed.WriteMessage($"\n     🔍 Tìm thấy {yellowTextsInSV.Count} text vàng trong SectionView");
 
-                            // ===== PASS 1: Thử parse từng text riêng lẻ (format "Tên: Giá_trị đơn_vị") =====
-                            var usedIndices = new HashSet<int>();
-                            var pass1Results = new List<(string Name, double Value, double Y)>();
+                            // Phân loại texts
+                            var yellowNameTexts = new List<(string Name, double X, double Y, int Index)>();
+                            var yellowValueTexts = new List<(double Value, string Unit, double X, double Y, int Index)>();
+                            var yellowSingleResults = new List<(string Name, double Value, double Y)>();
 
                             for (int i = 0; i < yellowTextsInSV.Count; i++)
                             {
-                                var parsed = TryParseYellowText(yellowTextsInSV[i].Text);
-                                if (parsed.HasValue && parsed.Value.Name != "Text vàng") // Chỉ chấp nhận nếu có tên thực
+                                string trimmed = yellowTextsInSV[i].Text.Trim();
+
+                                // Thử parse dạng "Tên: giá_trị đơn_vị" (single text)
+                                var parsedSingle = TryParseYellowText(trimmed);
+                                if (parsedSingle.HasValue && parsedSingle.Value.Name != "Text vàng")
                                 {
-                                    pass1Results.Add((parsed.Value.Name, parsed.Value.Value, yellowTextsInSV[i].Y));
-                                    usedIndices.Add(i);
-                                    A.Ed.WriteMessage($"\n     📗 Pass1: [{parsed.Value.Name}] = {parsed.Value.Value}");
+                                    yellowSingleResults.Add((parsedSingle.Value.Name, parsedSingle.Value.Value, yellowTextsInSV[i].Y));
+                                    A.Ed.WriteMessage($"\n     📗 [{parsedSingle.Value.Name}] = {parsedSingle.Value.Value} (single text vàng)");
+                                    continue;
                                 }
-                            }
 
-                            // ===== PASS 2: Ghép cặp texts còn lại (name text + value text gần nhau theo Y) =====
-                            var nameTexts = new List<(string Text, double X, double Y, int Index)>();
-                            var valueTexts = new List<(double Value, double X, double Y, int Index)>();
-
-                            for (int i = 0; i < yellowTextsInSV.Count; i++)
-                            {
-                                if (usedIndices.Contains(i)) continue;
-                                string t = yellowTextsInSV[i].Text.Trim();
-
-                                // Text bắt đầu bằng số → value text
-                                var (numVal, _) = ExtractNumberAndUnit(t);
-                                if (numVal > 0)
+                                // Name text: kết thúc bằng ":"
+                                if (trimmed.EndsWith(":"))
                                 {
-                                    valueTexts.Add((numVal, yellowTextsInSV[i].X, yellowTextsInSV[i].Y, i));
-                                }
-                                else
-                                {
-                                    // Không phải số → name text
-                                    string cleanName = t.TrimEnd(':', '=', ' ');
+                                    string cleanName = trimmed.TrimEnd(':', ' ');
                                     if (!string.IsNullOrWhiteSpace(cleanName))
                                     {
-                                        nameTexts.Add((cleanName, yellowTextsInSV[i].X, yellowTextsInSV[i].Y, i));
+                                        yellowNameTexts.Add((cleanName, yellowTextsInSV[i].X, yellowTextsInSV[i].Y, i));
                                     }
+                                    continue;
+                                }
+
+                                // Value text: bắt đầu bằng số (bao gồm cả giá trị 0.00)
+                                if (Regex.IsMatch(trimmed, @"^\d"))
+                                {
+                                    var (numVal, unit) = ExtractNumberAndUnit(trimmed);
+                                    yellowValueTexts.Add((numVal, unit, yellowTextsInSV[i].X, yellowTextsInSV[i].Y, i));
+                                    continue;
+                                }
+
+                                // Text không có ":" và không phải số → name text không có ":"
+                                string fallbackName = trimmed.TrimEnd(':', '=', ' ');
+                                if (!string.IsNullOrWhiteSpace(fallbackName))
+                                {
+                                    yellowNameTexts.Add((fallbackName, yellowTextsInSV[i].X, yellowTextsInSV[i].Y, i));
                                 }
                             }
 
-                            // Ghép mỗi value text với name text gần nhất theo Y
-                            foreach (var vt in valueTexts)
+                            A.Ed.WriteMessage($"\n     📊 Phân loại text vàng: {yellowNameTexts.Count} tên, {yellowValueTexts.Count} giá trị, {yellowSingleResults.Count} text hỗn hợp");
+
+                            // Ghép cặp name-value theo cùng Y (coordinate-based)
+                            double yellowYTolerance = 1.0;
+                            var usedYellowValueIndices = new HashSet<int>();
+                            var yellowPairResults = new List<(string Name, double Value, double Y)>();
+
+                            // Sắp xếp name texts theo Y giảm dần (trên → dưới)
+                            var sortedYellowNames = yellowNameTexts.OrderByDescending(n => n.Y).ToList();
+
+                            foreach (var (name, nameX, nameY, nameIdx) in sortedYellowNames)
                             {
-                                (string Text, double X, double Y, int Index) bestName = default;
-                                double bestDist = double.MaxValue;
+                                int bestIdx = -1;
+                                double bestYDist = double.MaxValue;
 
-                                foreach (var nt in nameTexts)
+                                for (int vi = 0; vi < yellowValueTexts.Count; vi++)
                                 {
-                                    if (usedIndices.Contains(nt.Index)) continue;
-                                    double yDist = Math.Abs(nt.Y - vt.Y);
-                                    if (yDist < bestDist)
+                                    if (usedYellowValueIndices.Contains(vi)) continue;
+                                    double yDist = Math.Abs(yellowValueTexts[vi].Y - nameY);
+                                    if (yDist < yellowYTolerance && yDist < bestYDist)
                                     {
-                                        bestDist = yDist;
-                                        bestName = nt;
+                                        bestYDist = yDist;
+                                        bestIdx = vi;
                                     }
                                 }
 
-                                if (bestDist < 5.0 && !string.IsNullOrWhiteSpace(bestName.Text))
+                                if (bestIdx >= 0)
                                 {
-                                    pass1Results.Add((bestName.Text, vt.Value, Math.Max(bestName.Y, vt.Y)));
-                                    usedIndices.Add(vt.Index);
-                                    usedIndices.Add(bestName.Index);
-                                    A.Ed.WriteMessage($"\n     📘 Pass2: [{bestName.Text}] = {vt.Value} (ghép cặp, Y gap={bestDist:F1})");
-                                }
-                                else
-                                {
-                                    // Value không ghép được → dùng tên "Text vàng"
-                                    pass1Results.Add(("Text vàng", vt.Value, vt.Y));
-                                    usedIndices.Add(vt.Index);
-                                    A.Ed.WriteMessage($"\n     📙 Pass2: [Text vàng] = {vt.Value} (không tìm thấy tên)");
+                                    usedYellowValueIndices.Add(bestIdx);
+                                    yellowPairResults.Add((name, yellowValueTexts[bestIdx].Value, nameY));
+                                    A.Ed.WriteMessage($"\n     📘 [{name}] = {yellowValueTexts[bestIdx].Value} {yellowValueTexts[bestIdx].Unit} (ghép cặp, Y gap={bestYDist:F2})");
                                 }
                             }
 
-                            // Sắp xếp kết quả theo Y giảm dần (trên → dưới)
-                            var sortedResults = pass1Results.OrderByDescending(r => r.Y).ToList();
+                            // Value texts chưa ghép được → dùng tên "Text vàng"
+                            for (int vi = 0; vi < yellowValueTexts.Count; vi++)
+                            {
+                                if (usedYellowValueIndices.Contains(vi)) continue;
+                                yellowPairResults.Add(("Text vàng", yellowValueTexts[vi].Value, yellowValueTexts[vi].Y));
+                                A.Ed.WriteMessage($"\n     📙 [Text vàng] = {yellowValueTexts[vi].Value} (không tìm thấy tên)");
+                            }
 
-                            foreach (var (matName, matValue, _) in sortedResults)
+                            // Gộp tất cả kết quả (single + paired), sắp xếp theo Y giảm dần
+                            var allYellowResults = yellowSingleResults.Concat(yellowPairResults)
+                                .OrderByDescending(r => r.Y)
+                                .ToList();
+
+                            foreach (var (matName, matValue, _) in allYellowResults)
                             {
                                 // Chỉ thêm nếu Dạng 1 chưa có vật liệu này
                                 if (!materialAreas.ContainsKey(matName))

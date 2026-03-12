@@ -373,6 +373,21 @@ namespace MyFirstProject.Extensions
             return Rpeo.ObjectId;
         }
 
+        public static ObjectId GTextOrMText(string thongbao)
+        {
+            PromptEntityOptions peo = new(thongbao);
+            peo.SetRejectMessage("\n- Bạn phải chọn đúng đối tượng Text hoặc MText!");
+            peo.AddAllowedClass(typeof(DBText), true);
+            peo.AddAllowedClass(typeof(MText), true);
+            PromptEntityResult Rpeo = A.Ed.GetEntity(peo);
+            if (Rpeo.Status != PromptStatus.OK)
+            {
+                return ObjectId.Null;
+            }
+
+            return Rpeo.ObjectId;
+        }
+
         public static ObjectId GObjId(string thongbao)
         {
             PromptEntityOptions peo = new(thongbao);

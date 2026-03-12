@@ -20,6 +20,7 @@ using Section = Autodesk.Civil.DatabaseServices.Section;
 using Application = Autodesk.AutoCAD.ApplicationServices.Application;
 using MyFirstProject.Extensions;
 using MyFirstProject.Civil_Tool;
+using AcEntity = Autodesk.AutoCAD.DatabaseServices.Entity;
 
 // This line is not mandatory, but improves loading performances
 [assembly: CommandClass(typeof(Civil3DCsharp.CTSV_SapXepLayout_Commands))]
@@ -80,7 +81,7 @@ namespace Civil3DCsharp
                 foreach (ObjectId objId in allSelectedIds)
                 {
                     if (!objId.IsValid) continue;
-                    var ent = tr.GetObject(objId, OpenMode.ForWrite) as Autodesk.AutoCAD.DatabaseServices.Entity;
+                    var ent = tr.GetObject(objId, OpenMode.ForWrite) as AcEntity;
                     if (ent == null) continue;
 
                     if (objId.ObjectClass.DxfName == "AECC_GRAPH_SECTION_VIEW")
@@ -98,7 +99,7 @@ namespace Civil3DCsharp
                 {
                     foreach (ObjectId plId in defpointPolylineIds)
                     {
-                        var entDel = tr.GetObject(plId, OpenMode.ForWrite) as Autodesk.AutoCAD.DatabaseServices.Entity;
+                        var entDel = tr.GetObject(plId, OpenMode.ForWrite) as AcEntity;
                         entDel?.Erase();
                     }
                     A.Ed.WriteMessage($"\n Đã xóa {defpointPolylineIds.Count} khung in cũ (polyline Defpoints).");
@@ -181,7 +182,78 @@ namespace Civil3DCsharp
                     A.Ed.WriteMessage($"\n  Đã vẽ khung in trang {page + 1} tại ({x0:F1}, {y0:F1})");
                 }
 
-                // 10. Di chuyển từng section view vào vị trí trong lưới
+                // 10. Thu thập AECC_TABLE entities (takeoff tables) từ ModelSpace
+                List<AcEntity> allAeccTables = new();
+                foreach (ObjectId entityId in btr)
+                {
+                    try
+                    {
+                        var dbObj = tr.GetObject(entityId, OpenMode.ForRead);
+                        if (dbObj is AcEntity ent)
+                        {
+                            string dxfName = ent.GetRXClass().DxfName;
+                            if (dxfName.Contains("AECC") && dxfName.Contains("TABLE"))
+                            {
+                                allAeccTables.Add(ent);
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                A.Ed.WriteMessage($"\n Tìm thấy {allAeccTables.Count} AECC Tables (takeoff tables) trong bản vẽ.");
+
+                // 11. Xây dựng map: mỗi section view → danh sách AECC_TABLE nằm trong vùng bounds
+                //     Dùng GeometricExtents của SectionView (mở rộng 20% dự phòng) để tìm tables liên kết
+                var svTableMap = new Dictionary<int, List<AcEntity>>();
+
+                for (int i = 0; i < svList.Count; i++)
+                {
+                    SectionView? svCheck = tr.GetObject(svList[i].Id, OpenMode.ForRead) as SectionView;
+                    if (svCheck == null) continue;
+
+                    Extents3d svBounds;
+                    try { svBounds = svCheck.GeometricExtents; }
+                    catch { continue; }
+
+                    double svWidth = svBounds.MaxPoint.X - svBounds.MinPoint.X;
+                    double svHeight = svBounds.MaxPoint.Y - svBounds.MinPoint.Y;
+                    double marginX = svWidth * 0.20;
+                    double marginY = svHeight * 0.50; // Mở rộng Y nhiều hơn vì table thường nằm dưới SV
+
+                    double svMinX = svBounds.MinPoint.X - marginX;
+                    double svMinY = svBounds.MinPoint.Y - marginY;
+                    double svMaxX = svBounds.MaxPoint.X + marginX;
+                    double svMaxY = svBounds.MaxPoint.Y + marginY;
+
+                    List<AcEntity> associatedTables = new();
+                    foreach (var table in allAeccTables)
+                    {
+                        try
+                        {
+                            Extents3d tableBounds = table.GeometricExtents;
+                            // Kiểm tra table center nằm trong vùng bounds mở rộng
+                            double tableCenterX = (tableBounds.MinPoint.X + tableBounds.MaxPoint.X) / 2.0;
+                            double tableCenterY = (tableBounds.MinPoint.Y + tableBounds.MaxPoint.Y) / 2.0;
+
+                            if (tableCenterX >= svMinX && tableCenterX <= svMaxX &&
+                                tableCenterY >= svMinY && tableCenterY <= svMaxY)
+                            {
+                                associatedTables.Add(table);
+                            }
+                        }
+                        catch { }
+                    }
+
+                    svTableMap[i] = associatedTables;
+
+                    if (associatedTables.Count > 0)
+                    {
+                        A.Ed.WriteMessage($"\n  SV[{i + 1}] có {associatedTables.Count} takeoff table(s) liên kết.");
+                    }
+                }
+
+                // 12. Di chuyển từng section view (và takeoff tables) vào vị trí trong lưới
                 for (int i = 0; i < svList.Count; i++)
                 {
                     int pageIndex = i / soSVPerPage;
@@ -198,9 +270,35 @@ namespace Civil3DCsharp
                     SectionView? sv = tr.GetObject(svList[i].Id, OpenMode.ForWrite) as SectionView;
                     if (sv == null) continue;
 
+                    // Tính displacement vector từ vị trí cũ sang vị trí mới
+                    Point3d oldLocation = sv.Location;
+                    Vector3d displacement = new Point3d(newX, newY, 0) - oldLocation;
+
+                    // Di chuyển section view
                     sv.Location = new Point3d(newX, newY, 0);
 
-                    A.Ed.WriteMessage($"\n  [{i + 1}/{svList.Count}] Trang {pageIndex + 1}, Hàng {row + 1} Cột {col + 1} → ({newX:F1}, {newY:F1})");
+                    // Di chuyển các takeoff tables liên kết theo cùng displacement
+                    if (svTableMap.TryGetValue(i, out List<AcEntity>? tables) && tables.Count > 0)
+                    {
+                        Matrix3d moveMatrix = Matrix3d.Displacement(displacement);
+                        foreach (var table in tables)
+                        {
+                            try
+                            {
+                                var tableForWrite = tr.GetObject(table.ObjectId, OpenMode.ForWrite) as AcEntity;
+                                tableForWrite?.TransformBy(moveMatrix);
+                            }
+                            catch (System.Exception ex)
+                            {
+                                A.Ed.WriteMessage($"\n  ⚠️ Lỗi di chuyển table: {ex.Message}");
+                            }
+                        }
+                        A.Ed.WriteMessage($"\n  [{i + 1}/{svList.Count}] Trang {pageIndex + 1}, Hàng {row + 1} Cột {col + 1} → ({newX:F1}, {newY:F1}) + {tables.Count} table(s)");
+                    }
+                    else
+                    {
+                        A.Ed.WriteMessage($"\n  [{i + 1}/{svList.Count}] Trang {pageIndex + 1}, Hàng {row + 1} Cột {col + 1} → ({newX:F1}, {newY:F1})");
+                    }
                 }
 
                 A.Ed.WriteMessage($"\n\n Hoàn thành! Đã bố trí {svList.Count} section view vào {totalPages} trang khung in.");
