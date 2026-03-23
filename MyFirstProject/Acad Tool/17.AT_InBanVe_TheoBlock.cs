@@ -1209,15 +1209,7 @@ namespace Civil3DCsharp
             sb.Append("\"Window\" ");               // Plot area
             sb.Append($"(list {p1X:F4} {p1Y:F4}) "); // Lower left
             sb.Append($"(list {p2X:F4} {p2Y:F4}) "); // Upper right
-            sb.Append("\"1\" ");                    // Plot scale (Fit or 1:1, usually 1 for 1:1 if paper matches, or Fit)
-                                                    // Previous code used "1". Assuming 1:1 mapping from Layout units (mm).
-                                                    // Warning: In Model space, if units are not mm, "1" might be wrong if we want Fit.
-                                                    // But existing Layout code used "1". Let's stick to "1" or "Fit". 
-                                                    // Wait, previous code:
-                                                    // line 1168: sb.Append("\"1\" "); // Plot scale: 1:1
-                                                    // PreviewPlot used "Fit".
-                                                    // If Model space is 1:1 mm, "1" is fine. If not, might need "Fit".
-                                                    // For now, keeping "1" as per original code for consistency.
+            sb.Append("\"Fit\" ");                  // Plot scale: Fit to paper
             
             sb.Append($"\"{offsetCmd}\" ");         // Plot offset
             sb.Append("\"Yes\" ");                  // Plot with plot styles?

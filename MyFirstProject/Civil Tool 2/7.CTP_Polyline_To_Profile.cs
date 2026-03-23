@@ -26,125 +26,154 @@ namespace Civil3DCsharp
         [CommandMethod("CTP_Polyline_To_Profile")]
         public static void PolylineToProfile()
         {
-            using Transaction tr = A.Db.TransactionManager.StartTransaction();
-            try
+            // 1. Chọn ProfileView (chỉ 1 lần)
+            A.Ed.WriteMessage("\n=== CHUYỂN ĐỔI POLYLINE THÀNH PROFILE ===");
+
+            ObjectId profileViewId;
+            ObjectId alignmentId;
+            string profileViewName;
+            string alignmentName;
+
+            using (Transaction trInit = A.Db.TransactionManager.StartTransaction())
             {
-                // 1. Chọn ProfileView
-                A.Ed.WriteMessage("\n=== CHUYỂN ĐỔI POLYLINE THÀNH PROFILE ===");
-                ObjectId profileViewId = UserInput.GProfileViewId("\n Chọn Profile View (trắc dọc) chứa polyline:");
-                
+                profileViewId = UserInput.GProfileViewId("\n Chọn Profile View (trắc dọc) chứa polyline:");
+
                 if (profileViewId == ObjectId.Null)
                 {
                     A.Ed.WriteMessage("\n Đã hủy: Không chọn Profile View.");
                     return;
                 }
 
-                ProfileView? profileView = tr.GetObject(profileViewId, OpenMode.ForWrite) as ProfileView;
+                ProfileView? profileView = trInit.GetObject(profileViewId, OpenMode.ForRead) as ProfileView;
                 if (profileView == null)
                 {
                     A.Ed.WriteMessage("\n Lỗi: Không thể lấy Profile View.");
                     return;
                 }
 
-                // 2. Lấy alignment từ ProfileView
-                ObjectId alignmentId = profileView.AlignmentId;
-                Alignment? alignment = tr.GetObject(alignmentId, OpenMode.ForWrite) as Alignment;
+                alignmentId = profileView.AlignmentId;
+                Alignment? alignment = trInit.GetObject(alignmentId, OpenMode.ForRead) as Alignment;
                 if (alignment == null)
                 {
                     A.Ed.WriteMessage("\n Lỗi: Không thể lấy Alignment từ Profile View.");
                     return;
                 }
 
-                A.Ed.WriteMessage($"\n Profile View: {profileView.Name}");
-                A.Ed.WriteMessage($"\n Alignment: {alignment.Name}");
+                profileViewName = profileView.Name;
+                alignmentName = alignment.Name;
+                trInit.Commit();
+            }
 
-                // 3. Chọn Polyline trên ProfileView
-                ObjectId polylineId = SelectPolyline("\n Chọn Polyline để chuyển thành Profile:");
+            A.Ed.WriteMessage($"\n Profile View: {profileViewName}");
+            A.Ed.WriteMessage($"\n Alignment: {alignmentName}");
+
+            // 2. Vòng lặp chọn Polyline nhiều lần
+            int totalCreated = 0;
+
+            while (true)
+            {
+                ObjectId polylineId = SelectPolyline($"\n Chọn Polyline để chuyển thành Profile (Enter/Esc để kết thúc) [{totalCreated} đã tạo]:");
                 if (polylineId == ObjectId.Null)
                 {
-                    A.Ed.WriteMessage("\n Đã hủy: Không chọn Polyline.");
-                    return;
+                    break; // Thoát vòng lặp khi người dùng hủy chọn
                 }
 
-                // 4. Lấy các điểm từ Polyline và chuyển đổi về Station/Elevation
-                List<(double station, double elevation)> stationElevations = GetStationElevationsFromPolyline(
-                    tr, profileView, polylineId);
-
-                if (stationElevations.Count < 2)
+                using Transaction tr = A.Db.TransactionManager.StartTransaction();
+                try
                 {
-                    A.Ed.WriteMessage("\n Lỗi: Polyline phải có ít nhất 2 điểm.");
-                    return;
-                }
+                    ProfileView? profileView = tr.GetObject(profileViewId, OpenMode.ForRead) as ProfileView;
+                    Alignment? alignment = tr.GetObject(alignmentId, OpenMode.ForRead) as Alignment;
 
-                A.Ed.WriteMessage($"\n Số điểm lấy từ Polyline: {stationElevations.Count}");
-
-                // 5. Nhập tên cho Profile mới
-                string profileName = UserInput.GString("\n Nhập tên Profile mới (Enter để dùng tên mặc định):");
-                if (string.IsNullOrWhiteSpace(profileName))
-                {
-                    profileName = $"Profile từ Polyline - {DateTime.Now:HHmmss}";
-                }
-
-                // Kiểm tra tên profile đã tồn tại chưa
-                ObjectIdCollection existingProfileIds = alignment.GetProfileIds();
-                int suffix = 0;
-                string originalName = profileName;
-                while (IsProfileNameExists(tr, existingProfileIds, profileName))
-                {
-                    suffix++;
-                    profileName = $"{originalName}_{suffix}";
-                }
-
-                // 6. Lấy style cho Profile mới
-                ObjectId layerID = alignment.LayerId;
-                ObjectId profileStyleId = GetDefaultProfileStyle();
-                ObjectId profileLabelSetId = GetDefaultProfileLabelSet();
-
-                // 7. Tạo Profile mới bằng CreateByLayout
-                ObjectId newProfileId = Profile.CreateByLayout(profileName, alignmentId, layerID, profileStyleId, profileLabelSetId);
-                Profile? newProfile = tr.GetObject(newProfileId, OpenMode.ForWrite) as Profile;
-
-                if (newProfile == null)
-                {
-                    A.Ed.WriteMessage("\n Lỗi: Không thể tạo Profile mới.");
-                    return;
-                }
-
-                // 8. Thêm các điểm PVI vào Profile mới
-                int addedCount = 0;
-                foreach (var (station, elevation) in stationElevations)
-                {
-                    try
+                    if (profileView == null || alignment == null)
                     {
-                        // Kiểm tra station nằm trong phạm vi alignment
-                        if (station >= alignment.StartingStation && station <= alignment.EndingStation)
+                        A.Ed.WriteMessage("\n Lỗi: Không thể lấy Profile View hoặc Alignment.");
+                        break;
+                    }
+
+                    // 3. Lấy các điểm từ Polyline và chuyển đổi về Station/Elevation
+                    List<(double station, double elevation)> stationElevations = GetStationElevationsFromPolyline(
+                        tr, profileView, polylineId);
+
+                    if (stationElevations.Count < 2)
+                    {
+                        A.Ed.WriteMessage("\n Lỗi: Polyline phải có ít nhất 2 điểm. Chọn polyline khác.");
+                        tr.Commit();
+                        continue;
+                    }
+
+                    A.Ed.WriteMessage($"\n Số điểm lấy từ Polyline: {stationElevations.Count}");
+
+                    // 4. Nhập tên cho Profile mới
+                    string profileName = UserInput.GString("\n Nhập tên Profile mới (Enter để dùng tên mặc định):");
+                    if (string.IsNullOrWhiteSpace(profileName))
+                    {
+                        profileName = $"Profile từ Polyline - {DateTime.Now:HHmmss}";
+                    }
+
+                    // Kiểm tra tên profile đã tồn tại chưa
+                    ObjectIdCollection existingProfileIds = alignment.GetProfileIds();
+                    int suffix = 0;
+                    string originalName = profileName;
+                    while (IsProfileNameExists(tr, existingProfileIds, profileName))
+                    {
+                        suffix++;
+                        profileName = $"{originalName}_{suffix}";
+                    }
+
+                    // 5. Lấy style cho Profile mới
+                    ObjectId layerID = alignment.LayerId;
+                    ObjectId profileStyleId = GetDefaultProfileStyle();
+                    ObjectId profileLabelSetId = GetDefaultProfileLabelSet();
+
+                    // 6. Tạo Profile mới bằng CreateByLayout
+                    ObjectId newProfileId = Profile.CreateByLayout(profileName, alignmentId, layerID, profileStyleId, profileLabelSetId);
+                    Profile? newProfile = tr.GetObject(newProfileId, OpenMode.ForWrite) as Profile;
+
+                    if (newProfile == null)
+                    {
+                        A.Ed.WriteMessage("\n Lỗi: Không thể tạo Profile mới.");
+                        tr.Commit();
+                        continue;
+                    }
+
+                    // 7. Thêm các điểm PVI vào Profile mới
+                    int addedCount = 0;
+                    foreach (var (station, elevation) in stationElevations)
+                    {
+                        try
                         {
-                            newProfile.PVIs.AddPVI(station, elevation);
-                            addedCount++;
+                            if (station >= alignment.StartingStation && station <= alignment.EndingStation)
+                            {
+                                newProfile.PVIs.AddPVI(station, elevation);
+                                addedCount++;
+                            }
+                            else
+                            {
+                                A.Ed.WriteMessage($"\n Bỏ qua điểm tại station {station:F2} (ngoài phạm vi alignment)");
+                            }
                         }
-                        else
+                        catch (System.Exception ex)
                         {
-                            A.Ed.WriteMessage($"\n Bỏ qua điểm tại station {station:F2} (ngoài phạm vi alignment)");
+                            A.Ed.WriteMessage($"\n Lỗi thêm PVI tại station {station:F2}: {ex.Message}");
                         }
                     }
-                    catch (System.Exception ex)
-                    {
-                        A.Ed.WriteMessage($"\n Lỗi thêm PVI tại station {station:F2}: {ex.Message}");
-                    }
+
+                    totalCreated++;
+                    A.Ed.WriteMessage($"\n --- Profile #{totalCreated} ---");
+                    A.Ed.WriteMessage($"\n Profile mới đã tạo: {newProfile.Name}");
+                    A.Ed.WriteMessage($"\n Số điểm PVI đã thêm: {addedCount}/{stationElevations.Count}");
+                    A.Ed.WriteMessage($"\n Station bắt đầu: {stationElevations[0].station:F2}");
+                    A.Ed.WriteMessage($"\n Station kết thúc: {stationElevations[^1].station:F2}");
+
+                    tr.Commit();
                 }
-
-                A.Ed.WriteMessage($"\n\n=== KẾT QUẢ ===");
-                A.Ed.WriteMessage($"\n Profile mới đã tạo: {newProfile.Name}");
-                A.Ed.WriteMessage($"\n Số điểm PVI đã thêm: {addedCount}/{stationElevations.Count}");
-                A.Ed.WriteMessage($"\n Station bắt đầu: {stationElevations[0].station:F2}");
-                A.Ed.WriteMessage($"\n Station kết thúc: {stationElevations[^1].station:F2}");
-
-                tr.Commit();
+                catch (Autodesk.AutoCAD.Runtime.Exception e)
+                {
+                    A.Ed.WriteMessage($"\n Lỗi: {e.Message}");
+                }
             }
-            catch (Autodesk.AutoCAD.Runtime.Exception e)
-            {
-                A.Ed.WriteMessage($"\n Lỗi: {e.Message}");
-            }
+
+            A.Ed.WriteMessage($"\n\n=== KẾT QUẢ: Đã tạo {totalCreated} Profile từ Polyline ===");
         }
 
         /// <summary>

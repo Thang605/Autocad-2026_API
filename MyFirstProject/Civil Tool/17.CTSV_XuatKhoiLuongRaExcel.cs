@@ -1,4 +1,4 @@
-﻿// (C) Copyright 2024 by  
+// (C) Copyright 2024 by  
 //
 using System;
 using System.Collections.Generic;
@@ -285,8 +285,9 @@ namespace Civil3DCsharp
                     // Tạo worksheet
                     var worksheet = workbook.Worksheets.Add(sheetData.SheetName);
 
-                    // Xuất dữ liệu vào sheet
-                    ExportSheetData(worksheet, pivotData, sheetData.AlignmentName, sheetData.SampleLineGroupName, decimalPlaces);
+                    // Xuất dữ liệu vào sheet (truyền hasSummarySheet = true nếu có > 1 sheet)
+                    bool hasSummarySheet = allSheetData.Count > 1;
+                    ExportSheetData(worksheet, pivotData, sheetData.AlignmentName, sheetData.SampleLineGroupName, decimalPlaces, hasSummarySheet);
 
                     A.Ed.WriteMessage($"\n  ✓ Sheet '{sheetData.SheetName}': {pivotData.StakeInfos.Count} cọc, {pivotData.MaterialTypes.Count} vật liệu");
 
@@ -348,7 +349,7 @@ namespace Civil3DCsharp
                 // Sắp xếp vật liệu theo thứ tự từ Material List (QTO)
                 var orderedMaterials = SortMaterialsByPriority(materialTypes, _currentQTOMaterialOrder);
                 int materialCount = orderedMaterials.Count;
-                int totalCols = 1 + materialCount; // Tên đường + các cột khối lượng
+                int totalCols = 1 + materialCount + 1; // Tên đường + các cột khối lượng + Ghi chú
 
                 // ===== THÔNG TIN DỰ ÁN =====
                 worksheet.Cell(currentRow, 1).Value = "Dự án:";
@@ -378,6 +379,9 @@ namespace Civil3DCsharp
                 {
                     worksheet.Cell(currentRow, 2 + i).Value = $"{orderedMaterials[i]} (m³)";
                 }
+
+                // Cột Ghi chú
+                worksheet.Cell(currentRow, totalCols).Value = "Ghi chú";
 
                 // Style cho header
                 for (int col = 1; col <= totalCols; col++)
@@ -471,10 +475,11 @@ namespace Civil3DCsharp
 
                 // ===== COLUMN WIDTHS =====
                 worksheet.Column(1).Width = 20;
-                for (int i = 2; i <= totalCols; i++)
+                for (int i = 2; i <= totalCols - 1; i++)
                 {
                     worksheet.Column(i).Width = 15;
                 }
+                worksheet.Column(totalCols).Width = 20; // Cột Ghi chú
             }
             catch (System.Exception ex)
             {
@@ -508,7 +513,7 @@ namespace Civil3DCsharp
             public Dictionary<string, int> MaterialColumnMapping { get; set; } = new();
         }
 
-        private static void ExportSheetData(IXLWorksheet worksheet, PivotTableData pivotData, string alignmentName, string sampleLineGroupName, int decimalPlaces)
+        private static void ExportSheetData(IXLWorksheet worksheet, PivotTableData pivotData, string alignmentName, string sampleLineGroupName, int decimalPlaces, bool hasSummarySheet)
         {
             try
             {
@@ -517,11 +522,10 @@ namespace Civil3DCsharp
                 int materialCount = pivotData.MaterialTypes.Count;
 
                 // ===== THÔNG TIN DỰ ÁN =====
-                // Tổng cột = 2 (Tên cọc, Khoảng cách) + số vật liệu (diện tích) + số vật liệu (khối lượng)
-                int totalCols = 2 + materialCount + materialCount;
+                // Tổng cột = 2 (Tên cọc, Khoảng cách) + số vật liệu (diện tích) + số vật liệu (khối lượng) + 1 (Ghi chú)
+                int totalCols = 2 + materialCount + materialCount + 1;
 
-                // Chỉ tham chiếu sheet TỔNG HỢP nếu nó tồn tại (khi có > 1 sheet)
-                bool hasSummarySheet = worksheet.Workbook.Worksheets.Any(ws => ws.Name == "TỔNG HỢP");
+                // Tham chiếu sheet TỔNG HỢP qua công thức nếu có nhiều sheet
                 if (hasSummarySheet)
                 {
                     worksheet.Cell(currentRow, 1).FormulaA1 = "='TỔNG HỢP'!A1";
@@ -577,6 +581,9 @@ namespace Civil3DCsharp
                 {
                     worksheet.Cell(currentRow, volumeStartCol + i).Value = $"{pivotData.MaterialTypes[i]} (m³)";
                 }
+
+                // Cột Ghi chú
+                worksheet.Cell(currentRow, totalCols).Value = "Ghi chú";
 
                 // Style cho header
                 for (int col = 1; col <= totalCols; col++)
@@ -709,10 +716,11 @@ namespace Civil3DCsharp
                 // ===== COLUMN WIDTHS =====
                 worksheet.Column(1).Width = 12;
                 worksheet.Column(2).Width = 15;
-                for (int i = 3; i <= totalCols; i++)
+                for (int i = 3; i <= totalCols - 1; i++)
                 {
                     worksheet.Column(i).Width = 15;
                 }
+                worksheet.Column(totalCols).Width = 20; // Cột Ghi chú
 
                 // ===== BỎ AUTO FILTER =====
                 // Đã bỏ dòng: worksheet.Range(2, 1, dataEndRow, totalCols).SetAutoFilter();
