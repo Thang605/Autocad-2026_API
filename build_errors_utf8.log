@@ -1,7 +1,0 @@
-﻿C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(3068,5): error MSB4803: The task "ResolveComReference" is not supported on the .NET Core version of MSBuild. Please use the .NET Framework version of MSBuild. See https://aka.ms/msbuild/MSB4803 for further details. [C:\Dropbox\DATA\AI Agent\Autocad 2026_API\External\Autocad-Civil3d-Tools\Acad-C3D-Tools\IntersectUtilities\IntersectUtilities.csproj]
-
-Build FAILED.
-    6 Warning(s)
-    1 Error(s)
-
-Time Elapsed 00:00:00.91

@@ -139,6 +139,7 @@ namespace MyFirstProject
             AddMenuItem(subMenuProfile, "Gắn Nhãn Nút Giao Lên Trắc Dọc", "CTP_GanNhanNutGiao_LenTracDoc ");
             AddHeader(subMenuProfile, "--- Chuyển đổi ---");
             AddMenuItem(subMenuProfile, "Polyline To Profile", "CTP_Polyline_To_Profile ");
+            AddMenuItem(subMenuProfile, "Profile To Polyline", "CTP_Profile_To_Polyline ");
             AddMenuItem(subMenuProfile, "Điều Chỉnh Profile Theo Polyline", "CTP_Adjust_Profile_By_Polyline ");
             AddHeader(subMenuProfile, "--- Tạo điểm ---");
             AddMenuItem(subMenuProfile, "Tạo CogoPoint Từ PVI", "CTP_TaoCogoPointTuPVI ");

@@ -1,4 +1,4 @@
-﻿// (C) Copyright 2015 by  
+// (C) Copyright 2015 by  
 //
 using System;
 using System.Windows.Forms;
@@ -80,57 +80,6 @@ namespace Civil3DCsharp
                 Clipboard.SetText(formatTong);
 
 
-
-                tr.Commit();
-            }
-            catch (Autodesk.AutoCAD.Runtime.Exception e)
-            {
-                A.Ed.WriteMessage(e.Message);
-            }
-        }
-
-        [CommandMethod("AT_TongDoDai_Replace")]
-        public static void AT_TongDoDai_Replace()
-        {
-            // start transantion
-            using Transaction tr = A.Db.TransactionManager.StartTransaction();
-            try
-            {
-                UserInput UI = new();
-                UtilitiesCAD CAD = new();
-                UtilitiesC3D C3D = new();
-                //start here
-                ObjectIdCollection polyLineColl = UserInput.GSelectionSet("Chọn các đối tượng (Polyline/Hatch) cần tính tổng độ dài: \n");
-                List<String> listLengthPolyline = [];
-
-                //tạo field data
-                string str1 = "%<\\AcObjProp Object(%<\\_ObjId ";
-                string str2 = ">%).Length \\f \"%lu2\">%";
-                string format = "";
-                foreach (ObjectId polyLineId in polyLineColl)
-                {
-                    string strId = polyLineId.OldIdPtr.ToString();
-                    format = str1 + strId + str2;
-                    listLengthPolyline.Add(format);
-                }
-
-                //tính tổng data file
-                string formatTong = "0";
-                string str3 = "%<\\AcExpr (";
-                string str4 = ") \\f \" %lu2\">%";
-                foreach (String item in listLengthPolyline)
-                {
-                    formatTong = formatTong + "+" + item;
-                }
-                formatTong = str3 + formatTong + str4 + "m";
-                // vẽ text
-                ObjectId textId = UserInput.GTextOrMText("Chọn text/mtext cần nhập nội dung: \n");
-                var textObj = tr.GetObject(textId, OpenMode.ForWrite);
-                if (textObj is DBText dbText)
-                    dbText.TextString = formatTong;
-                else if (textObj is MText mText)
-                    mText.Contents = formatTong;
-                A.Ed.Command("_UPDATEFIELD", textId);
 
                 tr.Commit();
             }
@@ -335,11 +284,12 @@ namespace Civil3DCsharp
                 }
                 formatTong = str3 + formatTong + str4 + "m2";
                 // vẽ text
-                ObjectId textId = UserInput.GDbText("Chọn text cần nhập nội dung: \n");
-                DBText? text = tr.GetObject(textId, OpenMode.ForWrite) as DBText;
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
-                text.TextString = formatTong;
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
+                ObjectId textId = UserInput.GTextOrMText("Chọn text/mtext cần nhập nội dung: \n");
+                var textObj = tr.GetObject(textId, OpenMode.ForWrite);
+                if (textObj is DBText dbText)
+                    dbText.TextString = formatTong;
+                else if (textObj is MText mText)
+                    mText.Contents = formatTong;
                 A.Ed.Command("_UPDATEFIELD", textId);
 
                 tr.Commit();
@@ -385,11 +335,12 @@ namespace Civil3DCsharp
                 }
                 formatTong = str3 + formatTong + str4;
                 // vẽ text
-                ObjectId textId = UserInput.GDbText("Chọn text cần nhập nội dung: \n");
-                DBText? text = tr.GetObject(textId, OpenMode.ForWrite) as DBText;
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
-                text.TextString = formatTong;
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
+                ObjectId textId = UserInput.GTextOrMText("Chọn text/mtext cần nhập nội dung: \n");
+                var textObj = tr.GetObject(textId, OpenMode.ForWrite);
+                if (textObj is DBText dbText)
+                    dbText.TextString = formatTong;
+                else if (textObj is MText mText)
+                    mText.Contents = formatTong;
                 A.Ed.Command("_UPDATEFIELD", textId);
 
                 tr.Commit();
@@ -414,8 +365,8 @@ namespace Civil3DCsharp
                 ObjectIdCollection polyLineColl = UserInput.GSelectionSet("Chọn các đối tượng (Polyline/Hatch) cần tính tổng diện tích: \n");
                 List<String> listLengthPolyline = [];
                 // vẽ text
-                ObjectId textId = UserInput.GDbText("Chọn text cần nhập nội dung: \n");
-                DBText? text = tr.GetObject(textId, OpenMode.ForWrite) as DBText;
+                ObjectId textId = UserInput.GTextOrMText("Chọn text/mtext cần nhập nội dung: \n");
+                var textObj = tr.GetObject(textId, OpenMode.ForWrite);
 
                 //tạo field data
                 string str1 = "%<\\AcObjProp Object(%<\\_ObjId ";
@@ -429,9 +380,13 @@ namespace Civil3DCsharp
                 }
 
                 //tính tổng data file
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
-                string formatTong = text.TextString;
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
+                string existingText = "";
+                if (textObj is DBText dbTextRead)
+                    existingText = dbTextRead.TextString;
+                else if (textObj is MText mTextRead)
+                    existingText = mTextRead.Contents;
+
+                string formatTong = existingText;
                 string str3 = "%<\\AcExpr (";
                 string str4 = ") \\f \" %lu2\">%";
                 foreach (String item in listLengthPolyline)
@@ -440,7 +395,10 @@ namespace Civil3DCsharp
                 }
                 formatTong = str3 + formatTong + str4;
 
-                text.TextString = formatTong;
+                if (textObj is DBText dbTextWrite)
+                    dbTextWrite.TextString = formatTong;
+                else if (textObj is MText mTextWrite)
+                    mTextWrite.Contents = formatTong;
                 A.Ed.Command("_UPDATEFIELD", textId);
 
                 tr.Commit();
