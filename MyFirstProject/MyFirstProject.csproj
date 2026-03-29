@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0-windows</TargetFramework>
@@ -25,7 +25,7 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="AcCui">
-      <HintPath>..\..\..\..\..\..\..\Program Files\Autodesk\AutoCAD 2026\AcCui.dll</HintPath>
+      <HintPath>C:\Program Files\Autodesk\AutoCAD 2026\AcCui.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Acdbmgd">
@@ -33,7 +33,7 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="acdbmgdbrep">
-      <HintPath>..\..\..\..\..\..\..\Program Files\Autodesk\AutoCAD 2026\acdbmgdbrep.dll</HintPath>
+      <HintPath>C:\Program Files\Autodesk\AutoCAD 2026\acdbmgdbrep.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Acmgd">
@@ -53,15 +53,15 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="AecPropDataMgd">
-      <HintPath>..\..\..\..\..\..\..\Program Files\Autodesk\AutoCAD 2026\ACA\AecPropDataMgd.dll</HintPath>
+      <HintPath>C:\Program Files\Autodesk\AutoCAD 2026\ACA\AecPropDataMgd.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Autodesk.AutoCAD.Interop">
-      <HintPath>..\..\..\..\..\..\..\Program Files\Autodesk\AutoCAD 2026\Autodesk.AutoCAD.Interop.dll</HintPath>
+      <HintPath>C:\Program Files\Autodesk\AutoCAD 2026\Autodesk.AutoCAD.Interop.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Autodesk.AutoCAD.Interop.Common">
-      <HintPath>..\..\..\..\..\..\..\Program Files\Autodesk\AutoCAD 2026\Autodesk.AutoCAD.Interop.Common.dll</HintPath>
+      <HintPath>C:\Program Files\Autodesk\AutoCAD 2026\Autodesk.AutoCAD.Interop.Common.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>

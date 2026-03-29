@@ -1,4 +1,4 @@
-﻿using Autodesk.AutoCAD.ApplicationServices;
+using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.Colors;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
@@ -259,6 +259,8 @@ namespace MyFirstProject.Extensions
             TypedValue[] acTypValAr = new TypedValue[1];
             acTypValAr.SetValue(new TypedValue((int)DxfCode.Start, typeObject), 0);
             PromptSelectionResult promptSelectionResult = A.Ed.GetSelection(new SelectionFilter(acTypValAr));
+            if (promptSelectionResult.Status != PromptStatus.OK || promptSelectionResult.Value == null)
+                return null;
             SelectionSet selectionSet = promptSelectionResult.Value;
             ObjectIdCollection objectIdCollection = [.. selectionSet.GetObjectIds()];
             return objectIdCollection;

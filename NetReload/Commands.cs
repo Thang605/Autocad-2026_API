@@ -37,7 +37,7 @@ namespace NetReload
 				// 1. Determine Project Path
 				// Since this is a standalone reloader, we point it to the main project we want to reload.
 				// You can change this path to reload different projects.
-				string projectDir = @"c:\Dropbox\DATA\AI Agent\Autocad 2026_API\MyFirstProject";
+				string projectDir = @"c:\Onedrive\0.AI AGENT\6.C#\Autocad 2026_API\MyFirstProject";
 
 				if (string.IsNullOrEmpty(projectDir) || !Directory.Exists(projectDir))
 				{
