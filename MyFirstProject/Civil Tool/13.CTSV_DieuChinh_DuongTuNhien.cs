@@ -1,4 +1,4 @@
-﻿// (C) Copyright 2015 by  
+// (C) Copyright 2015 by  
 //
 using System;
 using System.Collections.Generic;
@@ -57,99 +57,82 @@ namespace Civil3DCsharp
                 }
 
                 ObjectId sectionId = per.ObjectId;
-                Section? section = tr.GetObject(sectionId, OpenMode.ForWrite) as Section;
+                Section? section = tr.GetObject(sectionId, OpenMode.ForRead) as Section;
                 if (section == null)
                 {
                     A.Ed.WriteMessage("\nKhông thể lấy thông tin section.");
                     return;
                 }
 
-                // Step 2: Get section view from section and find source surface, sample line group
+                // Step 2: Navigate Civil 3D hierarchy to find parent objects
+                // (Optimized: thay vì duyệt toàn bộ Model Space, đi qua Alignment → SLG → SL)
                 SectionView? sectionView = null;
                 CivSurface? sourceSurface = null;
                 SampleLineGroup? sampleLineGroup = null;
                 SampleLine? currentSampleLine = null;
+                Alignment? alignment = null;
                 
-                // Get all entities in the drawing and find section views
-                BlockTable? bt = tr.GetObject(A.Db.BlockTableId, OpenMode.ForWrite) as BlockTable;
-                if (bt == null)
-                {
-                    A.Ed.WriteMessage("\nKhông thể truy cập Block Table.");
-                    return;
-                }
+                CivilDocument civDoc = CivilApplication.ActiveDocument;
+                ObjectIdCollection alignmentIds = civDoc.GetAlignmentIds();
+                bool found = false;
 
-                BlockTableRecord? btr = tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForWrite) as BlockTableRecord;
-                if (btr == null)
+                foreach (ObjectId alId in alignmentIds)
                 {
-                    A.Ed.WriteMessage("\nKhông thể truy cập Model Space.");
-                    return;
-                }
-                
-                foreach (ObjectId entId in btr)
-                {
-                    try
+                    if (found) break;
+                    Alignment? al = tr.GetObject(alId, OpenMode.ForRead) as Alignment;
+                    if (al == null) continue;
+
+                    ObjectIdCollection slgIds = al.GetSampleLineGroupIds();
+                    foreach (ObjectId slgId in slgIds)
                     {
-                        if (tr.GetObject(entId, OpenMode.ForWrite) is SectionView sv)
+                        if (found) break;
+                        SampleLineGroup? slg = tr.GetObject(slgId, OpenMode.ForRead) as SampleLineGroup;
+                        if (slg == null) continue;
+
+                        SectionSourceCollection sectionSources = slg.GetSectionSources();
+                        ObjectIdCollection slIds = slg.GetSampleLineIds();
+
+                        foreach (ObjectId slId in slIds)
                         {
-                            ObjectId svSampleLineId = sv.SampleLineId;
-                            SampleLine? sl = tr.GetObject(svSampleLineId, OpenMode.ForWrite) as SampleLine;
-                            if (sl != null)
+                            if (found) break;
+                            SampleLine? sl = tr.GetObject(slId, OpenMode.ForRead) as SampleLine;
+                            if (sl == null) continue;
+
+                            foreach (SectionSource source in sectionSources)
                             {
-                                // Check if this section belongs to this sample line
-                                ObjectId slGroupId = sl.GroupId;
-                                SampleLineGroup? slGroup = tr.GetObject(slGroupId, OpenMode.ForWrite) as SampleLineGroup;
-                                if (slGroup != null)
+                                try
                                 {
-                                    SectionSourceCollection sectionSources = slGroup.GetSectionSources();
-                                    foreach (SectionSource source in sectionSources)
+                                    ObjectId testSectionId = sl.GetSectionId(source.SourceId);
+                                    if (testSectionId == sectionId)
                                     {
+                                        currentSampleLine = sl;
+                                        sampleLineGroup = slg;
+                                        alignment = al;
+
                                         try
                                         {
-                                            ObjectId testSectionId = sl.GetSectionId(source.SourceId);
-                                            if (testSectionId == sectionId)
+                                            CivSurface? surf = tr.GetObject(source.SourceId, OpenMode.ForRead) as CivSurface;
+                                            if (surf != null)
                                             {
-                                                sectionView = sv;
-                                                currentSampleLine = sl;
-                                                sampleLineGroup = slGroup;
-                                                
-                                                // Try to get the source surface
-                                                try
-                                                {
-                                                    CivSurface? surf = tr.GetObject(source.SourceId, OpenMode.ForWrite) as CivSurface;
-                                                    if (surf != null)
-                                                    {
-                                                        sourceSurface = surf;
-                                                        A.Ed.WriteMessage($"\nĐã tìm thấy surface nguồn: '{surf.Name}'");
-                                                    }
-                                                }
-                                                catch
-                                                {
-                                                    // Surface might not be accessible or valid
-                                                }
-                                                break;
+                                                sourceSurface = surf;
+                                                A.Ed.WriteMessage($"\nĐã tìm thấy surface nguồn: '{surf.Name}'");
                                             }
                                         }
-                                        catch
-                                        {
-                                            // Continue if section doesn't exist for this source
-                                            continue;
-                                        }
+                                        catch { }
+
+                                        found = true;
+                                        break;
                                     }
-                                    if (sectionView != null) break;
                                 }
+                                catch { continue; }
                             }
                         }
                     }
-                    catch
-                    {
-                        // Skip entities that can't be processed
-                        continue;
-                    }
                 }
 
-                if (sectionView == null || currentSampleLine == null || sampleLineGroup == null)
+                if (currentSampleLine == null || sampleLineGroup == null || alignment == null)
                 {
-                    A.Ed.WriteMessage("\nKhông tìm thấy section view chứa section này.");
+                    A.Ed.WriteMessage("\nKhông tìm thấy sample line chứa section này.");
                     return;
                 }
 
@@ -160,12 +143,33 @@ namespace Civil3DCsharp
                     return;
                 }
 
-                // Get parent alignment
-                ObjectId alignmentId = currentSampleLine.GetParentAlignmentId();
-                Alignment? alignment = tr.GetObject(alignmentId, OpenMode.ForWrite) as Alignment;
-                if (alignment == null)
+                // Find SectionView via SampleLineGroup → SectionViewGroups
+                SectionViewGroupCollection svGroups = sampleLineGroup.SectionViewGroups;
+                foreach (SectionViewGroup svGroup in svGroups)
                 {
-                    A.Ed.WriteMessage("\nKhông thể lấy thông tin alignment.");
+                    if (sectionView != null) break;
+                    ObjectIdCollection svIds = svGroup.GetSectionViewIds();
+                    foreach (ObjectId svId in svIds)
+                    {
+                        SectionView? sv = tr.GetObject(svId, OpenMode.ForRead) as SectionView;
+                        if (sv != null && sv.SampleLineId == currentSampleLine.ObjectId)
+                        {
+                            sectionView = sv;
+                            break;
+                        }
+                    }
+                }
+
+                if (sectionView == null)
+                {
+                    A.Ed.WriteMessage("\nKhông tìm thấy section view chứa section này.");
+                    return;
+                }
+
+                BlockTable? bt = tr.GetObject(A.Db.BlockTableId, OpenMode.ForRead) as BlockTable;
+                if (bt == null)
+                {
+                    A.Ed.WriteMessage("\nKhông thể truy cập Block Table.");
                     return;
                 }
 
@@ -359,6 +363,7 @@ namespace Civil3DCsharp
                     // Parameters matching Civil 3D dialog:
                     // weedingDistance: 15.00m, supplementingDistance: 100.000m, 
                     // midOrdinateDistance: 1.000m, weedingAngle: 0 degrees
+                    sourceSurface.UpgradeOpen();
                     sourceSurface.BreaklinesDefinition.AddStandardBreaklines(breaklineIds, 15.0, 100.0, 1.0, 0.0);
                     
                     A.Ed.WriteMessage($"\nĐã thêm 3D polyline làm breakline vào surface '{sourceSurface.Name}'.");
@@ -452,6 +457,7 @@ namespace Civil3DCsharp
                     ObjectIdCollection breaklineIds = new ObjectIdCollection();
                     breaklineIds.Add(polyline3dId);
                     
+                    sourceSurface.UpgradeOpen();
                     sourceSurface.BreaklinesDefinition.AddStandardBreaklines(breaklineIds, 15.0, 100.0, 1.0, 0.0);
                     
                     A.Ed.WriteMessage($"\nĐã thêm 3D polyline tại station {station:F3} làm breakline vào surface '{sourceSurface.Name}'.");

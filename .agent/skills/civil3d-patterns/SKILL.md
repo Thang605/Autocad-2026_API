@@ -367,4 +367,4 @@ string description = point.RawDescription;
 5. [ ] Đặt tên method phù hợp với tên lệnh (VD: `CTSTenMethod`)
 6. [ ] Bọc code trong `using Transaction` và `try-catch`
 7. [ ] Sử dụng `A.Ed.WriteMessage()` để thông báo lỗi
-8. [ ] Build để kiểm tra lỗi: `dotnet build`
+8. [ ] **AI AGENT BẮT BUỘC PHẢI TỰ ĐỘNG CHẠY**: Sử dụng công cụ `run_command` để chạy `dotnet build` ngay lập tức bên trong thư mục `MyFirstProject` sau khi viết đoạn mã xong. Nếu phát sinh lỗi biên dịch, AI phải tự tìm hiểu và sửa cho tới khi thành công (0 errors) mà không cần hỏi người dùng!

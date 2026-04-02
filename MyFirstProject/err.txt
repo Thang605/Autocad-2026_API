@@ -1,0 +1,17 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+C:\Onedrive\0.AI AGENT\6.C#\Autocad 2026_API\MyFirstProject\Civil Tool\08c.SectionviewVatLieu.cs(28,28): error CS0104: 'Application' is an ambiguous reference between 'Autodesk.AutoCAD.ApplicationServices.Application' and 'System.Windows.Forms.Application' [C:\Onedrive\0.AI AGENT\6.C#\Autocad 2026_API\MyFirstProject\MyFirstProject.csproj]
+C:\Onedrive\0.AI AGENT\6.C#\Autocad 2026_API\MyFirstProject\Civil Tool\08c.SectionviewVatLieu.cs(113,36): error CS0104: 'Application' is an ambiguous reference between 'Autodesk.AutoCAD.ApplicationServices.Application' and 'System.Windows.Forms.Application' [C:\Onedrive\0.AI AGENT\6.C#\Autocad 2026_API\MyFirstProject\MyFirstProject.csproj]
+C:\Onedrive\0.AI AGENT\6.C#\Autocad 2026_API\MyFirstProject\Civil Tool\08c.SectionviewVatLieu.cs(127,55): error CS1061: 'SectionView' does not contain a definition for 'MaximumElevation' and no accessible extension method 'MaximumElevation' accepting a first argument of type 'SectionView' could be found (are you missing a using directive or an assembly reference?) [C:\Onedrive\0.AI AGENT\6.C#\Autocad 2026_API\MyFirstProject\MyFirstProject.csproj]
+C:\Onedrive\0.AI AGENT\6.C#\Autocad 2026_API\MyFirstProject\Civil Tool\08c.SectionviewVatLieu.cs(266,57): error CS1061: 'SectionView' does not contain a definition for 'MaximumElevation' and no accessible extension method 'MaximumElevation' accepting a first argument of type 'SectionView' could be found (are you missing a using directive or an assembly reference?) [C:\Onedrive\0.AI AGENT\6.C#\Autocad 2026_API\MyFirstProject\MyFirstProject.csproj]
+
+Build FAILED.
+
+C:\Onedrive\0.AI AGENT\6.C#\Autocad 2026_API\MyFirstProject\Civil Tool\08c.SectionviewVatLieu.cs(28,28): error CS0104: 'Application' is an ambiguous reference between 'Autodesk.AutoCAD.ApplicationServices.Application' and 'System.Windows.Forms.Application' [C:\Onedrive\0.AI AGENT\6.C#\Autocad 2026_API\MyFirstProject\MyFirstProject.csproj]
+C:\Onedrive\0.AI AGENT\6.C#\Autocad 2026_API\MyFirstProject\Civil Tool\08c.SectionviewVatLieu.cs(113,36): error CS0104: 'Application' is an ambiguous reference between 'Autodesk.AutoCAD.ApplicationServices.Application' and 'System.Windows.Forms.Application' [C:\Onedrive\0.AI AGENT\6.C#\Autocad 2026_API\MyFirstProject\MyFirstProject.csproj]
+C:\Onedrive\0.AI AGENT\6.C#\Autocad 2026_API\MyFirstProject\Civil Tool\08c.SectionviewVatLieu.cs(127,55): error CS1061: 'SectionView' does not contain a definition for 'MaximumElevation' and no accessible extension method 'MaximumElevation' accepting a first argument of type 'SectionView' could be found (are you missing a using directive or an assembly reference?) [C:\Onedrive\0.AI AGENT\6.C#\Autocad 2026_API\MyFirstProject\MyFirstProject.csproj]
+C:\Onedrive\0.AI AGENT\6.C#\Autocad 2026_API\MyFirstProject\Civil Tool\08c.SectionviewVatLieu.cs(266,57): error CS1061: 'SectionView' does not contain a definition for 'MaximumElevation' and no accessible extension method 'MaximumElevation' accepting a first argument of type 'SectionView' could be found (are you missing a using directive or an assembly reference?) [C:\Onedrive\0.AI AGENT\6.C#\Autocad 2026_API\MyFirstProject\MyFirstProject.csproj]
+    0 Warning(s)
+    4 Error(s)
+
+Time Elapsed 00:00:01.11

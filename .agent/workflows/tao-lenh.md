@@ -21,11 +21,12 @@ using Label = Autodesk.Civil.DatabaseServices.Label;
 ## Bước 3: Build để kiểm tra lỗi
 // turbo
 ```powershell
-cd c:\Dropbox\DATA\AI Agent\Autocad 2026_API\MyFirstProject
+cd "c:\Onedrive\0.AI AGENT\6.C#\Autocad 2026_API\MyFirstProject"
 dotnet build
 ```
 
-**QUAN TRỌNG**: Sau khi tạo lệnh xong, PHẢI build lại để kiểm tra còn lỗi gì không!
+**QUAN TRỌNG (NHIỆM VỤ BẮT BUỘC CHO AI AGENT)**: 
+Ngay sau khi AI Agent tự động viết code xong một lệnh mới (hoặc có chỉnh sửa bất kỳ nội dung C# nào), BẠN BẮT BUỘC PHẢI tự rigger công cụ `run_command` để chạy lệnh `dotnet build` bên trong thư mục `MyFirstProject` nhằm kiểm tra lỗi biên dịch! Nếu có lỗi (như Ambiguous reference `Section`), bạn phải tự sửa và build lại cho đến khi `0 errors`. Không đợi user yêu cầu.
 
 ## Bước 4: Sửa lỗi (nếu có)
 - Xem chi tiết lỗi từ output build
