@@ -212,14 +212,12 @@ namespace MyFirstProject
             AddHeader(subMenuSection, "--- Hiệu chỉnh ---");
             AddMenuItem(subMenuSection, "Hiệu Chỉnh Section Static", "CTSV_HieuChinh_Section ");
             AddMenuItem(subMenuSection, "Hiệu Chỉnh Section Dynamic", "CTSV_HieuChinh_Section_Dynamic ");
-            AddMenuItem(subMenuSection, "Điều Chỉnh Đường Tự Nhiên", "CTSV_DieuChinh_DuongTuNhien ");
             AddMenuItem(subMenuSection, "Chọn Section Static", "CTSV_ChonSection_Static ");
             AddHeader(subMenuSection, "--- Khác ---");
             AddMenuItem(subMenuSection, "Chuyển Đổi TN-TK sang TN-TN", "CTSV_ChuyenDoi_TNTK_TNTN ");
             AddMenuItem(subMenuSection, "Thêm Vật Liệu Trên Cắt Ngang", "CTSV_ThemVatLieu_TrenCatNgang ");
             AddMenuItem(subMenuSection, "Thêm Bảng KL Cắt Ngang", "CTSV_Them_BangKL_CatNgang ");
             AddMenuItem(subMenuSection, "Xuất Thông Tin Material Section", "CTSV_MaterialSection ");
-            AddMenuItem(subMenuSection, "Tạo Polyline Từ Section", "AT_PolylineFromSection ");
             AddHeader(subMenuSection, "--- Xuất/Khối lượng ---");
             AddMenuItem(subMenuSection, "Xuất Khối Lượng ra Excel", "CTSV_XuatKhoiLuongRaExcel ");
             AddMenuItem(subMenuSection, "Khối Lượng Cắt Ngang", "CTSV_KhoiLuongCatNgang ");

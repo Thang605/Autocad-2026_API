@@ -266,7 +266,7 @@ namespace Civil3DCsharp.Chatbot
             { "CTSV_KhoaCatNgang_AddPoint", "Khóa cắt ngang - thêm điểm" },
             { "CTSV_ThemVatLieu_TrenCatNgang", "Thêm vật liệu trên cắt ngang" },
             { "CTSV_VeTracNgangThietKe", "Vẽ trắc ngang thiết kế" },
-            { "CTSV_DieuChinh_DuongTuNhien", "Điều chỉnh đường tự nhiên" },
+
             { "CTSV_KhoiLuongCatNgang", "Khối lượng cắt ngang" },
             { "CTSV_XuatKhoiLuongRaExcel", "Xuất khối lượng ra Excel" },
             { "CTSV_TaoCorridorSurface", "Tạo corridor surface" },
@@ -285,7 +285,7 @@ namespace Civil3DCsharp.Chatbot
             { "AT_Solid_Set_PropertySet", "Set property set cho solid" },
             { "AT_Solid_Show_Info", "Hiển thị thông tin solid" },
             // Other Civil
-            { "AT_PolylineFromSection", "Tạo polyline từ section" },
+
             { "CT_ThongTinDoiTuong", "Thông tin đối tượng Civil 3D" },
 
             // === CIVIL TOOL 2 ===

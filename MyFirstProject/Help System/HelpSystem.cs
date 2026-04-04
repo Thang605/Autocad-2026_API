@@ -1232,15 +1232,6 @@ namespace Civil3DCsharp.HelpSystem
 
             AddCommand(new CommandInfo
             {
-                Name = "CTSV_DieuChinh_DuongTuNhien",
-                Category = "Civil - SectionView",
-                Description = "Điều chỉnh đường tự nhiên trên mặt cắt ngang",
-                Usage = "CTSV_DieuChinh_DuongTuNhien",
-                VideoLink = "https://www.youtube.com/watch?v=QbU1SG3-44E"
-            });
-
-            AddCommand(new CommandInfo
-            {
                 Name = "CTSV_KhoiLuongCatNgang",
                 Category = "Civil - SectionView",
                 Description = "Tính khối lượng từ mặt cắt ngang",
@@ -1345,14 +1336,6 @@ namespace Civil3DCsharp.HelpSystem
                 Usage = "CTA_BangThongKeCacTuyenDuong"
             });
 
-            // 19. AT_PolylineFromSection
-            AddCommand(new CommandInfo
-            {
-                Name = "AT_PolylineFromSection",
-                Category = "Civil - SectionView",
-                Description = "Tạo Polyline từ Section View",
-                Usage = "AT_PolylineFromSection"
-            });
 
             // 20. CT_ThongTinDoiTuong
             AddCommand(new CommandInfo
