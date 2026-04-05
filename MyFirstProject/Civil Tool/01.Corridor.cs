@@ -1,4 +1,4 @@
-﻿using Autodesk.AutoCAD.Runtime;
+using Autodesk.AutoCAD.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -29,29 +29,74 @@ namespace Civil3DCsharp
         [CommandMethod("CTC_AddAllSection")]
         public static void CVC_AddAllSection()
         {
+            // 1. Hiển thị form cho user chọn corridor(s)
+            var form = new MyFirstProject.Civil_Tool.AddAllSectionForm();
+            var dlgResult = Autodesk.AutoCAD.ApplicationServices.Application.ShowModalDialog(form);
+
+            if (dlgResult != System.Windows.Forms.DialogResult.OK || !form.FormAccepted)
+            {
+                A.Ed.WriteMessage("\n Đã hủy lệnh.");
+                return;
+            }
+
+            var selectedCorridors = form.SelectedCorridors;
+            bool rebuildAfterAdd = form.RebuildAfterAdd;
+
+            if (selectedCorridors.Count == 0)
+            {
+                A.Ed.WriteMessage("\nKhông có corridor nào được chọn.");
+                return;
+            }
+
+            // 2. Xử lý từng corridor
             using Transaction tr = A.Db.TransactionManager.StartTransaction();
             try
             {
-                // Get corridor from user
-                ObjectId corridorId = UserInput.GCorridorId("\n Select corridor model to add sections:\n");
-                if (corridorId.IsNull)
+                // Group theo CorridorId để xử lý mỗi corridor 1 lần
+                var corridorGroups = selectedCorridors
+                    .GroupBy(c => c.CorridorId)
+                    .ToList();
+
+                int totalProcessed = 0;
+
+                foreach (var group in corridorGroups)
                 {
-                    A.Ed.WriteMessage("\nNo corridor selected. Command cancelled.");
-                    return;
+                    var corridor = tr.GetObject(group.Key, OpenMode.ForWrite) as Corridor;
+                    if (corridor == null) continue;
+
+                    A.Ed.WriteMessage($"\n\n═══ Xử lý Corridor: {corridor.Name} ═══");
+
+                    foreach (var info in group)
+                    {
+                        if (info.SampleLineCount == 0)
+                        {
+                            A.Ed.WriteMessage($"\n  ⚠ Bỏ qua SL Group '{info.SampleLineGroupName}' (rỗng)");
+                            continue;
+                        }
+
+                        // Lấy danh sách station từ sample line group
+                        var sampleLineStations = GetSampleLineStations(info.SampleLineGroupId, tr);
+                        if (sampleLineStations.Length == 0) continue;
+
+                        // Tìm baseline tương ứng
+                        if (info.BaselineIndex >= 0 && info.BaselineIndex < corridor.Baselines.Count)
+                        {
+                            var baseline = corridor.Baselines[info.BaselineIndex];
+                            A.Ed.WriteMessage($"\n  → Baseline: {baseline.Name ?? "(unnamed)"}, SL Group: {info.SampleLineGroupName}, Stations: {sampleLineStations.Length}");
+                            AddStationsToBaselineRegions(baseline, sampleLineStations);
+                            totalProcessed++;
+                        }
+                    }
+
+                    if (rebuildAfterAdd)
+                    {
+                        A.Ed.WriteMessage($"\n  🔄 Rebuilding corridor: {corridor.Name}...");
+                        corridor.Rebuild();
+                    }
                 }
 
-                var corridor = tr.GetObject(corridorId, OpenMode.ForWrite) as Corridor;
-                if (corridor == null)
-                {
-                    A.Ed.WriteMessage("\nInvalid corridor selected. Command cancelled.");
-                    return;
-                }
-
-                ProcessCorridorBaselines(corridor, tr);
-
-                corridor.Rebuild();
                 tr.Commit();
-                A.Ed.WriteMessage("\nSections added successfully to corridor.");
+                A.Ed.WriteMessage($"\n\n✅ Hoàn thành! Đã xử lý {corridorGroups.Count} corridor(s), {totalProcessed} baseline(s).");
             }
             catch (System.Exception ex)
             {
@@ -60,65 +105,8 @@ namespace Civil3DCsharp
             }
         }
 
-        private static void ProcessCorridorBaselines(Corridor corridor, Transaction tr)
-        {
-            foreach (Baseline baseline in corridor.Baselines)
-            {
-                var alignment = tr.GetObject(baseline.AlignmentId, OpenMode.ForRead) as Alignment;
-                if (alignment == null) continue;
 
-                var sampleLineGroupIds = alignment.GetSampleLineGroupIds();
-                A.Ok($"Number of sample line groups on alignment: {sampleLineGroupIds.Count}");
 
-                if (sampleLineGroupIds.Count == 0)
-                {
-                    A.Ed.WriteMessage("\nNo sample line groups found on this alignment.");
-                    continue;
-                }
-
-                int selectedGroupIndex = SelectSampleLineGroup(sampleLineGroupIds, alignment, tr);
-                if (selectedGroupIndex < 0) continue;
-
-                var sampleLineStations = GetSampleLineStations(sampleLineGroupIds[selectedGroupIndex], tr);
-                if (sampleLineStations.Length == 0)
-                {
-                    A.Ed.WriteMessage("\nNo sample lines found in the selected group.");
-                    continue;
-                }
-
-                AddStationsToBaselineRegions(baseline, sampleLineStations);
-            }
-        }
-
-        private static int SelectSampleLineGroup(ObjectIdCollection sampleLineGroupIds, Alignment alignment, Transaction tr)
-        {
-            // Display available sample line groups
-            for (int i = 0; i < sampleLineGroupIds.Count; i++)
-            {
-                var sampleLineGroup = tr.GetObject(sampleLineGroupIds[i], OpenMode.ForRead) as SampleLineGroup;
-                if (sampleLineGroup != null)
-                {
-                    A.Ok($"Sample line group {i}: {sampleLineGroup.Name}");
-                }
-            }
-
-            // If only one group, select it automatically
-            if (sampleLineGroupIds.Count == 1)
-            {
-                return 0;
-            }
-
-            // Get user selection for multiple groups
-            int selectedIndex = UserInput.GInt("Enter the index of the sample line group to add sections:");
-
-            if (selectedIndex < 0 || selectedIndex >= sampleLineGroupIds.Count)
-            {
-                A.Ed.WriteMessage("\nInvalid group index selected.");
-                return -1;
-            }
-
-            return selectedIndex;
-        }
 
         private static double[] GetSampleLineStations(ObjectId sampleLineGroupId, Transaction tr)
         {

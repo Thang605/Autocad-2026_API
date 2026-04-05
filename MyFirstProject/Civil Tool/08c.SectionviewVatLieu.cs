@@ -117,6 +117,7 @@ namespace Civil3DCsharp
                 // === HIỂN THỊ FORM (NGOÀI TRANSACTION) ===
                 string selectedCode = "";
                 string prefixText = "";
+                double adjustValue = 0;
 
                 using (SectionVatLieuForm form = new SectionVatLieuForm(linkCodeNames))
                 {
@@ -128,6 +129,7 @@ namespace Civil3DCsharp
                     }
                     selectedCode = form.SelectedLinkCode;
                     prefixText = form.PrefixText;
+                    adjustValue = form.AdjustValue;
                 }
                 // Thêm dấu ':' vào cuối tên vật liệu nếu chưa có
                 if (!prefixText.EndsWith(":"))
@@ -361,7 +363,18 @@ namespace Civil3DCsharp
                             formatTong = formatTong + "+" + item;
                         }
 
-                        string valueFieldStr = $"{str3}{formatTong}{str4} m";
+                        string valueFieldStr;
+                        if (adjustValue != 0)
+                        {
+                            // Có giá trị cộng/trừ → thêm vào công thức
+                            string adjustStr = adjustValue.ToString("F4", System.Globalization.CultureInfo.InvariantCulture);
+                            string formatTongAdj = $"({formatTong})+({adjustStr})";
+                            valueFieldStr = $"{str3}{formatTongAdj}{str4} m";
+                        }
+                        else
+                        {
+                            valueFieldStr = $"{str3}{formatTong}{str4} m";
+                        }
 
                         // --- TEXT 1: TÊN VẬT LIỆU (label) - dùng Field link đến text gốc ---
                         double labelElevTarget = svTemp.ElevationMax - labelDeltaElev;

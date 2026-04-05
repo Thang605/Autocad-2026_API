@@ -1,6 +1,7 @@
 // CTSU_DieuChinh_EG_TK — 2 lệnh:
 //   Lệnh 1: CTSU_DieuChinh_EG_TK       → chọn section, tạo polyline, xóa điểm cũ
 //   Lệnh 2: CTSU_DieuChinh_EG_TK_Apply → đọc polyline đã chỉnh, add điểm mới vào surface
+//   ★ Hỗ trợ nhiều section: chạy Lệnh 1 nhiều lần, rồi Apply 1 lần duy nhất
 //
 using System;
 using System.Collections.Generic;
@@ -32,21 +33,28 @@ using MyFirstProject;
 
 namespace Civil3DCsharp
 {
+    /// <summary>
+    /// Dữ liệu cho mỗi section edit (1 polyline = 1 bộ dữ liệu)
+    /// </summary>
+    internal class SectionEditData
+    {
+        public ObjectId PolylineId { get; set; }
+        public ObjectId SurfaceId { get; set; }
+        public ObjectId AlignmentId { get; set; }
+        public ObjectId SectionViewId { get; set; }
+        public double Station { get; set; }
+        public List<Point3d> OldWorldPoints { get; set; } = new();
+    }
+
     public class CTSU_DieuChinh_EG_TK_Commands
     {
-        // Static fields — lưu trạng thái giữa 2 lệnh
-        private static ObjectId _polylineId = ObjectId.Null;
-        private static ObjectId _surfaceId = ObjectId.Null;
-        private static ObjectId _alignmentId = ObjectId.Null;
-        private static ObjectId _sectionViewId = ObjectId.Null;
-        private static double _station = 0;
-        private static bool _isWaitingForApply = false;
-        private static List<Point3d> _oldWorldPoints = new();
+        // ★ Lưu danh sách nhiều section edit thay vì chỉ 1
+        private static List<SectionEditData> _pendingEdits = new();
 
         // ═══════════════════════════════════════════════════════════════
-        // LỆNH 1: Chọn section → tạo polyline → xóa điểm cũ khỏi surface
-        // Sau khi chạy xong, user tự do chỉnh sửa polyline
-        // Rồi chạy lệnh CTSU_DieuChinh_EG_TK_Apply
+        // LỆNH 1: Chọn section → tạo polyline → lưu vào queue
+        // Có thể chạy nhiều lần → mỗi lần thêm 1 polyline vào queue
+        // Khi xong tất cả, chạy lệnh CTSU_DieuChinh_EG_TK_Apply
         // ═══════════════════════════════════════════════════════════════
         [CommandMethod("CTSU_DieuChinh_EG_TK")]
         public static void CTSUDieuChinhEGTK()
@@ -170,20 +178,23 @@ namespace Civil3DCsharp
 
                 A.Ed.WriteMessage($"\n✅ Đã tạo polyline ({vIdx} điểm, màu đỏ).");
 
-                // Lưu trạng thái cho lệnh Apply (chưa xóa điểm — sẽ xóa + add cùng lúc trong Apply)
-                _polylineId = newPolyId;
-                _surfaceId = sourceId;
-                _alignmentId = alignment.ObjectId;
-                _sectionViewId = sectionView.ObjectId;
-                _station = currentSampleLine.Station;
-                _oldWorldPoints = oldWorldPoints;
-                _isWaitingForApply = true;
+                // ★ Lưu vào danh sách pending (thay vì ghi đè static cũ)
+                _pendingEdits.Add(new SectionEditData
+                {
+                    PolylineId = newPolyId,
+                    SurfaceId = sourceId,
+                    AlignmentId = alignment.ObjectId,
+                    SectionViewId = sectionView.ObjectId,
+                    Station = currentSampleLine.Station,
+                    OldWorldPoints = oldWorldPoints
+                });
 
                 tr.Commit();
 
                 A.Ed.WriteMessage("\n\n══════════════════════════════════════");
-                A.Ed.WriteMessage("\n✏️  Bây giờ hãy chỉnh sửa polyline (màu đỏ).");
-                A.Ed.WriteMessage("\n   Khi xong, chạy lệnh: CTSU_DieuChinh_EG_TK_Apply");
+                A.Ed.WriteMessage($"\n✏️  Polyline #{_pendingEdits.Count} đã tạo (tổng: {_pendingEdits.Count} đang chờ).");
+                A.Ed.WriteMessage("\n   → Tiếp tục chọn section khác nếu muốn chỉnh thêm.");
+                A.Ed.WriteMessage("\n   → Khi xong hết, chạy lệnh: CTSU_DieuChinh_EG_TK_Apply");
                 A.Ed.WriteMessage("\n══════════════════════════════════════");
             }
             catch (Autodesk.AutoCAD.Runtime.Exception e)
@@ -199,79 +210,123 @@ namespace Civil3DCsharp
         }
 
         // ═══════════════════════════════════════════════════════════════
-        // LỆNH 2: Đọc polyline đã chỉnh sửa → add điểm mới vào surface
+        // LỆNH 2: Apply TẤT CẢ polyline đã chỉnh sửa vào surface
         // ═══════════════════════════════════════════════════════════════
         [CommandMethod("CTSU_DieuChinh_EG_TK_Apply")]
         public static void CTSUDieuChinhEGTKApply()
         {
-            if (!_isWaitingForApply || _polylineId == ObjectId.Null)
+            if (_pendingEdits.Count == 0)
             {
                 A.Ed.WriteMessage("\n⚠ Chưa có polyline nào cần apply.");
                 A.Ed.WriteMessage("\n   Hãy chạy lệnh CTSU_DieuChinh_EG_TK trước.");
                 return;
             }
 
+            A.Ed.WriteMessage($"\n📦 Bắt đầu apply {_pendingEdits.Count} polyline...");
+
             using Transaction tr = A.Db.TransactionManager.StartTransaction();
             try
             {
-                Polyline? editedPoly = tr.GetObject(_polylineId, OpenMode.ForWrite) as Polyline;
-                SectionView? sv = tr.GetObject(_sectionViewId, OpenMode.ForWrite) as SectionView;
-                Alignment? al = tr.GetObject(_alignmentId, OpenMode.ForWrite) as Alignment;
-                CivSurface? surface = tr.GetObject(_surfaceId, OpenMode.ForWrite) as CivSurface;
+                int totalRemoved = 0;
+                int totalAdded = 0;
+                int successCount = 0;
+                int failCount = 0;
 
-                if (editedPoly == null || sv == null || al == null || surface == null)
-                {
-                    A.Ed.WriteMessage("\nKhông truy cập được đối tượng. Polyline có thể đã bị xóa.");
-                    _isWaitingForApply = false;
-                    return;
-                }
+                // Gom điểm theo surface để Rebuild 1 lần duy nhất cho mỗi surface
+                Dictionary<ObjectId, List<Point3d>> surfaceNewPoints = new();
+                Dictionary<ObjectId, int> surfaceRemovedCount = new();
 
-                // Transform polyline vertices → world coordinates
-                List<Point3d> newWorldPoints = TransformPolylineVertices(sv, editedPoly, _station, al);
-
-                if (newWorldPoints.Count < 2)
-                {
-                    A.Ed.WriteMessage("\nKhông đủ điểm (cần ≥ 2).");
-                    tr.Abort();
-                    return;
-                }
-
-                // Step 1: Remove điểm cũ
-                int removedCount = 0;
-                foreach (Point3d pt in _oldWorldPoints)
+                foreach (SectionEditData edit in _pendingEdits)
                 {
                     try
                     {
-                        TinSurfaceVertex vertex = surface.FindVertexAtXY(pt.X, pt.Y);
-                        if (vertex != null)
+                        Polyline? editedPoly = tr.GetObject(edit.PolylineId, OpenMode.ForWrite) as Polyline;
+                        SectionView? sv = tr.GetObject(edit.SectionViewId, OpenMode.ForWrite) as SectionView;
+                        Alignment? al = tr.GetObject(edit.AlignmentId, OpenMode.ForWrite) as Alignment;
+                        CivSurface? surface = tr.GetObject(edit.SurfaceId, OpenMode.ForWrite) as CivSurface;
+
+                        if (editedPoly == null || sv == null || al == null || surface == null)
                         {
-                            surface.DeleteVertex(vertex);
-                            removedCount++;
+                            A.Ed.WriteMessage($"\n⚠ Bỏ qua station {edit.Station:F3} — đối tượng đã bị xóa.");
+                            failCount++;
+                            continue;
                         }
+
+                        // Transform polyline vertices → world coordinates
+                        List<Point3d> newWorldPoints = TransformPolylineVertices(sv, editedPoly, edit.Station, al);
+
+                        if (newWorldPoints.Count < 2)
+                        {
+                            A.Ed.WriteMessage($"\n⚠ Bỏ qua station {edit.Station:F3} — không đủ điểm (cần ≥ 2).");
+                            failCount++;
+                            continue;
+                        }
+
+                        // Remove điểm cũ
+                        int removedCount = 0;
+                        foreach (Point3d pt in edit.OldWorldPoints)
+                        {
+                            try
+                            {
+                                TinSurfaceVertex vertex = surface.FindVertexAtXY(pt.X, pt.Y);
+                                if (vertex != null)
+                                {
+                                    surface.DeleteVertex(vertex);
+                                    removedCount++;
+                                }
+                            }
+                            catch { }
+                        }
+
+                        // Gom điểm mới theo surface
+                        if (!surfaceNewPoints.ContainsKey(edit.SurfaceId))
+                        {
+                            surfaceNewPoints[edit.SurfaceId] = new List<Point3d>();
+                            surfaceRemovedCount[edit.SurfaceId] = 0;
+                        }
+                        surfaceNewPoints[edit.SurfaceId].AddRange(newWorldPoints);
+                        surfaceRemovedCount[edit.SurfaceId] += removedCount;
+
+                        totalRemoved += removedCount;
+                        totalAdded += newWorldPoints.Count;
+
+                        // Xóa polyline tạm
+                        editedPoly.Erase();
+                        successCount++;
+
+                        A.Ed.WriteMessage($"\n   ✓ Station {edit.Station:F3}: xóa {removedCount} cũ, thêm {newWorldPoints.Count} mới");
                     }
-                    catch { }
+                    catch (System.Exception ex)
+                    {
+                        A.Ed.WriteMessage($"\n⚠ Lỗi tại station {edit.Station:F3}: {ex.Message}");
+                        failCount++;
+                    }
                 }
-                A.Ed.WriteMessage($"\n🗑️ Đã xóa {removedCount}/{_oldWorldPoints.Count} điểm cũ.");
 
-                // Step 2: Add điểm mới
-                Point3dCollection pts = new();
-                foreach (Point3d pt in newWorldPoints) pts.Add(pt);
+                // Add tất cả điểm mới và Rebuild từng surface 1 lần
+                foreach (var kvp in surfaceNewPoints)
+                {
+                    CivSurface? surface = tr.GetObject(kvp.Key, OpenMode.ForWrite) as CivSurface;
+                    if (surface == null) continue;
 
-                surface.AddVertices(pts);
-                surface.Rebuild();
+                    Point3dCollection pts = new();
+                    foreach (Point3d pt in kvp.Value) pts.Add(pt);
 
-                A.Ed.WriteMessage($"\n✅ Đã thêm {newWorldPoints.Count} điểm mới vào surface '{surface.Name}'.");
+                    surface.AddVertices(pts);
+                    surface.Rebuild();
 
-                // Xóa polyline tạm
-                editedPoly.Erase();
-                A.Ed.WriteMessage("\n🗑️ Đã xóa polyline tạm.");
+                    A.Ed.WriteMessage($"\n📐 Surface '{surface.Name}': xóa {surfaceRemovedCount[kvp.Key]} cũ, thêm {kvp.Value.Count} mới → Rebuild ✓");
+                }
 
                 // Reset trạng thái
-                _isWaitingForApply = false;
-                _polylineId = ObjectId.Null;
+                _pendingEdits.Clear();
 
                 tr.Commit();
-                A.Ed.WriteMessage("\n✅ Hoàn thành điều chỉnh surface!");
+
+                A.Ed.WriteMessage("\n\n══════════════════════════════════════");
+                A.Ed.WriteMessage($"\n✅ Hoàn thành! {successCount} section thành công, {failCount} thất bại.");
+                A.Ed.WriteMessage($"\n   Tổng: xóa {totalRemoved} điểm cũ, thêm {totalAdded} điểm mới.");
+                A.Ed.WriteMessage("\n══════════════════════════════════════");
             }
             catch (Autodesk.AutoCAD.Runtime.Exception e)
             {
@@ -281,6 +336,72 @@ namespace Civil3DCsharp
             catch (System.Exception ex)
             {
                 A.Ed.WriteMessage($"\nLỗi: {ex.Message}\n{ex.StackTrace}");
+                tr.Abort();
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // LỆNH 3: Xem danh sách pending / Hủy tất cả
+        // ═══════════════════════════════════════════════════════════════
+        [CommandMethod("CTSU_DieuChinh_EG_TK_Status")]
+        public static void CTSUDieuChinhEGTKStatus()
+        {
+            if (_pendingEdits.Count == 0)
+            {
+                A.Ed.WriteMessage("\n📭 Không có polyline nào đang chờ apply.");
+                return;
+            }
+
+            A.Ed.WriteMessage($"\n\n📋 Danh sách {_pendingEdits.Count} polyline đang chờ apply:");
+            A.Ed.WriteMessage("\n──────────────────────────────────");
+            for (int i = 0; i < _pendingEdits.Count; i++)
+            {
+                var edit = _pendingEdits[i];
+                A.Ed.WriteMessage($"\n   #{i + 1}: Station {edit.Station:F3} | {edit.OldWorldPoints.Count} điểm");
+            }
+            A.Ed.WriteMessage("\n──────────────────────────────────");
+            A.Ed.WriteMessage("\n   Chạy CTSU_DieuChinh_EG_TK_Apply để apply tất cả.");
+            A.Ed.WriteMessage("\n   Chạy CTSU_DieuChinh_EG_TK_Cancel để hủy tất cả.");
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // LỆNH 4: Hủy tất cả pending edits + xóa polyline tạm
+        // ═══════════════════════════════════════════════════════════════
+        [CommandMethod("CTSU_DieuChinh_EG_TK_Cancel")]
+        public static void CTSUDieuChinhEGTKCancel()
+        {
+            if (_pendingEdits.Count == 0)
+            {
+                A.Ed.WriteMessage("\n📭 Không có gì để hủy.");
+                return;
+            }
+
+            using Transaction tr = A.Db.TransactionManager.StartTransaction();
+            try
+            {
+                int deleted = 0;
+                foreach (SectionEditData edit in _pendingEdits)
+                {
+                    try
+                    {
+                        Polyline? poly = tr.GetObject(edit.PolylineId, OpenMode.ForWrite) as Polyline;
+                        if (poly != null)
+                        {
+                            poly.Erase();
+                            deleted++;
+                        }
+                    }
+                    catch { }
+                }
+
+                _pendingEdits.Clear();
+                tr.Commit();
+
+                A.Ed.WriteMessage($"\n🗑️ Đã hủy và xóa {deleted} polyline tạm.");
+            }
+            catch (System.Exception ex)
+            {
+                A.Ed.WriteMessage($"\nLỗi: {ex.Message}");
                 tr.Abort();
             }
         }

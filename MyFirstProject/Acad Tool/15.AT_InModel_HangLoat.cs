@@ -1,5 +1,6 @@
 // (C) Copyright 2024 by T27
 // Lệnh in hàng loạt Model space - Tham khảo từ LISP INMODEL_TNC3D
+// Cập nhật: Quét chọn block cùng tên, nhóm theo Y, sắp xếp trái→phải, trên→dưới
 //
 using System;
 using System.Collections.Generic;
@@ -28,7 +29,7 @@ using DrawingFont = System.Drawing.Font;
 namespace Civil3DCsharp
 {
     /// <summary>
-    /// Class lưu thông tin điểm in
+    /// Class lưu thông tin điểm in (1 nhóm block cùng Y)
     /// </summary>
     public class PrintPointInfo
     {
@@ -45,20 +46,36 @@ namespace Civil3DCsharp
     }
 
     /// <summary>
+    /// Thông tin một nhóm block cùng Y (một hàng in)
+    /// </summary>
+    public class PrintRowInfo
+    {
+        public double YValue { get; set; }
+        public List<Point3d> BlockPositions { get; set; } = new();
+        public int RowIndex { get; set; }
+
+        /// <summary>
+        /// Số lượng block trong hàng = số bản in
+        /// </summary>
+        public int Count => BlockPositions.Count;
+    }
+
+    /// <summary>
     /// Form cấu hình in hàng loạt
     /// </summary>
     public class BatchPlotSettingsForm : Form
     {
         // Properties trả về kết quả
-        public List<PrintPointInfo> PrintPoints { get; private set; } = new();
+        public List<PrintRowInfo> PrintRows { get; private set; } = new();
         public string SelectedPrinter { get; private set; } = "PDF reDirect v2";
         public string SelectedPaperSize { get; private set; } = "A3";
         public double FrameWidth { get; private set; } = 84.0;
         public double FrameHeight { get; private set; } = 59.4;
-        public double Spacing { get; private set; } = 421.0;
         public string SelectedScale { get; private set; } = "5:1";
         public string SelectedCtb { get; private set; } = "monochrome.ctb";
         public bool IsLandscape { get; private set; } = true;
+        public string BlockName { get; set; } = "";
+        public List<ObjectId> SelectedBlockIds { get; set; } = new();
 
         // Controls
         private DataGridView dgvPrintPoints = null!;
@@ -66,15 +83,14 @@ namespace Civil3DCsharp
         private WinFormsComboBox cmbPaperSize = null!;
         private WinFormsTextBox txtFrameWidth = null!;
         private WinFormsTextBox txtFrameHeight = null!;
-        private WinFormsTextBox txtSpacing = null!;
         private WinFormsComboBox cmbScale = null!;
         private WinFormsComboBox cmbCtb = null!;
         private RadioButton rbLandscape = null!;
         private RadioButton rbPortrait = null!;
-        private WinFormsButton btnAddPoint = null!;
-        private WinFormsButton btnRemovePoint = null!;
-        private WinFormsButton btnImport = null!;
-        private WinFormsButton btnExport = null!;
+        private WinFormsButton btnSelectBlocks = null!;
+        private WinFormsButton btnPickBlock = null!;
+        private WinFormsTextBox txtBlockName = null!;
+        private WinFormsLabel lblBlockCount = null!;
         private WinFormsButton btnOK = null!;
         private WinFormsButton btnCancel = null!;
         private WinFormsLabel lblTotalPrints = null!;
@@ -83,14 +99,14 @@ namespace Civil3DCsharp
         private Editor _editor;
 
         // Static để lưu giá trị giữa các phiên
-        private static string _lastPrinter = "PDF reDirect v2";  // Mặc định như LISP
-        private static string _lastPaperSize = "A3";             // Mặc định như LISP
+        private static string _lastPrinter = "PDF reDirect v2";
+        private static string _lastPaperSize = "A3";
         private static double _lastFrameWidth = 84.0;
         private static double _lastFrameHeight = 59.4;
-        private static double _lastSpacing = 421.0;
         private static string _lastScale = "5:1";
         private static string _lastCtb = "monochrome.ctb";
         private static bool _lastIsLandscape = true;
+        public static string LastBlockName { get; set; } = "";
 
         // Paper sizes cho từng loại máy in
         private static readonly Dictionary<string, string[]> PrinterPaperSizes = new()
@@ -106,9 +122,10 @@ namespace Civil3DCsharp
             }}
         };
 
-        public BatchPlotSettingsForm(Editor editor)
+        public BatchPlotSettingsForm(Editor editor, string blockName)
         {
             _editor = editor;
+            BlockName = blockName;
             InitializeComponent();
             LoadDefaultValues();
         }
@@ -116,7 +133,7 @@ namespace Civil3DCsharp
         private void InitializeComponent()
         {
             this.Text = "🖨️ In Hàng Loạt Model - AT_InModel_HangLoat";
-            this.Size = new Size(750, 620);
+            this.Size = new Size(750, 680);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -125,10 +142,89 @@ namespace Civil3DCsharp
 
             int y = 15;
 
-            // ========== Group: Danh sách điểm in ==========
+            // ========== Group: Chọn Block ==========
+            var grpBlock = new GroupBox
+            {
+                Text = "📦 Chọn Block khung in",
+                Location = new Point(15, y),
+                Size = new Size(705, 85),
+                ForeColor = Color.FromArgb(0, 120, 215)
+            };
+
+            var lblBlockNameLabel = new WinFormsLabel
+            {
+                Text = "Tên Block:",
+                Location = new Point(10, 28),
+                Size = new Size(75, 23),
+                ForeColor = Color.Black
+            };
+
+            txtBlockName = new WinFormsTextBox
+            {
+                Location = new Point(90, 25),
+                Size = new Size(180, 25),
+                Text = BlockName,
+                ReadOnly = true,
+                BackColor = Color.FromArgb(240, 240, 240)
+            };
+
+            btnPickBlock = new WinFormsButton
+            {
+                Text = "🔄 Đổi Block",
+                Location = new Point(280, 23),
+                Size = new Size(100, 28),
+                BackColor = Color.FromArgb(108, 117, 125),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
+            };
+            btnPickBlock.FlatAppearance.BorderSize = 0;
+            btnPickBlock.Click += BtnPickBlock_Click;
+
+            btnSelectBlocks = new WinFormsButton
+            {
+                Text = "📍 Quét chọn Block",
+                Location = new Point(390, 23),
+                Size = new Size(140, 28),
+                BackColor = Color.FromArgb(40, 167, 69),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
+            };
+            btnSelectBlocks.FlatAppearance.BorderSize = 0;
+            btnSelectBlocks.Click += BtnSelectBlocks_Click;
+
+            lblBlockCount = new WinFormsLabel
+            {
+                Text = "Đã chọn: 0 block",
+                Location = new Point(540, 28),
+                Size = new Size(150, 23),
+                ForeColor = Color.FromArgb(0, 120, 215),
+                Font = new DrawingFont("Segoe UI", 9, FontStyle.Bold)
+            };
+
+            var lblBlockNote = new WinFormsLabel
+            {
+                Text = "💡 Chọn Block mẫu (🔄) → Quét chọn tất cả block cùng tên (📍). Điểm đặt block = góc trái dưới khung in.",
+                Location = new Point(10, 55),
+                Size = new Size(680, 20),
+                ForeColor = Color.Gray,
+                Font = new DrawingFont("Segoe UI", 8f)
+            };
+
+            grpBlock.Controls.Add(lblBlockNameLabel);
+            grpBlock.Controls.Add(txtBlockName);
+            grpBlock.Controls.Add(btnPickBlock);
+            grpBlock.Controls.Add(btnSelectBlocks);
+            grpBlock.Controls.Add(lblBlockCount);
+            grpBlock.Controls.Add(lblBlockNote);
+
+            y += 95;
+
+            // ========== Group: Danh sách điểm in (nhóm theo Y) ==========
             var grpPoints = new GroupBox
             {
-                Text = "📍 Danh sách điểm in",
+                Text = "📍 Danh sách điểm in (nhóm theo hàng Y)",
                 Location = new Point(15, y),
                 Size = new Size(705, 200),
                 ForeColor = Color.FromArgb(0, 120, 215)
@@ -137,101 +233,36 @@ namespace Civil3DCsharp
             dgvPrintPoints = new DataGridView
             {
                 Location = new Point(10, 25),
-                Size = new Size(480, 160),
+                Size = new Size(580, 160),
                 AllowUserToAddRows = false,
                 AllowUserToDeleteRows = false,
-                ReadOnly = false,
+                ReadOnly = true,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 MultiSelect = false,
                 RowHeadersVisible = false,
                 BackgroundColor = Color.White,
                 BorderStyle = BorderStyle.FixedSingle
             };
-            dgvPrintPoints.Columns.Add("STT", "STT");
-            dgvPrintPoints.Columns.Add("X", "X");
-            dgvPrintPoints.Columns.Add("Y", "Y");
-            dgvPrintPoints.Columns.Add("Quantity", "Số lượng");
-            dgvPrintPoints.Columns["STT"].Width = 50;
-            dgvPrintPoints.Columns["STT"].ReadOnly = true;
-            dgvPrintPoints.Columns["X"].Width = 130;
-            dgvPrintPoints.Columns["X"].ReadOnly = true;
-            dgvPrintPoints.Columns["Y"].Width = 130;
-            dgvPrintPoints.Columns["Y"].ReadOnly = true;
-            dgvPrintPoints.Columns["Quantity"].Width = 80;
-            dgvPrintPoints.CellEndEdit += DgvPrintPoints_CellEndEdit;
-
-            int btnX = 505;
-            int btnY = 25;
-            int btnHeight = 32;
-            int btnSpacing = 38;
-
-            btnAddPoint = new WinFormsButton
-            {
-                Text = "➕ Thêm điểm",
-                Location = new Point(btnX, btnY),
-                Size = new Size(95, btnHeight),
-                BackColor = Color.FromArgb(40, 167, 69),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Cursor = Cursors.Hand
-            };
-            btnAddPoint.FlatAppearance.BorderSize = 0;
-            btnAddPoint.Click += BtnAddPoint_Click;
-
-            btnRemovePoint = new WinFormsButton
-            {
-                Text = "➖ Xóa điểm",
-                Location = new Point(btnX, btnY + btnSpacing),
-                Size = new Size(95, btnHeight),
-                BackColor = Color.FromArgb(220, 53, 69),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Cursor = Cursors.Hand
-            };
-            btnRemovePoint.FlatAppearance.BorderSize = 0;
-            btnRemovePoint.Click += BtnRemovePoint_Click;
-
-            btnImport = new WinFormsButton
-            {
-                Text = "📥 Nhập CSV",
-                Location = new Point(btnX, btnY + btnSpacing * 2),
-                Size = new Size(95, btnHeight),
-                BackColor = Color.FromArgb(23, 162, 184),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Cursor = Cursors.Hand
-            };
-            btnImport.FlatAppearance.BorderSize = 0;
-            btnImport.Click += BtnImport_Click;
-
-            btnExport = new WinFormsButton
-            {
-                Text = "📤 Xuất CSV",
-                Location = new Point(btnX, btnY + btnSpacing * 3),
-                Size = new Size(95, btnHeight),
-                BackColor = Color.FromArgb(255, 193, 7),
-                ForeColor = Color.Black,
-                FlatStyle = FlatStyle.Flat,
-                Cursor = Cursors.Hand
-            };
-            btnExport.FlatAppearance.BorderSize = 0;
-            btnExport.Click += BtnExport_Click;
+            dgvPrintPoints.Columns.Add("RowIdx", "Hàng");
+            dgvPrintPoints.Columns.Add("YValue", "Tọa độ Y");
+            dgvPrintPoints.Columns.Add("Count", "Số bản");
+            dgvPrintPoints.Columns.Add("XRange", "Phạm vi X");
+            dgvPrintPoints.Columns["RowIdx"].Width = 55;
+            dgvPrintPoints.Columns["YValue"].Width = 120;
+            dgvPrintPoints.Columns["Count"].Width = 80;
+            dgvPrintPoints.Columns["XRange"].Width = 310;
 
             lblTotalPrints = new WinFormsLabel
             {
-                Text = "Tổng: 0 bản",
-                Location = new Point(btnX + 100, btnY),
-                Size = new Size(90, 60),
+                Text = "Tổng:\n0 bản\n0 hàng",
+                Location = new Point(600, 25),
+                Size = new Size(95, 80),
                 Font = new DrawingFont("Segoe UI", 10, FontStyle.Bold),
                 ForeColor = Color.FromArgb(0, 120, 215),
                 TextAlign = ContentAlignment.TopLeft
             };
 
             grpPoints.Controls.Add(dgvPrintPoints);
-            grpPoints.Controls.Add(btnAddPoint);
-            grpPoints.Controls.Add(btnRemovePoint);
-            grpPoints.Controls.Add(btnImport);
-            grpPoints.Controls.Add(btnExport);
             grpPoints.Controls.Add(lblTotalPrints);
 
             y += 210;
@@ -241,7 +272,7 @@ namespace Civil3DCsharp
             {
                 Text = "⚙️ Cài đặt in",
                 Location = new Point(15, y),
-                Size = new Size(350, 300),
+                Size = new Size(350, 290),
                 ForeColor = Color.FromArgb(0, 120, 215)
             };
 
@@ -265,7 +296,7 @@ namespace Civil3DCsharp
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
             cmbPrinter.Items.AddRange(new object[] {
-                "PDF reDirect v2",  // Mặc định đầu tiên như LISP
+                "PDF reDirect v2",
                 "Microsoft Print to PDF",
                 "AutoCAD PDF (General Documentation).pc3"
             });
@@ -375,7 +406,7 @@ namespace Civil3DCsharp
             {
                 Text = "📐 Kích thước khung in",
                 Location = new Point(380, y),
-                Size = new Size(340, 300),
+                Size = new Size(340, 290),
                 ForeColor = Color.FromArgb(0, 120, 215)
             };
 
@@ -420,43 +451,25 @@ namespace Civil3DCsharp
             grpFrame.Controls.Add(lblFrameHeight);
             grpFrame.Controls.Add(txtFrameHeight);
 
-            frameY += 40;
-
-            // Khoảng cách
-            var lblSpacing = new WinFormsLabel
-            {
-                Text = "Khoảng cách (mm):",
-                Location = new Point(frameLabelX, frameY + 3),
-                Size = new Size(130, 23),
-                ForeColor = Color.Black
-            };
-            txtSpacing = new WinFormsTextBox
-            {
-                Location = new Point(frameControlX, frameY),
-                Size = new Size(frameControlWidth, 25),
-                Text = "421"
-            };
-            grpFrame.Controls.Add(lblSpacing);
-            grpFrame.Controls.Add(txtSpacing);
-
             frameY += 50;
 
             // Ghi chú
             var lblNote = new WinFormsLabel
             {
                 Text = "💡 Ghi chú:\n" +
-                       "- Điểm chọn là góc trái dưới\n" +
-                       "- Các bản vẽ in theo hướng X+\n" +
-                       "- Khoảng cách tính từ điểm đầu\n" +
-                       "  của bản vẽ này đến bản kế tiếp",
+                       "- Điểm đặt block = góc trái dưới\n" +
+                       "- Nhóm cùng Y (dung sai 0.5)\n" +
+                       "- In: Trái→Phải, Trên→Dưới\n" +
+                       "- Kích thước khung = vùng in\n" +
+                       "  quanh mỗi điểm đặt block",
                 Location = new Point(frameLabelX, frameY),
-                Size = new Size(300, 100),
+                Size = new Size(300, 120),
                 ForeColor = Color.Gray,
                 Font = new DrawingFont("Segoe UI", 8.5f)
             };
             grpFrame.Controls.Add(lblNote);
 
-            y += 310;
+            y += 300;
 
             // ========== Buttons OK/Cancel ==========
             btnOK = new WinFormsButton
@@ -488,6 +501,7 @@ namespace Civil3DCsharp
             btnCancel.Click += (s, e) => { this.DialogResult = DialogResult.Cancel; this.Close(); };
 
             // Add controls
+            this.Controls.Add(grpBlock);
             this.Controls.Add(grpPoints);
             this.Controls.Add(grpSettings);
             this.Controls.Add(grpFrame);
@@ -514,11 +528,9 @@ namespace Civil3DCsharp
             }
             else
             {
-                // Default paper sizes nếu không tìm thấy máy in
                 cmbPaperSize.Items.AddRange(new object[] { "A0", "A1", "A2", "A3", "A4" });
             }
 
-            // Chọn A3 nếu có, hoặc item đầu tiên
             int a3Index = -1;
             for (int i = 0; i < cmbPaperSize.Items.Count; i++)
             {
@@ -537,8 +549,6 @@ namespace Civil3DCsharp
 
         private void LoadDefaultValues()
         {
-            // Kiểm tra và reset về mặc định nếu cần
-            // Đảm bảo mặc định là "PDF reDirect v2" như LISP
             bool printerFound = false;
             for (int i = 0; i < cmbPrinter.Items.Count; i++)
             {
@@ -550,19 +560,17 @@ namespace Civil3DCsharp
                 }
             }
             
-            // Nếu không tìm thấy, chọn PDF reDirect v2 (item đầu tiên)
             if (!printerFound && cmbPrinter.Items.Count > 0)
             {
-                cmbPrinter.SelectedIndex = 0; // PDF reDirect v2 là item đầu tiên
+                cmbPrinter.SelectedIndex = 0;
                 _lastPrinter = cmbPrinter.Items[0]?.ToString() ?? "PDF reDirect v2";
             }
             
-            UpdatePaperSizeList();  // Cập nhật paper size list
+            UpdatePaperSizeList();
             SelectComboItemExact(cmbPaperSize, _lastPaperSize);
             
             txtFrameWidth.Text = _lastFrameWidth.ToString("F1");
             txtFrameHeight.Text = _lastFrameHeight.ToString("F1");
-            txtSpacing.Text = _lastSpacing.ToString("F1");
             SelectComboItemExact(cmbScale, _lastScale);
             SelectComboItemExact(cmbCtb, _lastCtb);
             rbLandscape.Checked = _lastIsLandscape;
@@ -571,7 +579,6 @@ namespace Civil3DCsharp
 
         private void SelectComboItemExact(WinFormsComboBox combo, string value)
         {
-            // Ưu tiên exact match trước
             for (int i = 0; i < combo.Items.Count; i++)
             {
                 if (combo.Items[i]?.ToString() == value)
@@ -581,7 +588,6 @@ namespace Civil3DCsharp
                 }
             }
             
-            // Nếu không có exact match, tìm contains
             for (int i = 0; i < combo.Items.Count; i++)
             {
                 string? item = combo.Items[i]?.ToString();
@@ -592,44 +598,52 @@ namespace Civil3DCsharp
                 }
             }
             
-            // Mặc định chọn item đầu
             if (combo.Items.Count > 0)
                 combo.SelectedIndex = 0;
         }
 
-        private void BtnAddPoint_Click(object? sender, EventArgs e)
+        /// <summary>
+        /// Pick block mẫu để lấy tên
+        /// </summary>
+        private void BtnPickBlock_Click(object? sender, EventArgs e)
         {
-            // Hide form to allow point picking
             this.Hide();
-            
+
             try
             {
-                // Prompt for point
-                PromptPointOptions ppo = new PromptPointOptions("\n📍 Chọn điểm góc trái dưới của khung in (hoặc Esc để hủy):");
-                ppo.AllowNone = true;
-                PromptPointResult ppr = _editor.GetPoint(ppo);
+                Document doc = Application.DocumentManager.MdiActiveDocument;
+                Database db = doc.Database;
+                Editor ed = doc.Editor;
 
-                if (ppr.Status == PromptStatus.OK)
+                PromptEntityOptions peo = new PromptEntityOptions("\n📍 Chọn Block mẫu (khung in):");
+                peo.SetRejectMessage("\n⚠️ Vui lòng chọn Block!");
+                peo.AddAllowedClass(typeof(BlockReference), true);
+
+                PromptEntityResult per = ed.GetEntity(peo);
+
+                if (per.Status == PromptStatus.OK)
                 {
-                    // Prompt for quantity
-                    PromptIntegerOptions pio = new PromptIntegerOptions("\n🔢 Nhập số lượng bản vẽ:");
-                    pio.DefaultValue = 1;
-                    pio.LowerLimit = 1;
-                    pio.UpperLimit = 1000;
-                    PromptIntegerResult pir = _editor.GetInteger(pio);
-
-                    int quantity = pir.Status == PromptStatus.OK ? pir.Value : 1;
-
-                    // Add to grid
-                    int index = dgvPrintPoints.Rows.Count + 1;
-                    dgvPrintPoints.Rows.Add(index, ppr.Value.X.ToString("F2"), ppr.Value.Y.ToString("F2"), quantity);
-
-                    // Add to list
-                    PrintPoints.Add(new PrintPointInfo(index, ppr.Value, quantity));
-
-                    UpdateTotalPrints();
-
-                    _editor.WriteMessage($"\n✅ Đã thêm điểm {index}: ({ppr.Value.X:F2}, {ppr.Value.Y:F2}) - Số lượng: {quantity}");
+                    using (Transaction tr = db.TransactionManager.StartTransaction())
+                    {
+                        BlockReference blkRef = tr.GetObject(per.ObjectId, OpenMode.ForRead) as BlockReference;
+                        if (blkRef != null)
+                        {
+                            BlockTableRecord btr = tr.GetObject(blkRef.BlockTableRecord, OpenMode.ForRead) as BlockTableRecord;
+                            if (btr != null)
+                            {
+                                BlockName = btr.Name;
+                                txtBlockName.Text = BlockName;
+                                LastBlockName = BlockName;
+                                SelectedBlockIds.Clear();
+                                PrintRows.Clear();
+                                dgvPrintPoints.Rows.Clear();
+                                lblBlockCount.Text = "Đã chọn: 0 block";
+                                UpdateTotalPrints();
+                                ed.WriteMessage($"\n✅ Đã chọn Block mẫu: {BlockName}");
+                            }
+                        }
+                        tr.Commit();
+                    }
                 }
             }
             catch (System.Exception ex)
@@ -638,149 +652,135 @@ namespace Civil3DCsharp
             }
             finally
             {
-                // Show form again
                 this.Show();
                 this.BringToFront();
                 this.Focus();
             }
         }
 
-        private void BtnRemovePoint_Click(object? sender, EventArgs e)
+        /// <summary>
+        /// Quét chọn các block cùng tên, nhóm theo Y, sắp xếp trái→phải
+        /// </summary>
+        private void BtnSelectBlocks_Click(object? sender, EventArgs e)
         {
-            if (dgvPrintPoints.SelectedRows.Count > 0)
+            if (string.IsNullOrWhiteSpace(BlockName))
             {
-                int selectedIndex = dgvPrintPoints.SelectedRows[0].Index;
-                dgvPrintPoints.Rows.RemoveAt(selectedIndex);
-                
-                if (selectedIndex < PrintPoints.Count)
-                    PrintPoints.RemoveAt(selectedIndex);
-
-                // Renumber
-                for (int i = 0; i < dgvPrintPoints.Rows.Count; i++)
-                {
-                    dgvPrintPoints.Rows[i].Cells["STT"].Value = i + 1;
-                    if (i < PrintPoints.Count)
-                        PrintPoints[i].Index = i + 1;
-                }
-
-                UpdateTotalPrints();
-            }
-        }
-
-        private void BtnImport_Click(object? sender, EventArgs e)
-        {
-            using var ofd = new OpenFileDialog
-            {
-                Title = "Nhập danh sách điểm in",
-                Filter = "CSV files (*.csv)|*.csv|Text files (*.txt)|*.txt|All files (*.*)|*.*",
-                DefaultExt = "csv"
-            };
-
-            if (ofd.ShowDialog() == DialogResult.OK)
-            {
-                try
-                {
-                    var lines = File.ReadAllLines(ofd.FileName);
-                    int imported = 0;
-
-                    // Clear existing
-                    dgvPrintPoints.Rows.Clear();
-                    PrintPoints.Clear();
-
-                    foreach (var line in lines)
-                    {
-                        if (string.IsNullOrWhiteSpace(line)) continue;
-                        if (line.StartsWith("STT") || line.StartsWith("#")) continue; // Skip header
-
-                        var parts = line.Split(new[] { ',', '\t', ';' }, StringSplitOptions.RemoveEmptyEntries);
-                        if (parts.Length >= 3)
-                        {
-                            // Format: X, Y, Quantity (or STT, X, Y, Quantity)
-                            int startIdx = parts.Length >= 4 ? 1 : 0;
-                            
-                            if (double.TryParse(parts[startIdx], out double x) &&
-                                double.TryParse(parts[startIdx + 1], out double y) &&
-                                int.TryParse(parts[startIdx + 2], out int qty))
-                            {
-                                int index = PrintPoints.Count + 1;
-                                dgvPrintPoints.Rows.Add(index, x.ToString("F2"), y.ToString("F2"), qty);
-                                PrintPoints.Add(new PrintPointInfo(index, new Point3d(x, y, 0), qty));
-                                imported++;
-                            }
-                        }
-                    }
-
-                    UpdateTotalPrints();
-                    MessageBox.Show($"Đã nhập {imported} điểm thành công!", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-                catch (System.Exception ex)
-                {
-                    MessageBox.Show($"Lỗi nhập file: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-            }
-        }
-
-        private void BtnExport_Click(object? sender, EventArgs e)
-        {
-            if (PrintPoints.Count == 0)
-            {
-                MessageBox.Show("Không có điểm nào để xuất!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Vui lòng chọn Block mẫu trước (nút 🔄 Đổi Block)!", "Thông báo",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            using var sfd = new SaveFileDialog
-            {
-                Title = "Xuất danh sách điểm in",
-                Filter = "CSV files (*.csv)|*.csv|Text files (*.txt)|*.txt",
-                DefaultExt = "csv",
-                FileName = "PrintPoints_" + DateTime.Now.ToString("yyyyMMdd_HHmmss")
-            };
+            this.Hide();
 
-            if (sfd.ShowDialog() == DialogResult.OK)
+            try
             {
-                try
+                Document doc = Application.DocumentManager.MdiActiveDocument;
+                Database db = doc.Database;
+                Editor ed = doc.Editor;
+
+                // Tạo filter để chọn block theo tên (giống lệnh 18)
+                TypedValue[] filterList = new TypedValue[]
                 {
-                    using var sw = new StreamWriter(sfd.FileName);
-                    sw.WriteLine("STT,X,Y,SoLuong");
-                    
-                    foreach (var point in PrintPoints)
+                    new TypedValue((int)DxfCode.Start, "INSERT"),
+                    new TypedValue((int)DxfCode.BlockName, BlockName)
+                };
+                SelectionFilter filter = new SelectionFilter(filterList);
+
+                PromptSelectionOptions pso = new PromptSelectionOptions();
+                pso.MessageForAdding = $"\n📍 Quét chọn các Block '{BlockName}' cần in:";
+                pso.AllowDuplicates = false;
+
+                PromptSelectionResult psr = ed.GetSelection(pso, filter);
+
+                if (psr.Status == PromptStatus.OK)
+                {
+                    SelectionSet ss = psr.Value;
+                    SelectedBlockIds.Clear();
+
+                    // Thu thập vị trí các block
+                    var blockPositions = new List<Point3d>();
+
+                    using (Transaction tr = db.TransactionManager.StartTransaction())
                     {
-                        sw.WriteLine($"{point.Index},{point.StartPoint.X:F2},{point.StartPoint.Y:F2},{point.Quantity}");
+                        foreach (SelectedObject so in ss)
+                        {
+                            if (so != null)
+                            {
+                                SelectedBlockIds.Add(so.ObjectId);
+                                BlockReference blkRef = tr.GetObject(so.ObjectId, OpenMode.ForRead) as BlockReference;
+                                if (blkRef != null)
+                                {
+                                    blockPositions.Add(blkRef.Position);
+                                }
+                            }
+                        }
+                        tr.Commit();
                     }
 
-                    MessageBox.Show($"Đã xuất {PrintPoints.Count} điểm thành công!\n{sfd.FileName}", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-                catch (System.Exception ex)
-                {
-                    MessageBox.Show($"Lỗi xuất file: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    // Nhóm theo Y (dung sai 0.5) - giống lệnh 18
+                    double yTolerance = 0.5;
+                    var yGroups = blockPositions
+                        .GroupBy(p => Math.Round(p.Y / yTolerance) * yTolerance)
+                        .OrderByDescending(g => g.Key)  // Trên→Dưới (Y cao trước)
+                        .ToList();
+
+                    // Tạo PrintRows
+                    PrintRows.Clear();
+                    dgvPrintPoints.Rows.Clear();
+                    int rowIdx = 1;
+
+                    foreach (var group in yGroups)
+                    {
+                        var sortedPositions = group.OrderBy(p => p.X).ToList(); // Trái→Phải
+
+                        var row = new PrintRowInfo
+                        {
+                            YValue = group.Key,
+                            BlockPositions = sortedPositions,
+                            RowIndex = rowIdx
+                        };
+                        PrintRows.Add(row);
+
+                        // Hiển thị trên DataGridView
+                        double minX = sortedPositions.First().X;
+                        double maxX = sortedPositions.Last().X;
+                        string xRange = sortedPositions.Count == 1
+                            ? $"X = {minX:F1}"
+                            : $"X: {minX:F1} → {maxX:F1}";
+
+                        dgvPrintPoints.Rows.Add(rowIdx, group.Key.ToString("F1"), sortedPositions.Count, xRange);
+                        rowIdx++;
+                    }
+
+                    UpdateTotalPrints();
+                    lblBlockCount.Text = $"Đã chọn: {SelectedBlockIds.Count} block";
+                    ed.WriteMessage($"\n✅ Đã chọn {SelectedBlockIds.Count} block '{BlockName}' → {PrintRows.Count} hàng");
                 }
             }
-        }
-
-        private void DgvPrintPoints_CellEndEdit(object? sender, DataGridViewCellEventArgs e)
-        {
-            if (e.ColumnIndex == 3 && e.RowIndex >= 0 && e.RowIndex < PrintPoints.Count) // Quantity column
+            catch (System.Exception ex)
             {
-                if (int.TryParse(dgvPrintPoints.Rows[e.RowIndex].Cells["Quantity"].Value?.ToString(), out int qty))
-                {
-                    PrintPoints[e.RowIndex].Quantity = qty;
-                    UpdateTotalPrints();
-                }
+                _editor.WriteMessage($"\n❌ Lỗi: {ex.Message}");
+            }
+            finally
+            {
+                this.Show();
+                this.BringToFront();
+                this.Focus();
             }
         }
 
         private void UpdateTotalPrints()
         {
-            int total = PrintPoints.Sum(p => p.Quantity);
-            lblTotalPrints.Text = $"Tổng:\n{total} bản";
+            int total = PrintRows.Sum(r => r.Count);
+            lblTotalPrints.Text = $"Tổng:\n{total} bản\n{PrintRows.Count} hàng";
         }
 
         private void BtnOK_Click(object? sender, EventArgs e)
         {
             // Validate
-            if (PrintPoints.Count == 0)
+            if (PrintRows.Count == 0)
             {
-                MessageBox.Show("Vui lòng thêm ít nhất một điểm in!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Vui lòng quét chọn các block trước!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -798,19 +798,11 @@ namespace Civil3DCsharp
                 return;
             }
 
-            if (!double.TryParse(txtSpacing.Text, out double spacing) || spacing <= 0)
-            {
-                MessageBox.Show("Khoảng cách phải là số dương!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                txtSpacing.Focus();
-                return;
-            }
-
             // Save values
             SelectedPrinter = cmbPrinter.SelectedItem?.ToString() ?? "PDF reDirect v2";
             SelectedPaperSize = cmbPaperSize.SelectedItem?.ToString() ?? "A3";
             FrameWidth = frameWidth;
             FrameHeight = frameHeight;
-            Spacing = spacing;
             SelectedScale = cmbScale.SelectedItem?.ToString() ?? "5:1";
             SelectedCtb = cmbCtb.SelectedItem?.ToString() ?? "monochrome.ctb";
             IsLandscape = rbLandscape.Checked;
@@ -820,7 +812,6 @@ namespace Civil3DCsharp
             _lastPaperSize = SelectedPaperSize;
             _lastFrameWidth = FrameWidth;
             _lastFrameHeight = FrameHeight;
-            _lastSpacing = Spacing;
             _lastScale = SelectedScale;
             _lastCtb = SelectedCtb;
             _lastIsLandscape = IsLandscape;
@@ -854,12 +845,48 @@ namespace Civil3DCsharp
                     return;
                 }
 
-                // Hiển thị form
-                List<PrintPointInfo> printPoints;
-                string printer, paperSize, scale, ctb, orientation;
-                double frameWidth, frameHeight, spacing;
+                // Bước 1: Chọn block mẫu (nếu chưa có)
+                string blockName = BatchPlotSettingsForm.LastBlockName ?? "";
 
-                using (var form = new BatchPlotSettingsForm(ed))
+                if (string.IsNullOrEmpty(blockName))
+                {
+                    // Pick block mẫu
+                    PromptEntityOptions peo = new PromptEntityOptions("\n📍 Chọn Block khung in mẫu:");
+                    peo.SetRejectMessage("\n⚠️ Vui lòng chọn Block!");
+                    peo.AddAllowedClass(typeof(BlockReference), true);
+
+                    PromptEntityResult per = ed.GetEntity(peo);
+
+                    if (per.Status != PromptStatus.OK)
+                    {
+                        ed.WriteMessage("\n❌ Đã hủy lệnh.");
+                        return;
+                    }
+
+                    using (Transaction tr = db.TransactionManager.StartTransaction())
+                    {
+                        BlockReference blkRef = tr.GetObject(per.ObjectId, OpenMode.ForRead) as BlockReference;
+                        if (blkRef != null)
+                        {
+                            BlockTableRecord btr = tr.GetObject(blkRef.BlockTableRecord, OpenMode.ForRead) as BlockTableRecord;
+                            if (btr != null)
+                            {
+                                blockName = btr.Name;
+                                BatchPlotSettingsForm.LastBlockName = blockName;
+                            }
+                        }
+                        tr.Commit();
+                    }
+                }
+
+                ed.WriteMessage($"\n📦 Block mẫu: {blockName}");
+
+                // Bước 2: Hiển thị form
+                List<PrintRowInfo> printRows;
+                string printer, paperSize, scale, ctb, orientation;
+                double frameWidth, frameHeight;
+
+                using (var form = new BatchPlotSettingsForm(ed, blockName))
                 {
                     if (form.ShowDialog() != DialogResult.OK)
                     {
@@ -868,68 +895,64 @@ namespace Civil3DCsharp
                     }
 
                     // Lấy thông tin từ form
-                    printPoints = new List<PrintPointInfo>(form.PrintPoints); // Clone list
+                    printRows = new List<PrintRowInfo>(form.PrintRows);
                     printer = form.SelectedPrinter;
                     paperSize = form.SelectedPaperSize;
                     frameWidth = form.FrameWidth;
                     frameHeight = form.FrameHeight;
-                    spacing = form.Spacing;
                     scale = form.SelectedScale;
                     ctb = form.SelectedCtb;
                     orientation = form.IsLandscape ? "Landscape" : "Portrait";
                 }
 
+                int totalPrints = printRows.Sum(r => r.Count);
+
                 ed.WriteMessage($"\n\n📋 Thông tin in:");
                 ed.WriteMessage($"\n   - Máy in: {printer}");
                 ed.WriteMessage($"\n   - Kích thước giấy: {paperSize}");
                 ed.WriteMessage($"\n   - Kích thước khung: {frameWidth} x {frameHeight} mm");
-                ed.WriteMessage($"\n   - Khoảng cách: {spacing} mm");
                 ed.WriteMessage($"\n   - Tỷ lệ: {scale}");
                 ed.WriteMessage($"\n   - CTB: {ctb}");
                 ed.WriteMessage($"\n   - Hướng: {orientation}");
-                ed.WriteMessage($"\n   - Số điểm in: {printPoints.Count}");
-                ed.WriteMessage($"\n   - Tổng số bản in: {printPoints.Sum(p => p.Quantity)}");
+                ed.WriteMessage($"\n   - Số hàng: {printRows.Count}");
+                ed.WriteMessage($"\n   - Tổng số bản in: {totalPrints}");
 
-                // Xây dựng tất cả lệnh in thành một chuỗi LISP duy nhất
-                // Sử dụng (progn ...) để đảm bảo tất cả lệnh thực thi liên tiếp
+                // Bước 3: Xây dựng lệnh in LISP
+                // Thứ tự: Trái→Phải trong mỗi hàng, Trên→Dưới giữa các hàng
                 var allCommands = new System.Text.StringBuilder();
-                int totalPrinted = 0;
+                int printedCount = 0;
 
-                // Bắt đầu block progn
                 allCommands.AppendLine("(progn ");
 
-                foreach (var pointInfo in printPoints)
+                foreach (var row in printRows)
                 {
-                    ed.WriteMessage($"\n\n📍 Chuẩn bị in từ điểm {pointInfo.Index}: ({pointInfo.StartPoint.X:F2}, {pointInfo.StartPoint.Y:F2}) - Số lượng: {pointInfo.Quantity}");
+                    ed.WriteMessage($"\n\n📍 Hàng {row.RowIndex} (Y ≈ {row.YValue:F1}) - {row.Count} bản:");
 
-                    for (int i = 0; i < pointInfo.Quantity; i++)
+                    foreach (var pos in row.BlockPositions)
                     {
-                        // Tính điểm p3, p4 cho mỗi bản vẽ (giống LISP)
-                        double offsetX = spacing * i;
-                        double p3X = pointInfo.StartPoint.X + offsetX;
-                        double p3Y = pointInfo.StartPoint.Y;
+                        // Điểm đặt block = góc trái dưới
+                        double p3X = pos.X;
+                        double p3Y = pos.Y;
                         double p4X = p3X + frameWidth;
                         double p4Y = p3Y + frameHeight;
 
-                        // Thêm lệnh -PLOT cho bản vẽ này
-                        AppendPlotCommand(allCommands, 
+                        AppendPlotCommand(allCommands,
                             printer, paperSize, orientation,
                             p3X, p3Y, p4X, p4Y,
                             scale, ctb);
 
-                        totalPrinted++;
-                        ed.WriteMessage($"\n   📄 Bản vẽ {i + 1}/{pointInfo.Quantity}: Window ({p3X:F0},{p3Y:F0}) to ({p4X:F0},{p4Y:F0})");
+                        printedCount++;
+                        ed.WriteMessage($"\n   📄 Bản {printedCount}: ({p3X:F0},{p3Y:F0}) → ({p4X:F0},{p4Y:F0})");
                     }
                 }
 
-                // Đóng block progn
                 allCommands.AppendLine("(princ)) ");
 
                 // Gửi tất cả lệnh một lần
-                ed.WriteMessage($"\n\n🚀 Đang gửi {totalPrinted} lệnh in...");
+                ed.WriteMessage($"\n\n🚀 Đang gửi {printedCount} lệnh in...");
                 doc.SendStringToExecute(allCommands.ToString(), true, false, false);
 
-                ed.WriteMessage($"\n\n🎉 Đã gửi lệnh in cho {totalPrinted} bản vẽ!");
+                ed.WriteMessage($"\n\n🎉 Đã gửi lệnh in cho {printedCount} bản vẽ!");
                 ed.WriteMessage("\n💡 Vui lòng đợi quá trình in hoàn tất.");
             }
             catch (System.Exception ex)
@@ -948,9 +971,6 @@ namespace Civil3DCsharp
             double p3X, double p3Y, double p4X, double p4Y,
             string scale, string ctb)
         {
-            // Sử dụng LISP (command ...) syntax để đảm bảo đồng bộ như LISP gốc
-            // Format: (command "-PLOT" "Y" "" "printer" "papersize" "Millimeters" ...)
-            
             sb.Append("(command \"-PLOT\" ");
             sb.Append("\"Y\" ");           // Detailed plot configuration? Yes
             sb.Append("\"\" ");            // Layout name (empty = current/Model)
