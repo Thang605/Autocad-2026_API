@@ -4,13 +4,15 @@ using System.Runtime.InteropServices;
 using Autodesk.AutoCAD.Runtime;
 using AcadApp = Autodesk.AutoCAD.ApplicationServices.Application;
 
-[assembly: CommandClass(typeof(MyFirstProject.ClassicMenu))]
+// [assembly: CommandClass(typeof(MyFirstProject.ClassicMenu))]
+// ⚠️ File này đã được thay thế bởi MenuLoader.cs + MenuConfig.json
+// Giữ lại làm backup. Dùng lệnh SHOW_MENU_OLD nếu cần quay lại bản cũ.
 
 namespace MyFirstProject
 {
     public class ClassicMenu
     {
-        [CommandMethod("SHOW_MENU")]
+        [CommandMethod("SHOW_MENU_OLD")]
         public static void ShowMenu()
         {
             CreateMenuGeneric("Civil tool", BuildCivilToolStructure);
@@ -161,9 +163,8 @@ namespace MyFirstProject
             AddMenuItem(subMenuSample, "Đổi Tên Cọc Theo Thứ Tự", "CTS_DoiTenCoc_TheoThuTu ");
             AddMenuItem(subMenuSample, "Đổi Tên Cọc H", "CTS_DoiTenCoc_H ");
             AddHeader(subMenuSample, "--- Bảng tọa độ/Update ---");
-            AddMenuItem(subMenuSample, "Tạo Bảng Tọa Độ Cọc", "CTS_TaoBang_ToaDoCoc ");
-            AddMenuItem(subMenuSample, "Tạo Bảng Tọa Độ Cọc (Lý Trình)", "CTS_TaoBang_ToaDoCoc2 ");
-            AddMenuItem(subMenuSample, "Tạo Bảng Tọa Độ Cọc (Cao Độ)", "CTS_TaoBang_ToaDoCoc3 ");
+
+            AddMenuItem(subMenuSample, "★ Xuất Toạ Độ Cọc (Gộp)", "CTS_XuatToaDocCoc ");
             AddMenuItem(subMenuSample, "Cập Nhật 2 Table", "AT_UPdate2Table ");
             AddHeader(subMenuSample, "--- Chèn/Phát sinh cọc ---");
             AddMenuItem(subMenuSample, "Chèn Cọc Trên Trắc Dọc", "CTS_ChenCoc_TrenTracDoc ");

@@ -368,3 +368,63 @@ string description = point.RawDescription;
 6. [ ] Bọc code trong `using Transaction` và `try-catch`
 7. [ ] Sử dụng `A.Ed.WriteMessage()` để thông báo lỗi
 8. [ ] **AI AGENT BẮT BUỘC PHẢI TỰ ĐỘNG CHẠY**: Sử dụng công cụ `run_command` để chạy `dotnet build` ngay lập tức bên trong thư mục `MyFirstProject` sau khi viết đoạn mã xong. Nếu phát sinh lỗi biên dịch, AI phải tự tìm hiểu và sửa cho tới khi thành công (0 errors) mà không cần hỏi người dùng!
+
+## 🎀 Quản lý giao diện Ribbon (MenuConfig.xlsx)
+
+Toàn bộ hệ thống Ribbon Menu của dự án được nạp động từ file Excel cấu hình tại:
+`z:\Z.FORM MAU LAM VIEC\1. BIM\2.MAU C3D\1.LISP\0.CIVIL TOOL\Excel file\MenuConfig.xlsx`.
+
+> [!IMPORTANT]
+> - Sheet chứa cấu hình BẮT BUỘC phải có tên là `Ribbon` (ExcelMenuReader.cs sẽ tìm kiếm đích danh tên này).
+> - File này sau khi cập nhật lệnh mới cần phải chạy script format màu nền để người dùng dễ nhìn. Cột phân loại bao gồm: `Tab`, `Panel`, `Loại`, `Tên hiển thị`, `Tên lệnh`, `Kích thước`, `Mô tả`.
+
+### Cấu trúc `Loại` trên Ribbon
+- **`button`**: Nút bấm độc lập thông thường. Cần có `Tên lệnh`.
+- **`split`**: Nút Dropdown/Split, gồm 1 danh mục chính. Dòng `split` có thể không cần `Tên lệnh` nếu nó thuần túy là Drop-down menu con.
+- **`row`**: Stack chứa tối đa 3 nút dạng nằm ngang. Dòng này bắt buộc để trống `Tên lệnh`.
+- **`sub`**: Các item con nằm dưới `split` hoặc `row`. Thụt lề và có nút lệnh rõ ràng.
+- Bố trí logic tiêu chuẩn: 3 items mỗi `row` để tiết kiệm khoảng không. 
+
+### Quy định Format Màu sắc tự động
+Để làm đẹp giao diện file Excel sau mỗi lần chỉnh sửa (thêm lệnh), AI hãy lưu trữ vòng lặp Python sau và tự động chạy nó dưới nền nếu user yêu cầu định dạng / hoặc có thay đổi lớn:
+
+```python
+# Script: format_colors.py
+import openpyxl
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+excel_path = r'z:\Z.FORM MAU LAM VIEC\1. BIM\2.MAU C3D\1.LISP\0.CIVIL TOOL\Excel file\MenuConfig.xlsx'
+wb = openpyxl.load_workbook(excel_path)
+ws = wb["Ribbon"]
+
+# Style definitions
+h_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+c_fill = PatternFill(start_color="DDEBF7", end_color="DDEBF7", fill_type="solid")
+a_fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+sub_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+border = Border(left=Side(style='thin', color='A6A6A6'), right=Side(style='thin', color='A6A6A6'),
+                top=Side(style='thin', color='A6A6A6'), bottom=Side(style='thin', color='A6A6A6'))
+c_align = Alignment(horizontal="center", vertical="center")
+
+# Apply Header
+for cell in ws[1]:
+    cell.fill, cell.font, cell.alignment, cell.border = h_fill, Font(color="FFFFFF", bold=True), c_align, border
+
+# Apply Rows
+curr_tab = None
+for row in ws.iter_rows(min_row=2):
+    tab_val, row_type = row[0].value, row[2].value
+    if tab_val and "civil" in str(tab_val).lower(): curr_tab = "civil"
+    elif tab_val and "acad" in str(tab_val).lower(): curr_tab = "acad"
+    
+    fill = openpyxl.styles.PatternFill(fill_type=None)
+    if row_type == "sub": fill = sub_fill
+    elif curr_tab == "civil": fill = c_fill
+    elif curr_tab == "acad": fill = a_fill
+    
+    for idx, cell in enumerate(row):
+        if fill.fill_type: cell.fill = fill
+        cell.border = border
+        cell.alignment = c_align if idx in [0, 1, 2, 5] else Alignment(horizontal="left", vertical="center")
+
+wb.save(excel_path)
+```

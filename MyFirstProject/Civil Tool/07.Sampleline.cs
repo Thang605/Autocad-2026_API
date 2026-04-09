@@ -17,9 +17,6 @@
 //   - CTS_DoiTenCoc_H
 //
 // 07d.SamplelineTable.cs    - Bảng tọa độ + cập nhật bảng (4 lệnh)
-//   - CTS_TaoBang_ToaDoCoc
-//   - CTS_TaoBang_ToaDoCoc2
-//   - CTS_TaoBang_ToaDoCoc3
 //   - AT_UPdate2Table
 //
 // 07e.SamplelineCreate.cs   - Chèn / Phát sinh cọc (6 lệnh)

@@ -937,30 +937,7 @@ namespace Civil3DCsharp.HelpSystem
                 Usage = "CTS_DoiTenCoc3"
             });
 
-            AddCommand(new CommandInfo
-            {
-                Name = "CTS_TaoBang_ToaDoCoc",
-                Category = "Civil - Sampleline",
-                Description = "Tạo bảng tọa độ các cọc",
-                Usage = "CTS_TaoBang_ToaDoCoc",
-                VideoLink = "https://www.youtube.com/watch?v=mCoLFwdNBJo"
-            });
 
-            AddCommand(new CommandInfo
-            {
-                Name = "CTS_TaoBang_ToaDoCoc2",
-                Category = "Civil - Sampleline",
-                Description = "Tạo bảng tọa độ cọc (phiên bản 2)",
-                Usage = "CTS_TaoBang_ToaDoCoc2"
-            });
-
-            AddCommand(new CommandInfo
-            {
-                Name = "CTS_TaoBang_ToaDoCoc3",
-                Category = "Civil - Sampleline",
-                Description = "Tạo bảng tọa độ cọc (phiên bản 3)",
-                Usage = "CTS_TaoBang_ToaDoCoc3"
-            });
 
             AddCommand(new CommandInfo
             {
