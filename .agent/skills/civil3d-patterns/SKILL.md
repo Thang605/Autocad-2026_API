@@ -368,6 +368,7 @@ string description = point.RawDescription;
 6. [ ] Bọc code trong `using Transaction` và `try-catch`
 7. [ ] Sử dụng `A.Ed.WriteMessage()` để thông báo lỗi
 8. [ ] **AI AGENT BẮT BUỘC PHẢI TỰ ĐỘNG CHẠY**: Sử dụng công cụ `run_command` để chạy `dotnet build` ngay lập tức bên trong thư mục `MyFirstProject` sau khi viết đoạn mã xong. Nếu phát sinh lỗi biên dịch, AI phải tự tìm hiểu và sửa cho tới khi thành công (0 errors) mà không cần hỏi người dùng!
+9. [ ] ⛔ **KHÔNG cập nhật ToolPalette.xlsx** — User tự thêm lệnh mới vào file Excel. AI KHÔNG được tự ý sửa file này.
 
 ## 🎀 Quản lý giao diện Ribbon (MenuConfig.xlsx)
 

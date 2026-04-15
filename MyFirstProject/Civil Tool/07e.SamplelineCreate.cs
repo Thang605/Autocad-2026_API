@@ -30,72 +30,183 @@ namespace Civil3DCsharp
         [CommandMethod("CTS_ChenCoc_TrenTracDoc")]
         public static void CTSChenCocTrenTracDoc()
         {
-            // start transantion
-            _ = new            // start transantion
-            UserInput();
+            // 1. Hiển thị form để thiết lập tên cọc
+            var form = new MyFirstProject.Civil_Tool.ChenCocTrenTracDocForm();
+            var result = Autodesk.AutoCAD.ApplicationServices.Application.ShowModalDialog(form);
+
+            if (result != System.Windows.Forms.DialogResult.OK || !form.FormAccepted)
+            {
+                A.Ed.WriteMessage("\n Đã hủy lệnh.");
+                return;
+            }
+
+            // 2. Khởi tạo utilities
+            _ = new UserInput();
             _ = new UtilitiesCAD();
             _ = new UtilitiesC3D();
 
-            ObjectId profileViewId = UserInput.GProfileViewId("\n Chọn 1 bảng trắc dọc " + " để chèn cọc: \n");
-            UtilitiesC3D.SetDefaultPointSetting("CDTN", "CDTN");
+            // 3. Chọn ProfileView
+            ObjectId profileViewId = UserInput.GProfileViewId("\n Chọn 1 bảng trắc dọc để chèn cọc: \n");
 
-            String answer = "y"; ;
-            while (answer == "y")
+            // ============================================
+            // PHASE 1: Thu thập tất cả các điểm trước
+            // ============================================
+            List<double> collectedStations = new();
+            A.Ed.WriteMessage("\n === Chọn các vị trí cọc trên trắc dọc (ESC để kết thúc chọn) ===");
+
+            // Mở 1 transaction chỉ để đọc ProfileView (tìm station)
+            using (Transaction trRead = A.Db.TransactionManager.StartTransaction())
             {
-                using (Transaction tr = A.Db.TransactionManager.StartTransaction())
+                try
                 {
-                    try
+                    ProfileView? profileView = trRead.GetObject(profileViewId, OpenMode.ForWrite) as ProfileView;
+                    if (profileView == null) { A.Ed.WriteMessage("\n Không tìm thấy trắc dọc."); return; }
+
+                    ObjectId alignmentId = profileView.AlignmentId;
+                    Alignment? alignment = trRead.GetObject(alignmentId, OpenMode.ForWrite) as Alignment;
+                    if (alignment == null) { A.Ed.WriteMessage("\n Không tìm thấy tim tuyến."); return; }
+
+                    while (true)
                     {
+                        try
+                        {
+                            var ppo = new Autodesk.AutoCAD.EditorInput.PromptPointOptions($"\n Chọn vị trí cọc thứ {collectedStations.Count + 1} (ESC để kết thúc): ");
+                            var rppo = A.Ed.GetPoint(ppo);
 
-                        //start here
-                        //get profileview
+                            if (rppo.Status != Autodesk.AutoCAD.EditorInput.PromptStatus.OK)
+                            {
+                                // User pressed ESC or cancelled
+                                break;
+                            }
 
-                        ProfileView? profileView = tr.GetObject(profileViewId, OpenMode.ForRead) as ProfileView;
+                            Point3d point3D = rppo.Value;
+                            double station = 0, elevation = 0;
+                            profileView.FindStationAndElevationAtXY(point3D.X, point3D.Y, ref station, ref elevation);
 
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
-                        ObjectId alignmentId = profileView.AlignmentId;
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
-                        Alignment? alignment = tr.GetObject(alignmentId, OpenMode.ForRead) as Alignment;
-
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
-                        ObjectId sampleLineGroupId = alignment.GetSampleLineGroupIds()[0];
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
-                        SampleLineGroup? sampleLineGroup = tr.GetObject(sampleLineGroupId, OpenMode.ForWrite) as SampleLineGroup;
-
-                        // get point for add sampleline
-                        Point3d point3D = UserInput.GPoint("\n Chọn vị trí điểm" + "để thêm cọc ");
-                        double stations = 0, elevations = 0;
-                        profileView.FindStationAndElevationAtXY(point3D.X, point3D.Y, ref stations, ref elevations);
-
-                        //get sampleline name
-#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
-                        String samplelineName = UserInput.GString("Input sampleline name:");
-#pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
-
-                        // set station variable
-#pragma warning disable CS8604 // Possible null reference argument.
-                        ObjectId samplelineId = UtilitiesC3D.CreateSampleline(samplelineName, sampleLineGroupId, alignment, stations);
-#pragma warning restore CS8604 // Possible null reference argument.
-                        SampleLine? sampleline = tr.GetObject(samplelineId, OpenMode.ForWrite) as SampleLine;
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
-                        sampleline.StyleName = "Road Sample Line";
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
-
-                        tr.Commit();
+                            // Kiểm tra station hợp lệ
+                            if (station < alignment.StartingStation || station > alignment.EndingStation)
+                            {
+                                A.Ed.WriteMessage($"\n ⚠️ Vị trí nằm ngoài phạm vi tuyến. Bỏ qua.");
+                            }
+                            else
+                            {
+                                collectedStations.Add(station);
+                                A.Ed.WriteMessage($"\n   ✓ Điểm {collectedStations.Count}: Km{station / 1000:F3}");
+                            }
+                        }
+                        catch
+                        {
+                            // Any other error
+                            break;
+                        }
                     }
-                    catch (Autodesk.AutoCAD.Runtime.Exception e)
-                    {
-                        A.Ed.WriteMessage(e.Message);
-                    }
+
+                    trRead.Commit();
                 }
-#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
-                String answer1 = UserInput.GString("Do you want to add more sampleline? (y/n)");
-#pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
-#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
-                answer = answer1;
-#pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
+                catch (Autodesk.AutoCAD.Runtime.Exception e)
+                {
+                    A.Ed.WriteMessage("\n " + e.Message);
+                    return;
+                }
             }
 
+            // Kiểm tra có điểm nào được chọn không
+            if (collectedStations.Count == 0)
+            {
+                A.Ed.WriteMessage("\n Không có điểm nào được chọn. Đã hủy lệnh.");
+                return;
+            }
+
+            // Sắp xếp theo station tăng dần
+            collectedStations.Sort();
+            A.Ed.WriteMessage($"\n\n === Đang tạo {collectedStations.Count} cọc... ===");
+
+            // ============================================
+            // PHASE 2: Tạo tất cả SampleLine cùng lúc
+            // ============================================
+            int cocDaTao = 0;
+            using (Transaction tr = A.Db.TransactionManager.StartTransaction())
+            {
+                try
+                {
+                    ProfileView? profileView = tr.GetObject(profileViewId, OpenMode.ForWrite) as ProfileView;
+                    ObjectId alignmentId = profileView!.AlignmentId;
+                    Alignment? alignment = tr.GetObject(alignmentId, OpenMode.ForWrite) as Alignment;
+
+                    // Lấy hoặc tạo SampleLineGroup
+                    ObjectId sampleLineGroupId;
+                    if (alignment!.GetSampleLineGroupIds().Count == 0)
+                    {
+                        sampleLineGroupId = SampleLineGroup.Create(alignment.Name, alignmentId);
+                    }
+                    else
+                    {
+                        sampleLineGroupId = alignment.GetSampleLineGroupIds()[0];
+                    }
+
+                    // Lấy danh sách tên đã tồn tại
+                    SampleLineGroup? sampleLineGroup = tr.GetObject(sampleLineGroupId, OpenMode.ForWrite) as SampleLineGroup;
+                    HashSet<string> existingNames = new(StringComparer.OrdinalIgnoreCase);
+                    if (sampleLineGroup != null)
+                    {
+                        foreach (ObjectId slId in sampleLineGroup.GetSampleLineIds())
+                        {
+                            SampleLine? sl = tr.GetObject(slId, OpenMode.ForRead) as SampleLine;
+                            if (sl != null) existingNames.Add(sl.Name);
+                        }
+                    }
+
+                    // Tạo từng cọc
+                    foreach (double station in collectedStations)
+                    {
+                        // Tạo tên — tự nhảy số nếu trùng
+                        string samplelineName = form.GetCurrentStakeName();
+                        while (existingNames.Contains(samplelineName))
+                        {
+                            form.IncrementCounter();
+                            samplelineName = form.GetCurrentStakeName();
+                        }
+
+                        // Tạo SampleLine với tên tạm → rename (tránh lỗi trùng tên API)
+                        string tempName = $"z_{Guid.NewGuid():N}";
+                        Point2dCollection point2Ds = new();
+                        double easting = 0, northing = 0;
+                        alignment.PointLocation(station, -10, ref easting, ref northing);
+                        point2Ds.Add(new Point2d(easting, northing));
+                        alignment.PointLocation(station, 10, ref easting, ref northing);
+                        point2Ds.Add(new Point2d(easting, northing));
+
+                        ObjectId samplelineId = SampleLine.Create(tempName, sampleLineGroupId, point2Ds);
+
+                        // Rename sang tên thật + set style
+                        SampleLine? sampleline = tr.GetObject(samplelineId, OpenMode.ForWrite) as SampleLine;
+                        if (sampleline != null)
+                        {
+                            sampleline.Name = samplelineName;
+                            existingNames.Add(samplelineName); // tracking để lần sau không trùng
+
+                            if (!string.IsNullOrEmpty(form.SampleLineStyleName))
+                            {
+                                try { sampleline.StyleName = form.SampleLineStyleName; }
+                                catch { /* Style không tồn tại */ }
+                            }
+                        }
+
+                        form.IncrementCounter();
+                        cocDaTao++;
+
+                        A.Ed.WriteMessage($"\n ✓ {samplelineName} tại Km{station / 1000:F3}");
+                    }
+
+                    tr.Commit();
+                }
+                catch (Autodesk.AutoCAD.Runtime.Exception e)
+                {
+                    A.Ed.WriteMessage("\n Lỗi: " + e.Message);
+                }
+            }
+
+            A.Ed.WriteMessage($"\n\n ✅ Hoàn thành: đã tạo {cocDaTao}/{collectedStations.Count} cọc.");
         }
 
         [CommandMethod("CTS_CHENCOC_TRENTRACNGANG")]

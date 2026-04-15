@@ -9,7 +9,9 @@ using Autodesk.AutoCAD.Runtime;
 using Autodesk.AutoCAD.EditorInput;
 using AcadApp = Autodesk.AutoCAD.ApplicationServices.Application;
 
-[assembly: CommandClass(typeof(MyFirstProject.MenuLoader))]
+// [assembly: CommandClass(typeof(MyFirstProject.MenuLoader))]
+// ⚠️ Tạm ẩn hệ thống Ribbon cũ — dùng SHOW_PALETTE thay thế
+// Bỏ comment dòng trên để khôi phục SHOW_MENU, RELOAD_MENU, MENU_CONFIG
 
 namespace MyFirstProject
 {

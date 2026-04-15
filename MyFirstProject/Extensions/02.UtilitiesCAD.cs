@@ -1,4 +1,4 @@
-﻿using Autodesk.AutoCAD.ApplicationServices;
+using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
@@ -332,10 +332,10 @@ namespace MyFirstProject.Extensions
                 acPoly.AddVertexAt(i, new Point2d(easting, northing), 0, 0, 0);
             }
             acPoly.Closed = false;
-            
+
             // Set layer to Defpoints (không in được)
             acPoly.Layer = "Defpoints";
-            
+
             // Add the new object to the block table record and the transaction
             acBlkTblRec.AppendEntity(acPoly);
             tr.AddNewlyCreatedDBObject(acPoly, true);
@@ -549,7 +549,7 @@ namespace MyFirstProject.Extensions
 #pragma warning restore CS8602 // Dereference of a possibly null reference.
                 tr.AddNewlyCreatedDBObject(acText, true);
 
-                A.Ed.Command("_UPDATEFIELD", acText);
+                A.Ed.Command("_UPDATEFIELD", acText.Id);
                 // Save the changes and dispose of the transaction
 
                 tr.Commit();

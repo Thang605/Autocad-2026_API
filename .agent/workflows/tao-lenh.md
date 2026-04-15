@@ -32,3 +32,7 @@ Ngay sau khi AI Agent tự động viết code xong một lệnh mới (hoặc c
 - Xem chi tiết lỗi từ output build
 - Sửa các lỗi xung đột namespace, syntax, v.v.
 - Build lại cho đến khi thành công
+
+## ⛔ KHÔNG cập nhật ToolPalette.xlsx
+- **KHÔNG** tự động thêm lệnh mới vào file `ToolPalette.xlsx`.
+- User sẽ tự thêm lệnh vào file Excel khi cần.

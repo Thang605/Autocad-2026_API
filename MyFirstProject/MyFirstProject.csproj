@@ -10,6 +10,7 @@
 
   <PropertyGroup>
     <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
     <AssemblyName>Civil3D_Tools</AssemblyName>
     <OutputPath>bin\$(Configuration)\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
@@ -46,6 +47,10 @@
     </Reference>
     <Reference Include="AeccDbMgd">
       <HintPath>C:\Program Files\Autodesk\AutoCAD 2026\C3D\AeccDbMgd.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="AeccDataShortcutMgd">
+      <HintPath>C:\Program Files\Autodesk\AutoCAD 2026\C3D\AeccDataShortcutMgd.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="AdWindows">
