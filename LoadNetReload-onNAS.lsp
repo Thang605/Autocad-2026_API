@@ -41,6 +41,12 @@
     (progn
       ;; Load DLL
       (command "._NETLOAD" tempDll)
+      ;; Load NetReload.dll để có lệnh NRL và RELOAD
+      (setq localNrlDll "c:\\OneDrive\\0.AI AGENT\\6.C#\\Autocad 2026_API\\NetReload\\bin\\Debug\\NetReload.dll")
+      (if (findfile localNrlDll)
+        (command "._NETLOAD" localNrlDll)
+        (princ "\n*** WARNING: Không tìm thấy file NetReload.dll tại C:\\ ***")
+      )
       ;; Đếm số lần load
       (if (not *nrl-load-count*) (setq *nrl-load-count* 0))
       (setq *nrl-load-count* (1+ *nrl-load-count*))
