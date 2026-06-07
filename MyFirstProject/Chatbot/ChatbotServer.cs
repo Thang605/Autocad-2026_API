@@ -240,7 +240,9 @@ namespace Civil3DCsharp.Chatbot
             { "CTS_DongBo_2_NhomCoc_TheoDoan", "Đồng bộ 2 nhóm cọc theo đoạn" },
             { "CTS_ChenCoc_TrenTracDoc", "Chèn cọc trên trắc dọc" },
             { "CTS_CHENCOC_TRENTRACNGANG", "Chèn cọc trên trắc ngang" },
-
+            { "CTS_TaoBang_ToaDoCoc", "Tạo bảng tọa độ cọc" },
+            { "CTS_TaoBang_ToaDoCoc2", "Tạo bảng tọa độ cọc 2" },
+            { "CTS_TaoBang_ToaDoCoc3", "Tạo bảng tọa độ cọc 3" },
             { "AT_UPdate2Table", "Update 2 bảng" },
             { "CTS_ThayDoi_BeRong_Sampleline", "Thay đổi bề rộng sample line" },
             { "CTS_HieuChinh_KhoangCachCoc", "Hiệu chỉnh khoảng cách cọc" },
@@ -264,7 +266,7 @@ namespace Civil3DCsharp.Chatbot
             { "CTSV_KhoaCatNgang_AddPoint", "Khóa cắt ngang - thêm điểm" },
             { "CTSV_ThemVatLieu_TrenCatNgang", "Thêm vật liệu trên cắt ngang" },
             { "CTSV_VeTracNgangThietKe", "Vẽ trắc ngang thiết kế" },
-
+            { "CTSV_DieuChinh_DuongTuNhien", "Điều chỉnh đường tự nhiên" },
             { "CTSV_KhoiLuongCatNgang", "Khối lượng cắt ngang" },
             { "CTSV_XuatKhoiLuongRaExcel", "Xuất khối lượng ra Excel" },
             { "CTSV_TaoCorridorSurface", "Tạo corridor surface" },
@@ -283,7 +285,7 @@ namespace Civil3DCsharp.Chatbot
             { "AT_Solid_Set_PropertySet", "Set property set cho solid" },
             { "AT_Solid_Show_Info", "Hiển thị thông tin solid" },
             // Other Civil
-
+            { "AT_PolylineFromSection", "Tạo polyline từ section" },
             { "CT_ThongTinDoiTuong", "Thông tin đối tượng Civil 3D" },
 
             // === CIVIL TOOL 2 ===

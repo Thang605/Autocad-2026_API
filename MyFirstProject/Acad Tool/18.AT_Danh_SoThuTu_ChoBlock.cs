@@ -47,7 +47,6 @@ namespace Civil3DCsharp
         public Point3d Position { get; set; }
         public string BlockName { get; set; }
         public int Index { get; set; }
-        public int GroupTotal { get; set; }  // Tổng số block trong nhóm Y
 
         public BlockInfo(ObjectId objId, Point3d pos, string name)
         {
@@ -55,7 +54,6 @@ namespace Civil3DCsharp
             Position = pos;
             BlockName = name;
             Index = 0;
-            GroupTotal = 0;
         }
     }
 
@@ -561,35 +559,20 @@ namespace Civil3DCsharp
                         return;
                     }
 
-                    // 4. Nhóm các block cùng tọa độ Y (dung sai 0.5)
-                    //    Sắp xếp từ trái sang phải trong mỗi nhóm
-                    double yTolerance = 0.5;
-                    var yGroups = blockInfos
-                        .GroupBy(b => Math.Round(b.Position.Y / yTolerance) * yTolerance)
-                        .OrderByDescending(g => g.Key)  // Nhóm Y cao nhất trước (trên→dưới)
-                        .ToList();
+                    // 4. Sắp xếp theo thứ tự đã chọn
+                    blockInfos = SortBlocks(blockInfos, form.SortOrder);
 
-                    // 5. Đánh số thứ tự theo từng nhóm Y: 1/n đến n/n
-                    foreach (var group in yGroups)
+                    // 5. Đánh số thứ tự
+                    int total = blockInfos.Count;
+                    for (int i = 0; i < blockInfos.Count; i++)
                     {
-                        var sortedGroup = group.OrderBy(b => b.Position.X).ToList(); // Trái→Phải
-                        int groupTotal = sortedGroup.Count;
-                        for (int i = 0; i < sortedGroup.Count; i++)
-                        {
-                            sortedGroup[i].Index = i + 1;
-                            sortedGroup[i].GroupTotal = groupTotal;
-                        }
+                        blockInfos[i].Index = i + 1;
                     }
 
-                    ed.WriteMessage($"\n📊 Sắp xếp theo nhóm Y (dung sai {yTolerance}):");
-                    foreach (var group in yGroups)
+                    ed.WriteMessage($"\n📊 Thứ tự sắp xếp ({GetSortOrderName(form.SortOrder)}):");
+                    foreach (var info in blockInfos)
                     {
-                        var sortedGroup = group.OrderBy(b => b.Position.X).ToList();
-                        ed.WriteMessage($"\n  --- Hàng Y ≈ {group.Key:F2} ({sortedGroup.Count} block) ---");
-                        foreach (var info in sortedGroup)
-                        {
-                            ed.WriteMessage($"\n   {info.Index}/{info.GroupTotal}: X={info.Position.X:F2}, Y={info.Position.Y:F2}");
-                        }
+                        ed.WriteMessage($"\n   {info.Index}/{total}: X={info.Position.X:F2}, Y={info.Position.Y:F2}");
                     }
 
                     // 6. Cập nhật attribute cho từng block
@@ -613,8 +596,8 @@ namespace Civil3DCsharp
                                         AttributeReference attRef = tr.GetObject(attId, OpenMode.ForWrite) as AttributeReference;
                                         if (attRef != null && attRef.Tag.Equals(form.AttributeTag, StringComparison.OrdinalIgnoreCase))
                                         {
-                                            // Tạo giá trị theo format đã chọn (dùng GroupTotal thay vì total toàn bộ)
-                                            string newValue = FormatNumber(info.Index, info.GroupTotal, form.Prefix, form.Separator, form.ShowTotal);
+                                            // Tạo giá trị theo format đã chọn
+                                            string newValue = FormatNumber(info.Index, total, form.Prefix, form.Separator, form.ShowTotal);
                                             attRef.TextString = newValue;
                                             foundAttribute = true;
                                             successCount++;
@@ -646,12 +629,8 @@ namespace Civil3DCsharp
                     {
                         ed.WriteMessage($"\n   ⚠️ Không cập nhật được: {failCount} block");
                     }
-                    ed.WriteMessage($"\n   📝 Số nhóm Y: {yGroups.Count}");
-                    foreach (var group in yGroups)
-                    {
-                        string exampleFormat = FormatNumber(1, group.Count(), form.Prefix, form.Separator, form.ShowTotal);
-                        ed.WriteMessage($"\n   📝 Hàng Y ≈ {group.Key:F2}: Format {exampleFormat} → {FormatNumber(group.Count(), group.Count(), form.Prefix, form.Separator, form.ShowTotal)}");
-                    }
+                    string exampleFormat = FormatNumber(1, total, form.Prefix, form.Separator, form.ShowTotal);
+                    ed.WriteMessage($"\n   📝 Format số thứ tự: {exampleFormat}");
                 }
             }
             catch (System.Exception ex)

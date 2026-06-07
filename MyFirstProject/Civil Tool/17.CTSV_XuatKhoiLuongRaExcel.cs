@@ -886,7 +886,7 @@ namespace Civil3DCsharp
         /// <summary>
         /// Thu thập khối lượng vật liệu từ Text (Dạng 1: QTO Table explode + Dạng 2: Text vàng)
         /// </summary>
-        private static List<MaterialVolumeInfo> CollectMaterialVolumeFromText(SampleLineGroup sampleLineGroup, Transaction tr, double offsetXPercent = 5, double offsetYPercent = 25, bool drawRangePolyline = false)
+        private static List<MaterialVolumeInfo> CollectMaterialVolumeFromText(SampleLineGroup sampleLineGroup, Transaction tr, double offsetXPercent = 5, double offsetYPercent = 15, bool drawRangePolyline = false)
         {
             List<MaterialVolumeInfo> materialInfoList = new();
 

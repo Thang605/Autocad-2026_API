@@ -68,7 +68,7 @@ namespace Civil3DCsharp
                 {
                     formatTong = formatTong + "+" + item;
                 }
-                formatTong = str3 + formatTong + str4 + "\u00A0m";
+                formatTong = str3 + formatTong + str4;
                 // vẽ text
                 ObjectId textId = UserInput.GTextOrMText("Chọn text/mtext cần nhập nội dung: \n");
                 if (textId == ObjectId.Null) return;
@@ -335,7 +335,7 @@ namespace Civil3DCsharp
                 {
                     formatTong = formatTong + "+" + item;
                 }
-                formatTong = str3 + formatTong + str4 + "\u00A0m2";
+                formatTong = str3 + formatTong + str4 + "m2";
                 // vẽ text
                 ObjectId textId = UserInput.GTextOrMText("Chọn text/mtext cần nhập nội dung: \n");
                 if (textId == ObjectId.Null) return;

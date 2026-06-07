@@ -108,6 +108,46 @@ namespace Civil3DCsharp
             }
         }
 
+        [CommandMethod("AT_DanhSoThuTu")]
+        public static void ET_DanhSoThuTu()
+        {
+            // start transantion
+            _ = new            // start transantion
+            UserInput();
+            _ = new UtilitiesCAD();
+            _ = new UtilitiesC3D();
+            //start here
+            int soThuTu = UserInput.GInt("\n Nhập số thứ tự cần đánh số: ");
+            String ans = "Enter";
+            while (ans == "Enter")
+            {
+                using (Transaction tr = A.Db.TransactionManager.StartTransaction())
+                {
+                    try
+                    {
+                        //đổi text
+                        ObjectId textId = UserInput.GSelectionAnObject("\n Chọn các đối tượng TEXT để đánh số thứ tự:");
+                        var text = tr.GetObject(textId, OpenMode.ForWrite);
+                        if (text is DBText dbText)
+                            dbText.TextString = soThuTu.ToString();
+                        else if (text is MText mText)
+                            mText.Contents = soThuTu.ToString();
+                        else soThuTu--;
+
+                        soThuTu++;
+
+                        tr.Commit();
+                    }
+
+                    catch (Autodesk.AutoCAD.Runtime.Exception e)
+                    {
+                        A.Ed.WriteMessage(e.Message);
+                    }
+
+                }
+                ans = UserInput.GStopWithESC();
+            }
+        }
 
 
         [CommandMethod("AT_XoayDoiTuong_Theo2Diem")]

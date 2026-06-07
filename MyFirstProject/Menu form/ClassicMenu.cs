@@ -4,15 +4,13 @@ using System.Runtime.InteropServices;
 using Autodesk.AutoCAD.Runtime;
 using AcadApp = Autodesk.AutoCAD.ApplicationServices.Application;
 
-// [assembly: CommandClass(typeof(MyFirstProject.ClassicMenu))]
-// ⚠️ File này đã được thay thế bởi MenuLoader.cs + MenuConfig.json
-// Giữ lại làm backup. Dùng lệnh SHOW_MENU_OLD nếu cần quay lại bản cũ.
+[assembly: CommandClass(typeof(MyFirstProject.ClassicMenu))]
 
 namespace MyFirstProject
 {
     public class ClassicMenu
     {
-        [CommandMethod("SHOW_MENU_OLD")]
+        [CommandMethod("SHOW_MENU")]
         public static void ShowMenu()
         {
             CreateMenuGeneric("Civil tool", BuildCivilToolStructure);
@@ -163,8 +161,9 @@ namespace MyFirstProject
             AddMenuItem(subMenuSample, "Đổi Tên Cọc Theo Thứ Tự", "CTS_DoiTenCoc_TheoThuTu ");
             AddMenuItem(subMenuSample, "Đổi Tên Cọc H", "CTS_DoiTenCoc_H ");
             AddHeader(subMenuSample, "--- Bảng tọa độ/Update ---");
-
-            AddMenuItem(subMenuSample, "★ Xuất Toạ Độ Cọc (Gộp)", "CTS_XuatToaDocCoc ");
+            AddMenuItem(subMenuSample, "Tạo Bảng Tọa Độ Cọc", "CTS_TaoBang_ToaDoCoc ");
+            AddMenuItem(subMenuSample, "Tạo Bảng Tọa Độ Cọc (Lý Trình)", "CTS_TaoBang_ToaDoCoc2 ");
+            AddMenuItem(subMenuSample, "Tạo Bảng Tọa Độ Cọc (Cao Độ)", "CTS_TaoBang_ToaDoCoc3 ");
             AddMenuItem(subMenuSample, "Cập Nhật 2 Table", "AT_UPdate2Table ");
             AddHeader(subMenuSample, "--- Chèn/Phát sinh cọc ---");
             AddMenuItem(subMenuSample, "Chèn Cọc Trên Trắc Dọc", "CTS_ChenCoc_TrenTracDoc ");
@@ -213,12 +212,14 @@ namespace MyFirstProject
             AddHeader(subMenuSection, "--- Hiệu chỉnh ---");
             AddMenuItem(subMenuSection, "Hiệu Chỉnh Section Static", "CTSV_HieuChinh_Section ");
             AddMenuItem(subMenuSection, "Hiệu Chỉnh Section Dynamic", "CTSV_HieuChinh_Section_Dynamic ");
+            AddMenuItem(subMenuSection, "Điều Chỉnh Đường Tự Nhiên", "CTSV_DieuChinh_DuongTuNhien ");
             AddMenuItem(subMenuSection, "Chọn Section Static", "CTSV_ChonSection_Static ");
             AddHeader(subMenuSection, "--- Khác ---");
             AddMenuItem(subMenuSection, "Chuyển Đổi TN-TK sang TN-TN", "CTSV_ChuyenDoi_TNTK_TNTN ");
             AddMenuItem(subMenuSection, "Thêm Vật Liệu Trên Cắt Ngang", "CTSV_ThemVatLieu_TrenCatNgang ");
             AddMenuItem(subMenuSection, "Thêm Bảng KL Cắt Ngang", "CTSV_Them_BangKL_CatNgang ");
             AddMenuItem(subMenuSection, "Xuất Thông Tin Material Section", "CTSV_MaterialSection ");
+            AddMenuItem(subMenuSection, "Tạo Polyline Từ Section", "AT_PolylineFromSection ");
             AddHeader(subMenuSection, "--- Xuất/Khối lượng ---");
             AddMenuItem(subMenuSection, "Xuất Khối Lượng ra Excel", "CTSV_XuatKhoiLuongRaExcel ");
             AddMenuItem(subMenuSection, "Khối Lượng Cắt Ngang", "CTSV_KhoiLuongCatNgang ");

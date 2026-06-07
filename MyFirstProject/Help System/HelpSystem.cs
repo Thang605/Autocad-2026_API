@@ -937,7 +937,30 @@ namespace Civil3DCsharp.HelpSystem
                 Usage = "CTS_DoiTenCoc3"
             });
 
+            AddCommand(new CommandInfo
+            {
+                Name = "CTS_TaoBang_ToaDoCoc",
+                Category = "Civil - Sampleline",
+                Description = "Tạo bảng tọa độ các cọc",
+                Usage = "CTS_TaoBang_ToaDoCoc",
+                VideoLink = "https://www.youtube.com/watch?v=mCoLFwdNBJo"
+            });
 
+            AddCommand(new CommandInfo
+            {
+                Name = "CTS_TaoBang_ToaDoCoc2",
+                Category = "Civil - Sampleline",
+                Description = "Tạo bảng tọa độ cọc (phiên bản 2)",
+                Usage = "CTS_TaoBang_ToaDoCoc2"
+            });
+
+            AddCommand(new CommandInfo
+            {
+                Name = "CTS_TaoBang_ToaDoCoc3",
+                Category = "Civil - Sampleline",
+                Description = "Tạo bảng tọa độ cọc (phiên bản 3)",
+                Usage = "CTS_TaoBang_ToaDoCoc3"
+            });
 
             AddCommand(new CommandInfo
             {
@@ -1209,6 +1232,15 @@ namespace Civil3DCsharp.HelpSystem
 
             AddCommand(new CommandInfo
             {
+                Name = "CTSV_DieuChinh_DuongTuNhien",
+                Category = "Civil - SectionView",
+                Description = "Điều chỉnh đường tự nhiên trên mặt cắt ngang",
+                Usage = "CTSV_DieuChinh_DuongTuNhien",
+                VideoLink = "https://www.youtube.com/watch?v=QbU1SG3-44E"
+            });
+
+            AddCommand(new CommandInfo
+            {
                 Name = "CTSV_KhoiLuongCatNgang",
                 Category = "Civil - SectionView",
                 Description = "Tính khối lượng từ mặt cắt ngang",
@@ -1313,6 +1345,14 @@ namespace Civil3DCsharp.HelpSystem
                 Usage = "CTA_BangThongKeCacTuyenDuong"
             });
 
+            // 19. AT_PolylineFromSection
+            AddCommand(new CommandInfo
+            {
+                Name = "AT_PolylineFromSection",
+                Category = "Civil - SectionView",
+                Description = "Tạo Polyline từ Section View",
+                Usage = "AT_PolylineFromSection"
+            });
 
             // 20. CT_ThongTinDoiTuong
             AddCommand(new CommandInfo
