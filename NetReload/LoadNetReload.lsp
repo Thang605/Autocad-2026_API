@@ -6,7 +6,7 @@
   (if (not *netreload-loaded*)
     (progn
       (princ "\nLoading NetReload.dll...")
-      (command "._NETLOAD" "d:\\OneDrive\\0.AI AGENT\\C#\\Autocad 2026_API\\NetReload\\bin\\Debug\\NetReload.dll")
+      (command "._NETLOAD" "c:\\OneDrive\\0.AI AGENT\\6.C#\\Autocad 2026_API\\NetReload\\bin\\Debug\\NetReload.dll")
       (setq *netreload-loaded* T)
       (princ "\nNetReload.dll loaded successfully!")
       (princ "\nAvailable commands: NRL, RELOAD")
