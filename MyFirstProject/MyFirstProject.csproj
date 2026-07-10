@@ -48,10 +48,6 @@
       <HintPath>C:\Program Files\Autodesk\AutoCAD 2027\C3D\AeccDbMgd.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="AeccDataShortcutMgd">
-      <HintPath>C:\Program Files\Autodesk\AutoCAD 2027\C3D\AeccDataShortcutMgd.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
     <Reference Include="AdWindows">
       <HintPath>C:\Program Files\Autodesk\AutoCAD 2027\AdWindows.dll</HintPath>
       <Private>False</Private>
@@ -66,6 +62,26 @@
     </Reference>
     <Reference Include="Autodesk.AutoCAD.Interop.Common">
       <HintPath>C:\Program Files\Autodesk\AutoCAD 2027\Autodesk.AutoCAD.Interop.Common.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="ManagedMapApi">
+      <HintPath>C:\Program Files\Autodesk\AutoCAD 2027\Map\ManagedMapApi.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="OSGeo.MapGuide.Geometry">
+      <HintPath>C:\Program Files\Autodesk\AutoCAD 2027\Map\bin\GisPlatform\OSGeo.MapGuide.Geometry.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="OSGeo.MapGuide.PlatformBase">
+      <HintPath>C:\Program Files\Autodesk\AutoCAD 2027\Map\bin\GisPlatform\OSGeo.MapGuide.PlatformBase.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="OSGeo.MapGuide.Foundation">
+      <HintPath>C:\Program Files\Autodesk\AutoCAD 2027\Map\bin\GisPlatform\OSGeo.MapGuide.Foundation.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Autodesk.Map.Platform">
+      <HintPath>C:\Program Files\Autodesk\AutoCAD 2027\Map\Autodesk.Map.Platform.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>

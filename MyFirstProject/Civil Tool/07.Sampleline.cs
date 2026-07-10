@@ -1696,5 +1696,272 @@ namespace Civil3DCsharp
                 A.Ed.WriteMessage(e.Message);
             }
         }
+
+        [CommandMethod("CTS_Offset_BeRong_sampleLine")]
+        public static void CTSOffsetBeRongSampleLine()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null) return;
+            var db = doc.Database;
+            var ed = doc.Editor;
+
+            try
+            {
+                var selOpts = new PromptSelectionOptions { MessageForAdding = "\nChọn các sample lines:" };
+                var filter = new SelectionFilter([new TypedValue(0, "AECC_SAMPLE_LINE")]);
+                var selRes = ed.GetSelection(selOpts, filter);
+                if (selRes.Status != PromptStatus.OK) return;
+
+                // Show the new form
+                var form = new SampleLineOffsetPolylineForm();
+                if (Application.ShowModalDialog(form) != DialogResult.OK) return;
+
+                using var tr = db.TransactionManager.StartTransaction();
+                Polyline? plLeft = form.LeftPolylineId != ObjectId.Null ? (Polyline)tr.GetObject(form.LeftPolylineId, OpenMode.ForRead) : null;
+                Polyline? plRight = form.RightPolylineId != ObjectId.Null ? (Polyline)tr.GetObject(form.RightPolylineId, OpenMode.ForRead) : null;
+
+                double leftExcess = form.LeftExcess;
+                double rightExcess = form.RightExcess;
+
+                int updated = 0, noCenter = 0, noLeft = 0, noRight = 0, missLeft = 0, missRight = 0;
+
+                foreach (ObjectId id in selRes.Value.GetObjectIds())
+                {
+                    var sl = tr.GetObject(id, OpenMode.ForWrite) as SampleLine;
+                    if (sl == null) continue;
+
+                    var centerV = sl.Vertices.Cast<SampleLineVertex>().FirstOrDefault(v => v.Side == SampleLineVertexSideType.Center);
+                    if (centerV == null) { noCenter++; continue; }
+
+                    Point3d centerPt = centerV.Location;
+                    bool sampleLineUpdated = false;
+
+                    // Xử lý bên trái
+                    if (plLeft != null)
+                    {
+                        var leftV = sl.Vertices.Cast<SampleLineVertex>().FirstOrDefault(v => v.Side == SampleLineVertexSideType.Left);
+                        if (leftV != null)
+                        {
+                            Vector3d dirLeft = (leftV.Location - centerPt);
+                            if (dirLeft.Length < 1e-6) dirLeft = new Vector3d(-1, 0, 0);
+                            dirLeft = dirLeft.GetNormal();
+
+                            Point3d? hitLeft = IntersectOneDirection(centerPt, dirLeft, plLeft);
+                            if (hitLeft != null)
+                            {
+                                Point3d newLoc = hitLeft.Value + dirLeft * leftExcess;
+                                leftV.Location = new(newLoc.X, newLoc.Y, leftV.Location.Z);
+                                sampleLineUpdated = true;
+                            }
+                            else { missLeft++; }
+                        }
+                        else { noLeft++; }
+                    }
+
+                    // Xử lý bên phải
+                    if (plRight != null)
+                    {
+                        var rightV = sl.Vertices.Cast<SampleLineVertex>().FirstOrDefault(v => v.Side == SampleLineVertexSideType.Right);
+                        if (rightV != null)
+                        {
+                            Vector3d dirRight = (rightV.Location - centerPt);
+                            if (dirRight.Length < 1e-6) dirRight = new Vector3d(1, 0, 0);
+                            dirRight = dirRight.GetNormal();
+
+                            Point3d? hitRight = IntersectOneDirection(centerPt, dirRight, plRight);
+                            if (hitRight != null)
+                            {
+                                Point3d newLoc = hitRight.Value + dirRight * rightExcess;
+                                rightV.Location = new(newLoc.X, newLoc.Y, rightV.Location.Z);
+                                sampleLineUpdated = true;
+                            }
+                            else { missRight++; }
+                        }
+                        else { noRight++; }
+                    }
+
+                    if (sampleLineUpdated) updated++;
+                }
+
+                tr.Commit();
+                ed.WriteMessage($"\nCập nhật xong: {updated} sample lines. Không center: {noCenter}, không left vtx: {noLeft}, không right vtx: {noRight}, không giao trái: {missLeft}, không giao phải: {missRight}.");
+            }
+            catch (System.Exception ex)
+            {
+                ed.WriteMessage("\nLỗi: " + ex.Message);
+            }
+        }
+
+        private static Point3d? IntersectOneDirection(Point3d origin, Vector3d dir, Polyline boundary)
+        {
+            const double maxLen = 100000.0; // 100 km để đủ dài
+            using var ray = new Line(origin, origin + dir * maxLen);
+            var pts = new Point3dCollection();
+            try { boundary.IntersectWith(ray, Intersect.OnBothOperands, pts, IntPtr.Zero, IntPtr.Zero); }
+            catch { return null; }
+            if (pts.Count == 0) return null;
+            double best = double.MaxValue; Point3d bestPt = Point3d.Origin;
+            for (int i = 0; i < pts.Count; i++)
+            {
+                double d = (pts[i] - origin).DotProduct(dir);
+                if (d > 1e-6 && d < best) { best = d; bestPt = pts[i]; }
+            }
+            return best == double.MaxValue ? null : bestPt;
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    }
+
+    // Form for selecting polylines and extra offsets
+    public class SampleLineOffsetPolylineForm : Form
+    {
+        public ObjectId LeftPolylineId { get; private set; } = ObjectId.Null;
+        public ObjectId RightPolylineId { get; private set; } = ObjectId.Null;
+        public double LeftExcess { get; private set; } = 0.0;
+        public double RightExcess { get; private set; } = 0.0;
+
+        private System.Windows.Forms.Label lblLeftPl;
+        private System.Windows.Forms.Label lblRightPl;
+        private TextBox txtLeftExcess;
+        private TextBox txtRightExcess;
+        private Button btnPickLeft;
+        private Button btnPickRight;
+        private Button btnOK;
+        private Button btnCancel;
+
+        public SampleLineOffsetPolylineForm()
+        {
+            InitializeComponent();
+        }
+
+        private void InitializeComponent()
+        {
+            this.Text = "Offset Sample Line theo Polyline";
+            this.Size = new System.Drawing.Size(400, 250);
+            this.StartPosition = FormStartPosition.CenterScreen;
+            this.FormBorderStyle = FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
+
+            var gbLeft = new GroupBox { Text = "Bên Trái", Location = new System.Drawing.Point(10, 10), Size = new System.Drawing.Size(360, 75) };
+            lblLeftPl = new System.Windows.Forms.Label { Text = "Chưa chọn Polyline", Location = new System.Drawing.Point(10, 20), Size = new System.Drawing.Size(200, 20) };
+            btnPickLeft = new Button { Text = "Chọn Model", Location = new System.Drawing.Point(220, 15), Size = new System.Drawing.Size(130, 25) };
+            btnPickLeft.Click += (s, e) => PickPolyline(true);
+            var lblL2 = new System.Windows.Forms.Label { Text = "Khoảng vượt:", Location = new System.Drawing.Point(10, 48), Size = new System.Drawing.Size(100, 20) };
+            txtLeftExcess = new TextBox { Text = "0.0", Location = new System.Drawing.Point(110, 45), Size = new System.Drawing.Size(100, 20) };
+
+            gbLeft.Controls.AddRange(new Control[] { lblLeftPl, btnPickLeft, lblL2, txtLeftExcess });
+
+            var gbRight = new GroupBox { Text = "Bên Phải", Location = new System.Drawing.Point(10, 90), Size = new System.Drawing.Size(360, 75) };
+            lblRightPl = new System.Windows.Forms.Label { Text = "Chưa chọn Polyline", Location = new System.Drawing.Point(10, 20), Size = new System.Drawing.Size(200, 20) };
+            btnPickRight = new Button { Text = "Chọn Model", Location = new System.Drawing.Point(220, 15), Size = new System.Drawing.Size(130, 25) };
+            btnPickRight.Click += (s, e) => PickPolyline(false);
+            var lblR2 = new System.Windows.Forms.Label { Text = "Khoảng vượt:", Location = new System.Drawing.Point(10, 48), Size = new System.Drawing.Size(100, 20) };
+            txtRightExcess = new TextBox { Text = "0.0", Location = new System.Drawing.Point(110, 45), Size = new System.Drawing.Size(100, 20) };
+
+            gbRight.Controls.AddRange(new Control[] { lblRightPl, btnPickRight, lblR2, txtRightExcess });
+
+            btnOK = new Button { Text = "OK", Location = new System.Drawing.Point(210, 175), Size = new System.Drawing.Size(75, 25) };
+            btnOK.Click += BtnOK_Click;
+            btnCancel = new Button { Text = "Hủy", Location = new System.Drawing.Point(295, 175), Size = new System.Drawing.Size(75, 25) };
+            btnCancel.DialogResult = DialogResult.Cancel;
+
+            this.Controls.AddRange(new Control[] { gbLeft, gbRight, btnOK, btnCancel });
+        }
+
+        private void PickPolyline(bool isLeft)
+        {
+            var ed = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
+            this.Visible = false;
+            try
+            {
+                var peo = new PromptEntityOptions($"\nChọn Polyline biên {(isLeft ? "TRÁI" : "PHẢI")}: ");
+                peo.SetRejectMessage("\nPhải là Polyline.");
+                peo.AddAllowedClass(typeof(Polyline), true);
+                var per = ed.GetEntity(peo);
+                if (per.Status == PromptStatus.OK)
+                {
+                    if (isLeft)
+                    {
+                        LeftPolylineId = per.ObjectId;
+                        lblLeftPl.Text = $"Đã chọn: {per.ObjectId.Handle}";
+                    }
+                    else
+                    {
+                        RightPolylineId = per.ObjectId;
+                        lblRightPl.Text = $"Đã chọn: {per.ObjectId.Handle}";
+                    }
+                }
+            }
+            finally
+            {
+                this.Visible = true;
+            }
+        }
+
+        private void BtnOK_Click(object? sender, EventArgs e)
+        {
+            if (double.TryParse(txtLeftExcess.Text, out double l)) LeftExcess = l;
+            if (double.TryParse(txtRightExcess.Text, out double r)) RightExcess = r;
+
+            if (LeftPolylineId == ObjectId.Null && RightPolylineId == ObjectId.Null)
+            {
+                MessageBox.Show("Vui lòng chọn ít nhất một Polyline biên.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            this.DialogResult = DialogResult.OK;
+            this.Close();
+        }
     }
 }
+
