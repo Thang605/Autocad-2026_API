@@ -552,6 +552,74 @@ namespace Civil3DCsharp
             return points;
         }
 
+        internal static List<Point3d> GetPointsFromAlignment(Alignment alignment, Transaction tr)
+        {
+            List<Point3d> points = new List<Point3d>();
+            if (alignment == null) return points;
+
+            // Cách 1: Nổ Alignment thành các đối tượng hình học cơ bản (Line, Arc, Polyline, Spline)
+            try
+            {
+                DBObjectCollection subCol = new DBObjectCollection();
+                alignment.Explode(subCol);
+
+                if (subCol.Count > 0)
+                {
+                    foreach (DBObject dbObj in subCol)
+                    {
+                        if (dbObj is Curve curve)
+                        {
+                            List<Point3d> curvePts = GetPointsFromCurve(curve, tr);
+                            if (curvePts != null && curvePts.Count > 0)
+                            {
+                                points.AddRange(curvePts);
+                            }
+                            curve.Dispose();
+                        }
+                        else
+                        {
+                            dbObj.Dispose();
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            // Cách 2 (Fallback): Lấy mẫu qua PointLocation theo Station nếu Explode không ra điểm
+            if (points.Count == 0)
+            {
+                try
+                {
+                    double startSt = alignment.StartingStation;
+                    double endSt = alignment.EndingStation;
+                    double len = Math.Abs(endSt - startSt);
+
+                    if (len > 0.001)
+                    {
+                        int steps = Math.Max(50, Math.Min(10000, (int)Math.Ceiling(len / 1.0)));
+                        double delta = len / steps;
+                        for (int i = 0; i <= steps; i++)
+                        {
+                            double st = Math.Min(endSt, startSt + i * delta);
+                            try
+                            {
+                                double easting = 0, northing = 0;
+                                alignment.PointLocation(st, 0, ref easting, ref northing);
+                                if (Math.Abs(easting) > 0.001 || Math.Abs(northing) > 0.001)
+                                {
+                                    points.Add(new Point3d(easting, northing, 0));
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            return points;
+        }
+
         private static Point3d? TransformPoint(Point3d pt, MgCoordinateSystemTransform transform, MgGeometryFactory geoFactory)
         {
             MgCoordinate sourceCoord = null;

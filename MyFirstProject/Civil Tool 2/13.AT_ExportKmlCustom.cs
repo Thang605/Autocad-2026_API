@@ -30,10 +30,15 @@ namespace Civil3DCsharp
         public double BlockLineWidth { get; private set; } = 1.5;
         public double TextLineWidth { get; private set; } = 2.0;
         public bool FormAccepted { get; private set; } = false;
+        public bool OverrideTextColor { get; private set; } = false;
+        public System.Drawing.Color SelectedTextColor { get; private set; } = System.Drawing.Color.Yellow;
 
         private NumericUpDown numStandard;
         private NumericUpDown numBlock;
         private NumericUpDown numText;
+        private CheckBox chkOverrideColor;
+        private Panel pnlColorPreview;
+        private Button btnChooseColor;
         private Button btnOk;
         private Button btnCancel;
 
@@ -45,7 +50,7 @@ namespace Civil3DCsharp
         private void InitializeComponent()
         {
             this.Text = "Cấu hình xuất Google Earth KML";
-            this.Size = new System.Drawing.Size(320, 240);
+            this.Size = new System.Drawing.Size(320, 310);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterScreen;
             this.MaximizeBox = false;
@@ -110,11 +115,44 @@ namespace Civil3DCsharp
             groupBox.Controls.Add(lblText);
             groupBox.Controls.Add(numText);
 
+            // GroupBox thiết lập màu sắc chữ
+            GroupBox groupColor = new GroupBox();
+            groupColor.Text = "Màu sắc chữ / Label";
+            groupColor.Location = new System.Drawing.Point(12, 155);
+            groupColor.Size = new System.Drawing.Size(280, 65);
+
+            chkOverrideColor = new CheckBox();
+            chkOverrideColor.Text = "Ghi đè màu chữ";
+            chkOverrideColor.Location = new System.Drawing.Point(15, 25);
+            chkOverrideColor.Size = new System.Drawing.Size(120, 20);
+            chkOverrideColor.Checked = false;
+            chkOverrideColor.CheckedChanged += ChkOverrideColor_CheckedChanged;
+
+            pnlColorPreview = new Panel();
+            pnlColorPreview.Location = new System.Drawing.Point(145, 25);
+            pnlColorPreview.Size = new System.Drawing.Size(30, 20);
+            pnlColorPreview.BorderStyle = BorderStyle.FixedSingle;
+            pnlColorPreview.BackColor = System.Drawing.Color.Yellow;
+            pnlColorPreview.Enabled = false;
+            pnlColorPreview.Cursor = Cursors.Hand;
+            pnlColorPreview.Click += PnlColorPreview_Click;
+
+            btnChooseColor = new Button();
+            btnChooseColor.Text = "...";
+            btnChooseColor.Location = new System.Drawing.Point(185, 23);
+            btnChooseColor.Size = new System.Drawing.Size(35, 24);
+            btnChooseColor.Enabled = false;
+            btnChooseColor.Click += BtnChooseColor_Click;
+
+            groupColor.Controls.Add(chkOverrideColor);
+            groupColor.Controls.Add(pnlColorPreview);
+            groupColor.Controls.Add(btnChooseColor);
+
             // Nút Đồng ý
             btnOk = new Button();
             btnOk.Text = "Đồng ý";
             btnOk.DialogResult = DialogResult.OK;
-            btnOk.Location = new System.Drawing.Point(110, 160);
+            btnOk.Location = new System.Drawing.Point(110, 235);
             btnOk.Size = new System.Drawing.Size(85, 28);
             btnOk.Click += BtnOk_Click;
 
@@ -122,10 +160,11 @@ namespace Civil3DCsharp
             btnCancel = new Button();
             btnCancel.Text = "Hủy bỏ";
             btnCancel.DialogResult = DialogResult.Cancel;
-            btnCancel.Location = new System.Drawing.Point(205, 160);
+            btnCancel.Location = new System.Drawing.Point(205, 235);
             btnCancel.Size = new System.Drawing.Size(85, 28);
 
             this.Controls.Add(groupBox);
+            this.Controls.Add(groupColor);
             this.Controls.Add(btnOk);
             this.Controls.Add(btnCancel);
 
@@ -133,11 +172,42 @@ namespace Civil3DCsharp
             this.CancelButton = btnCancel;
         }
 
+        private void ChkOverrideColor_CheckedChanged(object sender, EventArgs e)
+        {
+            pnlColorPreview.Enabled = chkOverrideColor.Checked;
+            btnChooseColor.Enabled = chkOverrideColor.Checked;
+        }
+
+        private void PnlColorPreview_Click(object sender, EventArgs e)
+        {
+            ChooseColor();
+        }
+
+        private void BtnChooseColor_Click(object sender, EventArgs e)
+        {
+            ChooseColor();
+        }
+
+        private void ChooseColor()
+        {
+            using (ColorDialog cd = new ColorDialog())
+            {
+                cd.Color = pnlColorPreview.BackColor;
+                if (cd.ShowDialog() == DialogResult.OK)
+                {
+                    pnlColorPreview.BackColor = cd.Color;
+                    SelectedTextColor = cd.Color;
+                }
+            }
+        }
+
         private void BtnOk_Click(object sender, EventArgs e)
         {
             StandardLineWidth = (double)numStandard.Value;
             BlockLineWidth = (double)numBlock.Value;
             TextLineWidth = (double)numText.Value;
+            OverrideTextColor = chkOverrideColor.Checked;
+            SelectedTextColor = pnlColorPreview.BackColor;
             FormAccepted = true;
             this.Close();
         }
@@ -183,6 +253,8 @@ namespace Civil3DCsharp
                 double standardWidth = 3.0;
                 double blockWidth = 1.5;
                 double textWidth = 2.0;
+                bool overrideTextColor = false;
+                string customTextColorHex = "";
 
                 using (ExportKmlSettingsForm settingsForm = new ExportKmlSettingsForm())
                 {
@@ -195,6 +267,12 @@ namespace Civil3DCsharp
                     standardWidth = settingsForm.StandardLineWidth;
                     blockWidth = settingsForm.BlockLineWidth;
                     textWidth = settingsForm.TextLineWidth;
+                    overrideTextColor = settingsForm.OverrideTextColor;
+                    if (overrideTextColor)
+                    {
+                        var col = settingsForm.SelectedTextColor;
+                        customTextColorHex = $"ff{col.B:x2}{col.G:x2}{col.R:x2}";
+                    }
                 }
 
                 string displaySrs = sourceSrsWkt;
@@ -821,7 +899,7 @@ namespace Civil3DCsharp
                             // *** Xử lý Civil 3D Label (PHẢI đứng TRƯỚC Curve vì Label kế thừa từ Curve) ***
                             else if (ent is Autodesk.Civil.DatabaseServices.Label civLabel)
                             {
-                                string colorHexLabel = GetKmlColorString(civLabel, tr);
+                                string colorHexLabel = overrideTextColor ? customTextColorHex : GetKmlColorString(civLabel, tr);
                                 textOutlinesCache.TryGetValue(civLabel.ObjectId, out List<List<Point3d>> cachedPoints);
                                 labelTextsCache.TryGetValue(civLabel.ObjectId, out string labelText);
                                 if (string.IsNullOrEmpty(labelText))
@@ -829,6 +907,64 @@ namespace Civil3DCsharp
                                     labelText = $"Label_{civLabel.Handle}";
                                 }
                                 ExportTextAsVector(cachedPoints, labelText, colorHexLabel, ns, documentNode, transform, geoFactory, ref successLines, ref failed, textWidth);
+                            }
+                            // Xử lý riêng cho Alignment (Civil 3D Alignment không kế thừa từ Curve)
+                            else if (ent is Alignment alignment)
+                            {
+                                List<Point3d> points = GetPointsFromAlignment(alignment, tr);
+                                string colorHexCurve = GetKmlColorString(alignment, tr);
+                                // Kiểm tra nếu màu mặc định bị trắng/trống thì gán màu đỏ nổi bật (KML hex: ff0000ff -> Red)
+                                if (string.IsNullOrEmpty(colorHexCurve) || colorHexCurve == "ffffffff" || colorHexCurve == "ff000000")
+                                {
+                                    colorHexCurve = "ff0000ff"; // Đỏ tươi nổi bật trên bản đồ Google Earth
+                                }
+
+                                string alignName = alignment.Name;
+                                if (string.IsNullOrEmpty(alignName)) alignName = $"Alignment_{alignment.Handle}";
+
+                                if (points.Count > 0)
+                                {
+                                    System.Text.StringBuilder coordStr = new System.Text.StringBuilder();
+                                    int validCoords = 0;
+
+                                    foreach (Point3d pt in points)
+                                    {
+                                        Point3d? wgsPt = TransformPoint(pt, transform, geoFactory);
+                                        if (wgsPt.HasValue)
+                                        {
+                                            coordStr.Append($"{wgsPt.Value.X:F8},{wgsPt.Value.Y:F8},{wgsPt.Value.Z:F3} ");
+                                            validCoords++;
+                                        }
+                                    }
+
+                                    if (validCoords > 0)
+                                    {
+                                        XElement placemark = new XElement(ns + "Placemark",
+                                            new XElement(ns + "name", alignName),
+                                            new XElement(ns + "Style",
+                                                new XElement(ns + "LineStyle",
+                                                    new XElement(ns + "color", colorHexCurve),
+                                                    new XElement(ns + "width", standardWidth.ToString("F1"))
+                                                )
+                                            ),
+                                            new XElement(ns + "LineString",
+                                                new XElement(ns + "tessellate", "1"),
+                                                new XElement(ns + "coordinates", coordStr.ToString().Trim())
+                                            )
+                                        );
+                                        documentNode.Add(placemark);
+                                        successLines++;
+                                        ed.WriteMessage($"\n  [Thành công] Đã xuất Alignment '{alignName}': {validCoords} điểm tọa độ.");
+                                    }
+                                    else
+                                    {
+                                        failed++;
+                                    }
+                                }
+                                else
+                                {
+                                    failed++;
+                                }
                             }
                             // Xử lý các đối tượng Curve (Line, Polyline, Arc, Circle...)
                             // Lưu ý: Label đã được xử lý ở trên, không vào nhánh này
@@ -908,14 +1044,14 @@ namespace Civil3DCsharp
                             // Xử lý DBText
                             else if (ent is DBText dbText)
                             {
-                                string colorHexText = GetKmlColorString(dbText, tr);
+                                string colorHexText = overrideTextColor ? customTextColorHex : GetKmlColorString(dbText, tr);
                                 textOutlinesCache.TryGetValue(dbText.ObjectId, out List<List<Point3d>> cachedPoints);
                                 ExportTextAsVector(cachedPoints, dbText.TextString, colorHexText, ns, documentNode, transform, geoFactory, ref successLines, ref failed, textWidth);
                             }
                             // Xử lý MText
                             else if (ent is MText mText)
                             {
-                                string colorHexText = GetKmlColorString(mText, tr);
+                                string colorHexText = overrideTextColor ? customTextColorHex : GetKmlColorString(mText, tr);
                                 string txtStr = mText.Text;
                                 if (string.IsNullOrEmpty(txtStr))
                                 {
@@ -940,7 +1076,6 @@ namespace Civil3DCsharp
                                         colorHex = GetKmlColorString(blockRef, tr);
                                         if (colorHex == "ffffffff")
                                         {
-                                            // Fallback: lấy màu từ layer
                                             try
                                             {
                                                 LayerTableRecord layer = (LayerTableRecord)tr.GetObject(blockRef.LayerId, OpenMode.ForRead);
