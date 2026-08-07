@@ -83,37 +83,77 @@ namespace Civil3DCsharp
 }
 ```
 
-### Template 2: Command với Form (Dialog)
+### Template 2: Command với Form (Dialog), Tương tác Canvas & Ghi nhớ đối tượng
 
 ```csharp
-[CommandMethod("TEN_LENH_FORM")]
-public static void TenMethodForm()
+public class TenCommandClass
 {
-    // 1. Hiển thị form trước
-    var form = new MyFirstProject.Civil_Tool.TenForm();
-    var result = Autodesk.AutoCAD.ApplicationServices.Application.ShowModalDialog(form);
+    // Lưu giữ vết đối tượng đã chọn cho lần thực hiện sau
+    private static ObjectId _lastSelectedId = ObjectId.Null;
 
-    if (result != System.Windows.Forms.DialogResult.OK || !form.FormAccepted)
+    [CommandMethod("TEN_LENH_FORM")]
+    public static void TenMethodForm()
     {
-        A.Ed.WriteMessage("\\n Đã hủy lệnh.");
-        return;
-    }
+        Document doc = Application.DocumentManager.MdiActiveDocument;
+        Editor ed = doc.Editor;
+        Database db = doc.Database;
 
-    // 2. Lấy giá trị từ form
-    string value1 = form.Value1;
-    int value2 = form.Value2;
+        var form = new MyFirstProject.Civil_Tool.TenForm();
 
-    // 3. Bắt đầu transaction
-    using Transaction tr = A.Db.TransactionManager.StartTransaction();
-    try
-    {
-        // ... xử lý logic với giá trị từ form
+        // 1. Nạp lại đối tượng đã chọn ở lần chạy trước (nếu còn hợp lệ)
+        if (!_lastSelectedId.IsNull && _lastSelectedId.IsValid && !_lastSelectedId.IsErased)
+        {
+            try
+            {
+                using (Transaction tr = db.TransactionManager.StartTransaction())
+                {
+                    DBObject obj = tr.GetObject(_lastSelectedId, OpenMode.ForRead);
+                    if (obj != null)
+                    {
+                        form.SelectedObjectId = _lastSelectedId;
+                        // form.TxtName.Text = ...;
+                    }
+                }
+            }
+            catch { }
+        }
 
-        tr.Commit();
-    }
-    catch (Autodesk.AutoCAD.Runtime.Exception e)
-    {
-        A.Ed.WriteMessage(e.Message);
+        // 2. Sự kiện pick đối tượng / điểm từ Form
+        form.BtnPick.Click += (s, e) =>
+        {
+            using (var interaction = ed.StartUserInteraction(form))
+            {
+                PromptPointOptions ppo = new PromptPointOptions("\nChọn điểm trên bản vẽ: ");
+                PromptPointResult ppr = ed.GetPoint(ppo);
+                interaction.End();
+
+                if (ppr.Status == PromptStatus.OK)
+                {
+                    form.SelectedPoint = ppr.Value;
+                }
+            }
+        };
+
+        // 3. Hiển thị form Modal Dialog
+        var result = Application.ShowModalDialog(form);
+
+        if (result == System.Windows.Forms.DialogResult.OK && form.FormAccepted)
+        {
+            // Lưu lại đối tượng chọn cho lần sau
+            _lastSelectedId = form.SelectedObjectId;
+
+            // 4. Bắt đầu transaction và thực thi logic
+            using Transaction tr = db.TransactionManager.StartTransaction();
+            try
+            {
+                // ... xử lý logic với giá trị từ form
+                tr.Commit();
+            }
+            catch (System.Exception ex)
+            {
+                ed.WriteMessage($"\n Lỗi: {ex.Message}");
+            }
+        }
     }
 }
 ```

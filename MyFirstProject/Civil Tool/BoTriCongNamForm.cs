@@ -25,47 +25,67 @@ namespace MyFirstProject.Civil_Tool
         {
             InitializeComponent();
 
-            this.cmbStandard.SelectedIndex = 0; // TCVN 4054:2005
-            this.cmbVtk.SelectedIndex = 1; // 60 km/h by default
+            this.cmbStandard.Items.Clear();
+            var standards = Civil3DCsharp.StandardFactory.GetAllStandards();
+            foreach (var std in standards)
+            {
+                this.cmbStandard.Items.Add(std.StandardName);
+            }
 
-            this.cmbStandard.SelectedIndexChanged += (s, e) => UpdateSuggestions();
+            if (this.cmbStandard.Items.Count > 0)
+                this.cmbStandard.SelectedIndex = 0;
+
+            UpdateVtkList();
+
+            this.cmbStandard.SelectedIndexChanged += (s, e) => { UpdateVtkList(); UpdateSuggestions(); };
             this.cmbVtk.SelectedIndexChanged += (s, e) => UpdateSuggestions();
 
             this.btnCancel.Click += (s, e) => { this.DialogResult = DialogResult.Cancel; this.Close(); };
             this.btnApply.Click += BtnApply_Click;
         }
 
+        private void UpdateVtkList()
+        {
+            var standards = Civil3DCsharp.StandardFactory.GetAllStandards();
+            int stdIndex = cmbStandard.SelectedIndex;
+            if (stdIndex < 0 || stdIndex >= standards.Count) return;
+
+            var standard = standards[stdIndex];
+            string currentVtk = cmbVtk.SelectedItem?.ToString();
+
+            cmbVtk.Items.Clear();
+            foreach (int spd in standard.SupportedSpeeds)
+            {
+                cmbVtk.Items.Add(spd.ToString());
+            }
+
+            if (currentVtk != null && cmbVtk.Items.Contains(currentVtk))
+            {
+                cmbVtk.SelectedItem = currentVtk;
+            }
+            else if (cmbVtk.Items.Count > 0)
+            {
+                // Mặc định chọn tốc độ ở vị trí thứ 1 (hoặc 0)
+                cmbVtk.SelectedIndex = Math.Min(1, cmbVtk.Items.Count - 1);
+            }
+        }
+
         public void UpdateSuggestions()
         {
             if (cmbVtk.SelectedItem == null) return;
-            string vtk = cmbVtk.SelectedItem.ToString() ?? "60";
+            string vtkStr = cmbVtk.SelectedItem.ToString();
+            int vtk = int.TryParse(vtkStr, out int v) ? v : 60;
             
-            double rMinBase = 125;
-            double lsBase = 50;
-
-            switch (vtk)
-            {
-                case "40":
-                    rMinBase = 60;
-                    lsBase = 0; // Khi Vtk < 60 km/h: Không bố trí đoạn chuyển tiếp Ls
-                    break;
-                case "60":
-                    rMinBase = 125;
-                    lsBase = 50;
-                    break;
-                case "80":
-                    rMinBase = 250;
-                    lsBase = 70;
-                    break;
-                case "100":
-                    rMinBase = 400;
-                    lsBase = 85;
-                    break;
-                case "120":
-                    rMinBase = 600;
-                    lsBase = 100;
-                    break;
-            }
+            var standards = Civil3DCsharp.StandardFactory.GetAllStandards();
+            int stdIndex = cmbStandard.SelectedIndex;
+            if (stdIndex < 0 || stdIndex >= standards.Count) stdIndex = 0;
+            var standard = standards[stdIndex];
+            
+            var p = standard.GetParameters(vtk);
+            double rMinBase = p.MinRadiusLimit;
+            double rNormal = p.MinRadiusNormal;
+            double rNoSuperelevation = p.MinRadiusNoSuperelevation;
+            double lsBase = p.MinTransitionCurveLength;
 
             // Adjust for small deflection angle (alpha < 5 degrees)
             // Khi góc nhỏ -> Bán kính R rất lớn (vài nghìn m) -> Không cần bố trí Ls (Ls = 0)
@@ -78,8 +98,8 @@ namespace MyFirstProject.Civil_Tool
 
                 // Lmin chuẩn từ 100m (40km/h) đến 175m (80-120km/h)
                 double lMinCurve = vtk switch {
-                    "40" => 100,
-                    "60" => 140,
+                    40 => 100,
+                    60 => 140,
                     _ => 175
                 };
 
@@ -91,14 +111,14 @@ namespace MyFirstProject.Civil_Tool
                 lsBase = 0;
                 string lsText = "Ls = 0m (R lớn, không Ls)";
 
-                lblSuggest.Text = $"💡 TC ({vtk}km/h, α={DeflectionAngle:F1}°<5°): Rmin = {rSuggest}m | {lsText}";
+                lblSuggest.Text = $"💡 TC ({vtk}km/h, α={DeflectionAngle:F1}°<5°): Rmin={rSuggest}m | Rtt={rNormal}m | Rksc={rNoSuperelevation}m | {lsText}";
             }
             else
             {
                 lblAngleVal.Text = DeflectionAngle > 0 ? $"{DeflectionAngle:F1}°" : "--°";
                 lblAngleVal.ForeColor = System.Drawing.Color.DarkGreen;
                 string lsText = lsBase > 0 ? $"Ls = {lsBase}m" : "Ls = 0m (Không Ls)";
-                lblSuggest.Text = $"💡 TC ({vtk}km/h): Rmin = {rMinBase}m | {lsText}";
+                lblSuggest.Text = $"💡 TC ({vtk}km/h): Rmin = {rMinBase}m | Rtt = {rNormal}m | Rksc = {rNoSuperelevation}m | {lsText}";
             }
 
             txtR.Text = rSuggest.ToString();

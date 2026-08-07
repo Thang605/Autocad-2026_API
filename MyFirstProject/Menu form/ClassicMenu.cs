@@ -134,6 +134,8 @@ namespace MyFirstProject
             AddHeader(subMenuProfile, "--- Vẽ trắc dọc ---");
             AddMenuItem(subMenuProfile, "Vẽ Trắc Dọc Tự Nhiên", "CTP_VeTracDoc_TuNhien ");
             AddMenuItem(subMenuProfile, "Vẽ Trắc Dọc Tất Cả Tuyến", "CTP_VeTracDoc_TuNhien_TatCaTuyen ");
+            AddHeader(subMenuProfile, "--- Kiểm tra tiêu chuẩn ---");
+            AddMenuItem(subMenuProfile, "Kiểm Tra Profile Theo Tiêu Chuẩn", "CTP_KiemTraProfile ");
             AddHeader(subMenuProfile, "--- Sửa/Gắn nhãn ---");
             AddMenuItem(subMenuProfile, "Sửa Đường Tự Nhiên Theo Cọc", "CTP_Fix_DuongTuNhien_TheoCoc ");
             AddMenuItem(subMenuProfile, "Gắn Nhãn Nút Giao Lên Trắc Dọc", "CTP_GanNhanNutGiao_LenTracDoc ");
