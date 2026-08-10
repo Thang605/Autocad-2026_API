@@ -19,9 +19,25 @@ namespace MyFirstProject.Menu_form
         private IDesignStandard _currentStandard;
         public List<CheckResult> ErrorResults { get; private set; } = new List<CheckResult>();
 
+        // Bộ nhớ lưu các lựa chọn ở lần chạy trước
+        private static string _lastStandardName = "";
+        private static string _lastAlignmentName = "";
+        private static string _lastDesignSpeed = "";
+
+        private static bool _lastChkMinRadius = true;
+        private static bool _lastChkMinCurveLength = true;
+        private static bool _lastChkMaxStraightLength = true;
+        private static bool _lastChkStraightBetweenCurves = true;
+        private static bool _lastChkTransitionLength = true;
+        private static bool _lastChkCheckSuperelevation = true;
+
+        private static bool _lastChkShowPassed = true;
+        private static bool _lastChkShowFailed = true;
+
         public KiemTraTimTuyenForm()
         {
             InitializeComponent();
+            this.FormClosing += (s, e) => SaveLastUsedValues();
         }
 
         private void KiemTraTimTuyenForm_Load(object sender, EventArgs e)
@@ -31,8 +47,76 @@ namespace MyFirstProject.Menu_form
             var standards = StandardFactory.GetAllStandards();
             cbbStandard.DataSource = standards;
             cbbStandard.DisplayMember = "StandardName";
-            if (standards.Count > 0)
-                cbbStandard.SelectedIndex = 0;
+
+            RestoreLastUsedValues();
+        }
+
+        private void RestoreLastUsedValues()
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(_lastStandardName))
+                {
+                    for (int i = 0; i < cbbStandard.Items.Count; i++)
+                    {
+                        var std = cbbStandard.Items[i] as IDesignStandard;
+                        if (std != null && std.StandardName == _lastStandardName)
+                        {
+                            cbbStandard.SelectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(_lastDesignSpeed))
+                {
+                    int idx = cbbDesignSpeed.Items.IndexOf(_lastDesignSpeed);
+                    if (idx >= 0) cbbDesignSpeed.SelectedIndex = idx;
+                }
+
+                if (!string.IsNullOrEmpty(_lastAlignmentName))
+                {
+                    int idx = cbbAlignments.Items.IndexOf(_lastAlignmentName);
+                    if (idx >= 0) cbbAlignments.SelectedIndex = idx;
+                }
+
+                chkMinRadius.Checked = _lastChkMinRadius;
+                chkMinCurveLength.Checked = _lastChkMinCurveLength;
+                chkMaxStraightLength.Checked = _lastChkMaxStraightLength;
+                chkStraightBetweenCurves.Checked = _lastChkStraightBetweenCurves;
+                chkTransitionLength.Checked = _lastChkTransitionLength;
+                chkCheckSuperelevation.Checked = _lastChkCheckSuperelevation;
+
+                chkShowPassed.Checked = _lastChkShowPassed;
+                chkShowFailed.Checked = _lastChkShowFailed;
+            }
+            catch { }
+        }
+
+        private void SaveLastUsedValues()
+        {
+            try
+            {
+                if (cbbStandard.SelectedItem is IDesignStandard std)
+                    _lastStandardName = std.StandardName;
+
+                if (cbbAlignments.SelectedItem != null)
+                    _lastAlignmentName = cbbAlignments.SelectedItem.ToString() ?? "";
+
+                if (cbbDesignSpeed.SelectedItem != null)
+                    _lastDesignSpeed = cbbDesignSpeed.SelectedItem.ToString() ?? "";
+
+                _lastChkMinRadius = chkMinRadius.Checked;
+                _lastChkMinCurveLength = chkMinCurveLength.Checked;
+                _lastChkMaxStraightLength = chkMaxStraightLength.Checked;
+                _lastChkStraightBetweenCurves = chkStraightBetweenCurves.Checked;
+                _lastChkTransitionLength = chkTransitionLength.Checked;
+                _lastChkCheckSuperelevation = chkCheckSuperelevation.Checked;
+
+                _lastChkShowPassed = chkShowPassed.Checked;
+                _lastChkShowFailed = chkShowFailed.Checked;
+            }
+            catch { }
         }
 
         private void cbbStandard_SelectedIndexChanged(object sender, EventArgs e)

@@ -58,46 +58,47 @@ namespace Civil3DCsharp
                             {
                                 using (Transaction tr = db.TransactionManager.StartTransaction())
                                 {
-                                    Entity ent = tr.GetObject(per.ObjectId, OpenMode.ForWrite) as Entity;
+                                    Entity ent = tr.GetObject(per.ObjectId, OpenMode.ForRead) as Entity;
                                     if (ent is ProfileView pv)
                                     {
                                         form.ProfileViewId = pv.ObjectId;
                                         form.txtProfileViewName.Text = pv.Name;
 
-                                        // Auto find layout profile on alignment
                                         ObjectId alignId = pv.AlignmentId;
                                         if (alignId.IsValid && !alignId.IsNull)
                                         {
-                                            Alignment align = tr.GetObject(alignId, OpenMode.ForWrite) as Alignment;
+                                            Alignment align = tr.GetObject(alignId, OpenMode.ForRead) as Alignment;
                                             if (align != null)
                                             {
-                                                ObjectId profileId = ObjectId.Null;
-                                                foreach (ObjectId profId in align.GetProfileIds())
-                                                {
-                                                    Profile p = tr.GetObject(profId, OpenMode.ForWrite) as Profile;
-                                                    if (p != null && p.ProfileType == ProfileType.FG)
-                                                    {
-                                                        profileId = profId;
-                                                        form.txtProfileName.Text = p.Name;
-                                                        break;
-                                                    }
-                                                }
-
-                                                if (profileId.IsNull && align.GetProfileIds().Count > 0)
-                                                {
-                                                    profileId = align.GetProfileIds()[0];
-                                                    Profile p = tr.GetObject(profileId, OpenMode.ForWrite) as Profile;
-                                                    if (p != null) form.txtProfileName.Text = p.Name;
-                                                }
-
-                                                form.ProfileId = profileId;
+                                                LoadProfilesFromAlignment(tr, align, form);
                                             }
                                         }
                                     }
                                     else if (ent is Profile prof)
                                     {
-                                        form.ProfileId = prof.ObjectId;
-                                        form.txtProfileName.Text = prof.Name;
+                                        ObjectId alignId = prof.AlignmentId;
+                                        if (alignId.IsValid && !alignId.IsNull)
+                                        {
+                                            Alignment align = tr.GetObject(alignId, OpenMode.ForRead) as Alignment;
+                                            if (align != null)
+                                            {
+                                                LoadProfilesFromAlignment(tr, align, form, prof.ObjectId);
+                                                ObjectId pvId = FindProfileViewForAlignment(tr, db, align.ObjectId);
+                                                if (pvId.IsValid && !pvId.IsNull)
+                                                {
+                                                    ProfileView pvObj = tr.GetObject(pvId, OpenMode.ForRead) as ProfileView;
+                                                    if (pvObj != null)
+                                                    {
+                                                        form.ProfileViewId = pvObj.ObjectId;
+                                                        form.txtProfileViewName.Text = pvObj.Name;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        else
+                                        {
+                                            form.PopulateProfiles(new List<DieuChinhProfileItem> { new DieuChinhProfileItem(prof.Name, prof.ObjectId) }, prof.ObjectId);
+                                        }
                                     }
 
                                     // Reset PVI selections
@@ -112,6 +113,70 @@ namespace Civil3DCsharp
                     catch (System.Exception ex)
                     {
                         ed.WriteMessage($"\nLỗi khi chọn đối tượng: {ex.Message}");
+                    }
+                };
+
+                // Wire up Pick Profile
+                form.btnPickProfile.Click += (s, e) =>
+                {
+                    try
+                    {
+                        using (var interaction = ed.StartUserInteraction(form))
+                        {
+                            PromptEntityOptions peo = new PromptEntityOptions("\nChọn Profile trên bản vẽ: ");
+                            peo.SetRejectMessage("\nĐối tượng chọn phải là Profile!");
+                            peo.AddAllowedClass(typeof(Profile), true);
+
+                            PromptEntityResult per = ed.GetEntity(peo);
+                            interaction.End();
+
+                            if (per.Status == PromptStatus.OK)
+                            {
+                                using (Transaction tr = db.TransactionManager.StartTransaction())
+                                {
+                                    Profile prof = tr.GetObject(per.ObjectId, OpenMode.ForRead) as Profile;
+                                    if (prof != null)
+                                    {
+                                        ObjectId alignId = prof.AlignmentId;
+                                        if (alignId.IsValid && !alignId.IsNull)
+                                        {
+                                            Alignment align = tr.GetObject(alignId, OpenMode.ForRead) as Alignment;
+                                            if (align != null)
+                                            {
+                                                LoadProfilesFromAlignment(tr, align, form, prof.ObjectId);
+                                                if (form.ProfileViewId.IsNull || !form.ProfileViewId.IsValid)
+                                                {
+                                                    ObjectId pvId = FindProfileViewForAlignment(tr, db, align.ObjectId);
+                                                    if (pvId.IsValid && !pvId.IsNull)
+                                                    {
+                                                        ProfileView pvObj = tr.GetObject(pvId, OpenMode.ForRead) as ProfileView;
+                                                        if (pvObj != null)
+                                                        {
+                                                            form.ProfileViewId = pvObj.ObjectId;
+                                                            form.txtProfileViewName.Text = pvObj.Name;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        else
+                                        {
+                                            form.PopulateProfiles(new List<DieuChinhProfileItem> { new DieuChinhProfileItem(prof.Name, prof.ObjectId) }, prof.ObjectId);
+                                        }
+
+                                        // Reset PVI selections
+                                        form.Pvi1Index = -1;
+                                        form.Pvi2Index = -1;
+                                        form.UpdatePvi1Display();
+                                        form.UpdatePvi2Display();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (System.Exception ex)
+                    {
+                        ed.WriteMessage($"\nLỗi khi chọn Profile: {ex.Message}");
                     }
                 };
 
@@ -187,7 +252,10 @@ namespace Civil3DCsharp
                     {
                         using (var interaction = ed.StartUserInteraction(form))
                         {
-                            PromptPointOptions ppo = new PromptPointOptions("\nPick vị trí PVI 1 (cố định) trên trắc dọc: ");
+                            string promptMsg = form.IsFixPvi1
+                                ? "\nPick vị trí PVI 1 (cố định) trên trắc dọc: "
+                                : "\nPick vị trí PVI 1 (thay đổi) trên trắc dọc: ";
+                            PromptPointOptions ppo = new PromptPointOptions(promptMsg);
                             PromptPointResult ppr = ed.GetPoint(ppo);
                             interaction.End();
 
@@ -237,7 +305,10 @@ namespace Civil3DCsharp
                     {
                         using (var interaction = ed.StartUserInteraction(form))
                         {
-                            PromptPointOptions ppo = new PromptPointOptions("\nPick vị trí PVI 2 (thay đổi) trên trắc dọc: ");
+                            string promptMsg = form.IsFixPvi1
+                                ? "\nPick vị trí PVI 2 (thay đổi) trên trắc dọc: "
+                                : "\nPick vị trí PVI 2 (cố định) trên trắc dọc: ";
+                            PromptPointOptions ppo = new PromptPointOptions(promptMsg);
                             PromptPointResult ppr = ed.GetPoint(ppo);
                             interaction.End();
 
@@ -274,7 +345,7 @@ namespace Civil3DCsharp
                     }
                 };
 
-                // Nút Pick điểm thứ 2 để tính cả Khoảng cách L và Dốc i từ PVI 1 cố định
+                // Nút Pick điểm để tính cả Khoảng cách L và Dốc i
                 form.btnPickPoint2.Click += (s, e) =>
                 {
                     if (form.ProfileId.IsNull || !form.ProfileId.IsValid)
@@ -283,9 +354,14 @@ namespace Civil3DCsharp
                         return;
                     }
 
-                    if (form.Pvi1Index < 0)
+                    if (form.IsFixPvi1 && form.Pvi1Index < 0)
                     {
                         MessageBox.Show("Vui lòng chọn PVI 1 (cố định) trước!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                    else if (!form.IsFixPvi1 && form.Pvi2Index < 0)
+                    {
+                        MessageBox.Show("Vui lòng chọn PVI 2 (cố định) trước!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         return;
                     }
 
@@ -293,15 +369,18 @@ namespace Civil3DCsharp
                     {
                         using (var interaction = ed.StartUserInteraction(form))
                         {
-                            PromptPointOptions ppo = new PromptPointOptions("\nPick điểm thứ 2 trên trắc dọc để tính khoảng cách L và dốc i từ PVI 1: ");
+                            string promptMsg = form.IsFixPvi1
+                                ? "\nPick điểm thứ 2 trên trắc dọc để tính khoảng cách L và dốc i từ PVI 1: "
+                                : "\nPick điểm thứ 1 trên trắc dọc để tính khoảng cách L và dốc i đến PVI 2: ";
+                            PromptPointOptions ppo = new PromptPointOptions(promptMsg);
                             PromptPointResult ppr = ed.GetPoint(ppo);
                             interaction.End();
 
                             if (ppr.Status == PromptStatus.OK)
                             {
-                                Point3d pt2 = ppr.Value;
-                                double s2 = pt2.X;
-                                double e2 = pt2.Y;
+                                Point3d ptPicked = ppr.Value;
+                                double sPick = ptPicked.X;
+                                double ePick = ptPicked.Y;
 
                                 if (!form.ProfileViewId.IsNull && form.ProfileViewId.IsValid)
                                 {
@@ -310,13 +389,26 @@ namespace Civil3DCsharp
                                         ProfileView pv = tr.GetObject(form.ProfileViewId, OpenMode.ForWrite) as ProfileView;
                                         if (pv != null)
                                         {
-                                            pv.FindStationAndElevationAtXY(pt2.X, pt2.Y, ref s2, ref e2);
+                                            pv.FindStationAndElevationAtXY(ptPicked.X, ptPicked.Y, ref sPick, ref ePick);
                                         }
                                     }
                                 }
 
-                                double s1 = form.Pvi1Station;
-                                double e1 = form.Pvi1Elevation;
+                                double s1, e1, s2, e2;
+                                if (form.IsFixPvi1)
+                                {
+                                    s1 = form.Pvi1Station;
+                                    e1 = form.Pvi1Elevation;
+                                    s2 = sPick;
+                                    e2 = ePick;
+                                }
+                                else
+                                {
+                                    s1 = sPick;
+                                    e1 = ePick;
+                                    s2 = form.Pvi2Station;
+                                    e2 = form.Pvi2Elevation;
+                                }
 
                                 double dist = Math.Abs(s2 - s1);
                                 double slope = (Math.Abs(s2 - s1) > 0.0001) ? ((e2 - e1) / (s2 - s1)) * 100.0 : 0.0;
@@ -324,13 +416,13 @@ namespace Civil3DCsharp
                                 form.numDistance.Value = (decimal)Math.Round(dist, 3);
                                 form.numSlope.Value = (decimal)Math.Round(slope, 4);
 
-                                ed.WriteMessage($"\n✅ Đã tính từ PVI 1 ({s1:F2}m, {e1:F3}m) đến điểm thứ 2 ({s2:F2}m, {e2:F3}m): Khoảng cách L = {dist:F3}m, Dốc i = {slope:F4}%");
+                                ed.WriteMessage($"\n✅ Đã tính: PVI 1 ({s1:F2}m, {e1:F3}m) -> PVI 2 ({s2:F2}m, {e2:F3}m): Khoảng cách L = {dist:F3}m, Dốc i = {slope:F4}%");
                             }
                         }
                     }
                     catch (System.Exception ex)
                     {
-                        ed.WriteMessage($"\nLỗi khi pick điểm thứ 2: {ex.Message}");
+                        ed.WriteMessage($"\nLỗi khi pick điểm: {ex.Message}");
                     }
                 };
 
@@ -362,15 +454,26 @@ namespace Civil3DCsharp
             {
                 using (Transaction tr = db.TransactionManager.StartTransaction())
                 {
-                    Profile profile = tr.GetObject(_lastProfileId, OpenMode.ForWrite) as Profile;
+                    Profile profile = tr.GetObject(_lastProfileId, OpenMode.ForRead) as Profile;
                     if (profile != null)
                     {
-                        form.ProfileId = _lastProfileId;
-                        form.txtProfileName.Text = profile.Name;
+                        ObjectId alignId = profile.AlignmentId;
+                        if (alignId.IsValid && !alignId.IsNull)
+                        {
+                            Alignment align = tr.GetObject(alignId, OpenMode.ForRead) as Alignment;
+                            if (align != null)
+                            {
+                                LoadProfilesFromAlignment(tr, align, form, _lastProfileId);
+                            }
+                        }
+                        else
+                        {
+                            form.PopulateProfiles(new List<DieuChinhProfileItem> { new DieuChinhProfileItem(profile.Name, profile.ObjectId) }, profile.ObjectId);
+                        }
 
                         if (!_lastProfileViewId.IsNull && _lastProfileViewId.IsValid && !_lastProfileViewId.IsErased)
                         {
-                            ProfileView pv = tr.GetObject(_lastProfileViewId, OpenMode.ForWrite) as ProfileView;
+                            ProfileView pv = tr.GetObject(_lastProfileViewId, OpenMode.ForRead) as ProfileView;
                             if (pv != null)
                             {
                                 form.ProfileViewId = _lastProfileViewId;
@@ -399,6 +502,59 @@ namespace Civil3DCsharp
                 }
             }
             catch { }
+        }
+
+        private void LoadProfilesFromAlignment(Transaction tr, Alignment align, DieuChinhDuongDoForm form, ObjectId selectedProfId = default)
+        {
+            var list = new List<DieuChinhProfileItem>();
+            ObjectId defaultId = ObjectId.Null;
+
+            foreach (ObjectId profId in align.GetProfileIds())
+            {
+                Profile p = tr.GetObject(profId, OpenMode.ForRead) as Profile;
+                if (p != null)
+                {
+                    string displayName = p.Name;
+                    if (p.ProfileType == ProfileType.FG) displayName += " [Đường đỏ]";
+                    else if (p.ProfileType == ProfileType.EG) displayName += " [Tự nhiên]";
+
+                    list.Add(new DieuChinhProfileItem(displayName, profId));
+                    if (p.ProfileType == ProfileType.FG && defaultId.IsNull)
+                    {
+                        defaultId = profId;
+                    }
+                }
+            }
+
+            if (selectedProfId.IsValid && !selectedProfId.IsNull && list.Any(x => x.Id == selectedProfId))
+            {
+                defaultId = selectedProfId;
+            }
+            else if (defaultId.IsNull && list.Count > 0)
+            {
+                defaultId = list[0].Id;
+            }
+
+            form.PopulateProfiles(list, defaultId);
+        }
+
+        private ObjectId FindProfileViewForAlignment(Transaction tr, Database db, ObjectId alignId)
+        {
+            BlockTable bt = tr.GetObject(db.BlockTableId, OpenMode.ForRead) as BlockTable;
+            BlockTableRecord btr = tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForRead) as BlockTableRecord;
+
+            foreach (ObjectId id in btr)
+            {
+                if (id.ObjectClass.IsDerivedFrom(Autodesk.AutoCAD.Runtime.RXObject.GetClass(typeof(ProfileView))))
+                {
+                    ProfileView pv = tr.GetObject(id, OpenMode.ForRead) as ProfileView;
+                    if (pv != null && pv.AlignmentId == alignId)
+                    {
+                        return pv.ObjectId;
+                    }
+                }
+            }
+            return ObjectId.Null;
         }
 
         private bool FindSegmentPvis(Database db, ObjectId profileId, ObjectId profileViewId, Point3d pt,
@@ -535,75 +691,153 @@ namespace Civil3DCsharp
                 double sta1 = pvi1.RawStation;
                 double elev1 = pvi1.Elevation;
 
-                double oldSta2 = pvi2.RawStation;
-                double oldElev2 = pvi2.Elevation;
+                double sta2 = pvi2.RawStation;
+                double elev2 = pvi2.Elevation;
 
-                int direction = (idx2 >= idx1) ? 1 : -1;
                 double newDist = form.NewDistance;
                 double slope = form.SlopePercent;
-
-                double newSta2 = sta1 + direction * newDist;
-                double newElev2 = elev1 + direction * (slope / 100.0) * newDist;
-                double deltaSta = newSta2 - oldSta2;
-
-                // Cập nhật vị trí PVI 2
-                try
-                {
-                    pvi2.RawStation = newSta2;
-                    pvi2.Elevation = newElev2;
-                }
-                catch
-                {
-                    profile.PVIs.RemoveAt(idx2);
-                    profile.PVIs.AddPVI(newSta2, newElev2);
-                }
-
-                // Tịnh tiến các PVI phía sau nếu được bật
                 int shiftedCount = 0;
-                if (form.ShiftSubsequent && Math.Abs(deltaSta) > 0.0001)
+
+                if (form.IsFixPvi1)
                 {
-                    if (direction > 0)
+                    // Cố định PVI 1, điều chỉnh PVI 2
+                    double oldSta2 = sta2;
+                    double oldElev2 = elev2;
+
+                    int direction = (idx2 >= idx1) ? 1 : -1;
+                    double newSta2 = sta1 + direction * newDist;
+                    double newElev2 = elev1 + direction * (slope / 100.0) * newDist;
+                    double deltaSta = newSta2 - oldSta2;
+
+                    // Cập nhật vị trí PVI 2
+                    try
                     {
-                        for (int k = idx2 + 1; k < profile.PVIs.Count; k++)
+                        pvi2.RawStation = newSta2;
+                        pvi2.Elevation = newElev2;
+                    }
+                    catch
+                    {
+                        profile.PVIs.RemoveAt(idx2);
+                        profile.PVIs.AddPVI(newSta2, newElev2);
+                    }
+
+                    // Tịnh tiến các PVI phía sau PVI 2 nếu được bật
+                    if (form.ShiftSubsequent && Math.Abs(deltaSta) > 0.0001)
+                    {
+                        if (direction > 0)
                         {
-                            ProfilePVI subPvi = profile.PVIs[k];
-                            try
+                            for (int k = idx2 + 1; k < profile.PVIs.Count; k++)
                             {
-                                subPvi.RawStation = subPvi.RawStation + deltaSta;
-                                shiftedCount++;
+                                ProfilePVI subPvi = profile.PVIs[k];
+                                try
+                                {
+                                    subPvi.RawStation = subPvi.RawStation + deltaSta;
+                                    shiftedCount++;
+                                }
+                                catch { }
                             }
-                            catch { }
+                        }
+                        else
+                        {
+                            for (int k = idx2 - 1; k >= 0; k--)
+                            {
+                                ProfilePVI subPvi = profile.PVIs[k];
+                                try
+                                {
+                                    subPvi.RawStation = subPvi.RawStation + deltaSta;
+                                    shiftedCount++;
+                                }
+                                catch { }
+                            }
                         }
                     }
-                    else
+
+                    tr.Commit();
+
+                    ed.WriteMessage("\n==========================================");
+                    ed.WriteMessage($"\n🎉 ĐÃ ĐIỀU CHỈNH ĐƯỜNG ĐỎ: {profile.Name}");
+                    ed.WriteMessage($"\n - PVI 1 cố định (#{idx1}): Sta = {sta1:F2}m | Elev = {elev1:F3}m");
+                    ed.WriteMessage($"\n - PVI 2 trước điều chỉnh (#{idx2}): Sta = {oldSta2:F2}m | Elev = {oldElev2:F3}m");
+                    ed.WriteMessage($"\n - PVI 2 sau điều chỉnh (#{idx2}): Sta = {newSta2:F2}m | Elev = {newElev2:F3}m");
+                    ed.WriteMessage($"\n - Dốc thiết lập (PVI 1 -> PVI 2): {slope:F4}%");
+                    ed.WriteMessage($"\n - Khoảng cách mới PVI 1-2: {newDist:F3}m");
+                    if (form.ShiftSubsequent)
                     {
-                        for (int k = idx2 - 1; k >= 0; k--)
+                        ed.WriteMessage($"\n - Đã tịnh tiến {shiftedCount} PVI phía sau theo ΔS = {deltaSta:F3}m");
+                    }
+                    ed.WriteMessage("\n==========================================");
+                }
+                else
+                {
+                    // Cố định PVI 2, điều chỉnh PVI 1
+                    double oldSta1 = sta1;
+                    double oldElev1 = elev1;
+
+                    int direction = (idx1 >= idx2) ? 1 : -1;
+                    double newSta1 = sta2 + direction * newDist;
+                    double newElev1 = elev2 + direction * (slope / 100.0) * newDist;
+                    double deltaSta = newSta1 - oldSta1;
+
+                    // Cập nhật vị trí PVI 1
+                    try
+                    {
+                        pvi1.RawStation = newSta1;
+                        pvi1.Elevation = newElev1;
+                    }
+                    catch
+                    {
+                        profile.PVIs.RemoveAt(idx1);
+                        profile.PVIs.AddPVI(newSta1, newElev1);
+                    }
+
+                    // Tịnh tiến các PVI phía trước PVI 1 nếu được bật
+                    if (form.ShiftSubsequent && Math.Abs(deltaSta) > 0.0001)
+                    {
+                        if (direction < 0)
                         {
-                            ProfilePVI subPvi = profile.PVIs[k];
-                            try
+                            // PVI 1 nằm trước PVI 2 -> tịnh tiến các PVI phía trước PVI 1 (k < idx1)
+                            for (int k = idx1 - 1; k >= 0; k--)
                             {
-                                subPvi.RawStation = subPvi.RawStation + deltaSta;
-                                shiftedCount++;
+                                ProfilePVI subPvi = profile.PVIs[k];
+                                try
+                                {
+                                    subPvi.RawStation = subPvi.RawStation + deltaSta;
+                                    shiftedCount++;
+                                }
+                                catch { }
                             }
-                            catch { }
+                        }
+                        else
+                        {
+                            // PVI 1 nằm sau PVI 2 -> tịnh tiến các PVI phía sau PVI 1 (k > idx1)
+                            for (int k = idx1 + 1; k < profile.PVIs.Count; k++)
+                            {
+                                ProfilePVI subPvi = profile.PVIs[k];
+                                try
+                                {
+                                    subPvi.RawStation = subPvi.RawStation + deltaSta;
+                                    shiftedCount++;
+                                }
+                                catch { }
+                            }
                         }
                     }
-                }
 
-                tr.Commit();
+                    tr.Commit();
 
-                ed.WriteMessage("\n==========================================");
-                ed.WriteMessage($"\n🎉 ĐÃ ĐIỀU CHỈNH ĐƯỜNG ĐỎ: {profile.Name}");
-                ed.WriteMessage($"\n - PVI 1 cố định (#{idx1}): Sta = {sta1:F2}m | Elev = {elev1:F3}m");
-                ed.WriteMessage($"\n - PVI 2 trước điều chỉnh (#{idx2}): Sta = {oldSta2:F2}m | Elev = {oldElev2:F3}m");
-                ed.WriteMessage($"\n - PVI 2 sau điều chỉnh (#{idx2}): Sta = {newSta2:F2}m | Elev = {newElev2:F3}m");
-                ed.WriteMessage($"\n - Dốc thiết lập: {slope:F4}%");
-                ed.WriteMessage($"\n - Khoảng cách mới PVI 1-2: {newDist:F3}m");
-                if (form.ShiftSubsequent)
-                {
-                    ed.WriteMessage($"\n - Đã tịnh tiến {shiftedCount} PVI phía sau theo ΔS = {deltaSta:F3}m");
+                    ed.WriteMessage("\n==========================================");
+                    ed.WriteMessage($"\n🎉 ĐÃ ĐIỀU CHỈNH ĐƯỜNG ĐỎ: {profile.Name}");
+                    ed.WriteMessage($"\n - PVI 2 cố định (#{idx2}): Sta = {sta2:F2}m | Elev = {elev2:F3}m");
+                    ed.WriteMessage($"\n - PVI 1 trước điều chỉnh (#{idx1}): Sta = {oldSta1:F2}m | Elev = {oldElev1:F3}m");
+                    ed.WriteMessage($"\n - PVI 1 sau điều chỉnh (#{idx1}): Sta = {newSta1:F2}m | Elev = {newElev1:F3}m");
+                    ed.WriteMessage($"\n - Dốc thiết lập (PVI 1 -> PVI 2): {slope:F4}%");
+                    ed.WriteMessage($"\n - Khoảng cách mới PVI 1-2: {newDist:F3}m");
+                    if (form.ShiftSubsequent)
+                    {
+                        ed.WriteMessage($"\n - Đã tịnh tiến {shiftedCount} PVI phía trước/liên quan theo ΔS = {deltaSta:F3}m");
+                    }
+                    ed.WriteMessage("\n==========================================");
                 }
-                ed.WriteMessage("\n==========================================");
             }
         }
     }

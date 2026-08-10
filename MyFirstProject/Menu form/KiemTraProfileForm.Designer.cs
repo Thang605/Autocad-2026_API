@@ -58,6 +58,7 @@ namespace MyFirstProject.Menu_form
             this.chkShowWarning = new System.Windows.Forms.CheckBox();
             this.chkShowFailed = new System.Windows.Forms.CheckBox();
             this.btnZoomPVI = new System.Windows.Forms.Button();
+            this.btnDrawErrors = new System.Windows.Forms.Button();
             this.btnExportExcel = new System.Windows.Forms.Button();
             this.btnClose = new System.Windows.Forms.Button();
             this.groupBox1.SuspendLayout();
@@ -370,6 +371,17 @@ namespace MyFirstProject.Menu_form
             this.chkShowFailed.UseVisualStyleBackColor = true;
             this.chkShowFailed.CheckedChanged += new System.EventHandler(this.Filter_CheckedChanged);
             // 
+            // btnDrawErrors
+            // 
+            this.btnDrawErrors.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnDrawErrors.Location = new System.Drawing.Point(525, 578);
+            this.btnDrawErrors.Name = "btnDrawErrors";
+            this.btnDrawErrors.Size = new System.Drawing.Size(118, 28);
+            this.btnDrawErrors.TabIndex = 20;
+            this.btnDrawErrors.Text = "Đánh dấu vi phạm";
+            this.btnDrawErrors.UseVisualStyleBackColor = true;
+            this.btnDrawErrors.Click += new System.EventHandler(this.btnDrawErrors_Click);
+            // 
             // btnZoomPVI
             // 
             this.btnZoomPVI.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
@@ -409,6 +421,7 @@ namespace MyFirstProject.Menu_form
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(980, 618);
             this.MinimumSize = new System.Drawing.Size(850, 550);
+            this.Controls.Add(this.btnDrawErrors);
             this.Controls.Add(this.btnClose);
             this.Controls.Add(this.btnExportExcel);
             this.Controls.Add(this.btnZoomPVI);
@@ -475,6 +488,7 @@ namespace MyFirstProject.Menu_form
         private System.Windows.Forms.CheckBox chkShowPassed;
         private System.Windows.Forms.CheckBox chkShowWarning;
         private System.Windows.Forms.CheckBox chkShowFailed;
+        private System.Windows.Forms.Button btnDrawErrors;
         private System.Windows.Forms.Button btnZoomPVI;
         private System.Windows.Forms.Button btnExportExcel;
         private System.Windows.Forms.Button btnClose;

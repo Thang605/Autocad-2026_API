@@ -23,9 +23,26 @@ namespace MyFirstProject.Menu_form
         private IDesignStandard _currentStandard;
         private List<ProfileCheckItem> _rawResults = new List<ProfileCheckItem>();
 
+        // Bộ nhớ lưu thông số đã chọn ở lần chạy trước
+        private static string _lastStandardName = "";
+        private static string _lastAlignmentName = "";
+        private static string _lastProfileName = "";
+        private static string _lastDesignSpeed = "";
+        private static string _lastTerrain = "";
+
+        private static bool _lastChkMaxGrade = true;
+        private static bool _lastChkMinGrade = true;
+        private static bool _lastChkVerticalCurve = true;
+        private static bool _lastChkGradeLength = true;
+
+        private static bool _lastChkShowPassed = true;
+        private static bool _lastChkShowWarning = true;
+        private static bool _lastChkShowFailed = true;
+
         public KiemTraProfileForm()
         {
             InitializeComponent();
+            this.FormClosing += (s, e) => SaveLastUsedValues();
         }
 
         private void KiemTraProfileForm_Load(object sender, EventArgs e)
@@ -35,11 +52,104 @@ namespace MyFirstProject.Menu_form
             var standards = StandardFactory.GetAllStandards();
             cbbStandard.DataSource = standards;
             cbbStandard.DisplayMember = "StandardName";
-            if (standards.Count > 0)
-                cbbStandard.SelectedIndex = 0;
 
             if (cbbTerrain.Items.Count > 0)
                 cbbTerrain.SelectedIndex = 0;
+
+            RestoreLastUsedValues();
+        }
+
+        private void RestoreLastUsedValues()
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(_lastStandardName))
+                {
+                    for (int i = 0; i < cbbStandard.Items.Count; i++)
+                    {
+                        var std = cbbStandard.Items[i] as IDesignStandard;
+                        if (std != null && std.StandardName == _lastStandardName)
+                        {
+                            cbbStandard.SelectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(_lastDesignSpeed))
+                {
+                    int idx = cbbDesignSpeed.Items.IndexOf(_lastDesignSpeed);
+                    if (idx >= 0) cbbDesignSpeed.SelectedIndex = idx;
+                }
+
+                if (!string.IsNullOrEmpty(_lastTerrain))
+                {
+                    int idx = cbbTerrain.Items.IndexOf(_lastTerrain);
+                    if (idx >= 0) cbbTerrain.SelectedIndex = idx;
+                }
+
+                if (!string.IsNullOrEmpty(_lastAlignmentName))
+                {
+                    int idx = cbbAlignments.Items.IndexOf(_lastAlignmentName);
+                    if (idx >= 0)
+                    {
+                        cbbAlignments.SelectedIndex = idx;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(_lastProfileName))
+                {
+                    for (int i = 0; i < cbbProfiles.Items.Count; i++)
+                    {
+                        if (cbbProfiles.Items[i].ToString().StartsWith(_lastProfileName))
+                        {
+                            cbbProfiles.SelectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+
+                chkMaxGrade.Checked = _lastChkMaxGrade;
+                chkMinGrade.Checked = _lastChkMinGrade;
+                chkVerticalCurve.Checked = _lastChkVerticalCurve;
+                chkGradeLength.Checked = _lastChkGradeLength;
+
+                chkShowPassed.Checked = _lastChkShowPassed;
+                chkShowWarning.Checked = _lastChkShowWarning;
+                chkShowFailed.Checked = _lastChkShowFailed;
+            }
+            catch { }
+        }
+
+        private void SaveLastUsedValues()
+        {
+            try
+            {
+                if (cbbStandard.SelectedItem is IDesignStandard std)
+                    _lastStandardName = std.StandardName;
+
+                if (cbbAlignments.SelectedItem != null)
+                    _lastAlignmentName = cbbAlignments.SelectedItem.ToString() ?? "";
+
+                if (cbbProfiles.SelectedItem != null)
+                    _lastProfileName = cbbProfiles.SelectedItem.ToString()?.Split(' ')[0] ?? "";
+
+                if (cbbDesignSpeed.SelectedItem != null)
+                    _lastDesignSpeed = cbbDesignSpeed.SelectedItem.ToString() ?? "";
+
+                if (cbbTerrain.SelectedItem != null)
+                    _lastTerrain = cbbTerrain.SelectedItem.ToString() ?? "";
+
+                _lastChkMaxGrade = chkMaxGrade.Checked;
+                _lastChkMinGrade = chkMinGrade.Checked;
+                _lastChkVerticalCurve = chkVerticalCurve.Checked;
+                _lastChkGradeLength = chkGradeLength.Checked;
+
+                _lastChkShowPassed = chkShowPassed.Checked;
+                _lastChkShowWarning = chkShowWarning.Checked;
+                _lastChkShowFailed = chkShowFailed.Checked;
+            }
+            catch { }
         }
 
         private void cbbStandard_SelectedIndexChanged(object sender, EventArgs e)
@@ -356,6 +466,85 @@ namespace MyFirstProject.Menu_form
                     tr.Commit();
                 }
             }
+        }
+
+        private void btnDrawErrors_Click(object sender, EventArgs e)
+        {
+            var failOrWarnItems = _rawResults.Where(r => r.Status == CheckStatus.Fail || r.Status == CheckStatus.Warning).ToList();
+
+            if (failOrWarnItems.Count == 0)
+            {
+                MessageBox.Show("Không có vị trí vi phạm hoặc cảnh báo nào để đánh dấu!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            if (cbbAlignments.SelectedIndex < 0) return;
+            ObjectId alignId = _alignmentIds[cbbAlignments.SelectedIndex];
+
+            int countMarked = 0;
+
+            using (A.Doc.LockDocument())
+            {
+                using (var tr = A.Db.TransactionManager.StartTransaction())
+                {
+                    var align = tr.GetObject(alignId, OpenMode.ForRead) as Alignment;
+                    if (align != null)
+                    {
+                        var btr = (BlockTableRecord)tr.GetObject(A.Db.CurrentSpaceId, OpenMode.ForWrite);
+
+                        foreach (var item in failOrWarnItems)
+                        {
+                            try
+                            {
+                                double targetStation = item.Station;
+                                if (targetStation < align.StartingStation) targetStation = align.StartingStation;
+                                if (targetStation > align.EndingStation) targetStation = align.EndingStation;
+
+                                double x = 0, y = 0;
+                                align.PointLocation(targetStation, 0, ref x, ref y);
+
+                                // Màu sắc: Vi phạm = Đỏ (ColorIndex 1), Cảnh báo = Vàng (ColorIndex 2)
+                                short colorIndex = (item.Status == CheckStatus.Fail) ? (short)1 : (short)2;
+
+                                // 1. Vẽ vòng tròn ký hiệu tại tọa độ tuyến trên mặt bằng
+                                Circle circle = new Circle();
+                                circle.Center = new Autodesk.AutoCAD.Geometry.Point3d(x, y, 0);
+                                circle.Radius = 15.0; // Bán kính 15m
+                                circle.ColorIndex = colorIndex;
+                                btr.AppendEntity(circle);
+                                tr.AddNewlyCreatedDBObject(circle, true);
+
+                                // 2. Vẽ ký hiệu chữ thập (Crosshair)
+                                Line line1 = new Line(new Autodesk.AutoCAD.Geometry.Point3d(x - 25.0, y, 0), new Autodesk.AutoCAD.Geometry.Point3d(x + 25.0, y, 0));
+                                line1.ColorIndex = colorIndex;
+                                btr.AppendEntity(line1);
+                                tr.AddNewlyCreatedDBObject(line1, true);
+
+                                Line line2 = new Line(new Autodesk.AutoCAD.Geometry.Point3d(x, y - 25.0, 0), new Autodesk.AutoCAD.Geometry.Point3d(x, y + 25.0, 0));
+                                line2.ColorIndex = colorIndex;
+                                btr.AppendEntity(line2);
+                                tr.AddNewlyCreatedDBObject(line2, true);
+
+                                // 3. Ghi chú chữ MText thông tin vi phạm
+                                MText mtext = new MText();
+                                mtext.Location = new Autodesk.AutoCAD.Geometry.Point3d(x + 20.0, y + 20.0, 0);
+                                mtext.TextHeight = 5.0;
+                                mtext.ColorIndex = colorIndex;
+                                string prefix = item.Status == CheckStatus.Fail ? "❌ [VI PHẠM]" : "⚠️ [CẢNH BÁO]";
+                                mtext.Contents = $"{prefix} Km{(item.Station / 1000.0):F3}\\n{item.ItemName}\\n{item.ProposedValue}\\nYC: {item.StandardRequirement}";
+                                btr.AppendEntity(mtext);
+                                tr.AddNewlyCreatedDBObject(mtext, true);
+
+                                countMarked++;
+                            }
+                            catch { }
+                        }
+                    }
+                    tr.Commit();
+                }
+            }
+
+            MessageBox.Show($"Đã đánh dấu {countMarked} vị trí vi phạm/cảnh báo trên bản vẽ!", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private void btnExportExcel_Click(object sender, EventArgs e)

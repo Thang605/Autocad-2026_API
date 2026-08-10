@@ -243,7 +243,7 @@ namespace Civil3DCsharp
         public DesignParameters GetParameters(int speed)
         {
             var p = new DesignParameters { DesignSpeed = speed };
-            p.MaxStraightLength = 20 * speed;
+            p.MaxStraightLength = 4000; // TCVN 5729:2012 Mục 7.2: không nên thiết kế các đoạn tuyến thẳng trên đường cao tốc dài quá 4 km (4000 m)
             p.MinStraightLengthSameDirection = 6 * speed;
             p.MinStraightLengthReverseDirection = 2 * speed; 
             p.MaxSuperelevation = 8.0;
@@ -967,11 +967,15 @@ namespace Civil3DCsharp
                 double lenPVI = s2 - s1;
                 if (lenPVI <= 0.001) continue;
 
-                // Chiều dài tangent thực tế = PVI→PVI trừ nửa cong đứng ở 2 đầu
-                double halfCurveAtStart = curveLengthAtPVI[i] / 2.0;
-                double halfCurveAtEnd = curveLengthAtPVI[i + 1] / 2.0;
-                double lenTangent = lenPVI - halfCurveAtStart - halfCurveAtEnd;
+                // Chiều dài đoạn dốc theo TCVN 5729:2012 & TCVN 4054:2005 (Chú thích Bảng 5):
+                // L_dốc = 1/4 * L_v1 + L_thẳng + 1/4 * L_v2
+                // Với L_thẳng = lenPVI - 1/2 * L_v1 - 1/2 * L_v2
+                // => L_dốc = lenPVI - 1/4 * L_v1 - 1/4 * L_v2
+                double lenTangent = lenPVI - (curveLengthAtPVI[i] / 2.0) - (curveLengthAtPVI[i + 1] / 2.0); // Đoạn dốc thẳng thuần túy
                 if (lenTangent < 0) lenTangent = 0;
+
+                double lenDocTCVN = lenPVI - (curveLengthAtPVI[i] / 4.0) - (curveLengthAtPVI[i + 1] / 4.0); // Chiều dài dốc theo TCVN
+                if (lenDocTCVN < 0) lenDocTCVN = 0;
 
                 double slope = (z2 - z1) / lenPVI * 100.0;
                 double absSlope = Math.Abs(slope);
@@ -983,7 +987,7 @@ namespace Civil3DCsharp
                     Station = s1,
                     Elevation = z1,
                     ItemName = $"Đoạn dốc Km{(s1 / 1000.0):F3} - Km{(s2 / 1000.0):F3} (i%)",
-                    ProposedValue = $"{slope:+0.00;-0.00;0.00} % (L={lenPVI:F2}m)",
+                    ProposedValue = $"{slope:+0.00;-0.00;0.00} % (L_dốc={lenDocTCVN:F2}m)",
                     StandardRequirement = $"|i| ≤ {req.MaxGrade:F1} % (Vtk={req.DesignSpeed}km/h, {req.TerrainType})"
                 };
 
@@ -1016,26 +1020,26 @@ namespace Civil3DCsharp
                 }
 
                 // Check 1.3: Chiều dài đoạn dốc tối thiểu (L_doc_min)
-                // Sử dụng lenTangent (đã trừ cong đứng) thay vì lenPVI
+                // Sử dụng lenDocTCVN = 1/4 L_v1 + L_thẳng + 1/4 L_v2 theo TCVN 5729:2012 (Chú thích Bảng 5)
                 var itemLen = new ProfileCheckItem
                 {
                     Index = stt++,
                     Station = s1,
                     Elevation = z1,
-                    ItemName = $"Chiều dài đoạn dốc L (Km{(s1 / 1000.0):F3})",
-                    ProposedValue = $"{lenTangent:F2} m (PVI→PVI={lenPVI:F2}m)",
-                    StandardRequirement = $"≥ {req.MinGradeTangentLength:F1} m"
+                    ItemName = $"Chiều dài đoạn dốc L_dốc (Km{(s1 / 1000.0):F3})",
+                    ProposedValue = $"{lenDocTCVN:F2} m (L_thẳng={lenTangent:F2}m)",
+                    StandardRequirement = $"≥ {req.MinGradeTangentLength:F1} m (TCVN 5729:2012)"
                 };
 
-                if (lenTangent < req.MinGradeTangentLength - 0.001)
+                if (lenDocTCVN < req.MinGradeTangentLength - 0.001)
                 {
                     itemLen.Status = CheckStatus.Fail;
-                    itemLen.Note = $"VI PHẠM: Chiều dài tangent L = {lenTangent:F2}m nhỏ hơn chiều dài tối thiểu {req.MinGradeTangentLength:F1}m quy định.";
+                    itemLen.Note = $"VI PHẠM: Chiều dài dốc L_dốc = {lenDocTCVN:F2}m nhỏ hơn chiều dài tối thiểu {req.MinGradeTangentLength:F1}m quy định.";
                 }
                 else
                 {
                     itemLen.Status = CheckStatus.Pass;
-                    itemLen.Note = "Đoạn dốc đủ chiều dài êm thuận";
+                    itemLen.Note = "Đoạn dốc đủ chiều dài êm thuận theo TCVN";
                 }
                 results.Add(itemLen);
             }

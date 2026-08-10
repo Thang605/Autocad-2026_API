@@ -8,6 +8,23 @@ using WinFormsPoint = System.Drawing.Point;
 
 namespace MyFirstProject.Civil_Tool
 {
+    public class DieuChinhProfileItem
+    {
+        public string Name { get; set; } = string.Empty;
+        public ObjectId Id { get; set; } = ObjectId.Null;
+
+        public DieuChinhProfileItem(string name, ObjectId id)
+        {
+            Name = name;
+            Id = id;
+        }
+
+        public override string ToString()
+        {
+            return Name;
+        }
+    }
+
     /// <summary>
     /// Form nhập và điều chỉnh thông số đường đỏ (PVI) trong Civil 3D
     /// </summary>
@@ -17,6 +34,7 @@ namespace MyFirstProject.Civil_Tool
         private static double _lastSlope = 0.0;
         private static double _lastDistance = 50.0;
         private static bool _lastShiftSubsequent = false;
+        private static bool _lastIsFixPvi1 = true;
 
         // Selected Object References
         public ObjectId ProfileId { get; set; } = ObjectId.Null;
@@ -32,6 +50,7 @@ namespace MyFirstProject.Civil_Tool
         public double Pvi2Elevation { get; set; } = 0.0;
 
         // Form Outputs
+        public bool IsFixPvi1 => rdoFixPvi1.Checked;
         public double SlopePercent => (double)numSlope.Value;
         public double NewDistance => (double)numDistance.Value;
         public bool ShiftSubsequent => chkShiftSubsequent.Checked;
@@ -43,7 +62,8 @@ namespace MyFirstProject.Civil_Tool
         // Group Đối tượng
         private GroupBox grpObjects = null!;
         private WinFormsLabel lblProfile = null!;
-        public TextBox txtProfileName = null!;
+        public ComboBox cboProfile = null!;
+        public Button btnPickProfile = null!;
         private WinFormsLabel lblProfileView = null!;
         public TextBox txtProfileViewName = null!;
         public Button btnPickProfileView = null!;
@@ -51,6 +71,8 @@ namespace MyFirstProject.Civil_Tool
         // Group PVI
         private GroupBox grpPVI = null!;
         public Button btnPickSegment = null!;
+        public RadioButton rdoFixPvi1 = null!;
+        public RadioButton rdoFixPvi2 = null!;
         private WinFormsLabel lblPvi1 = null!;
         public TextBox txtPvi1Info = null!;
         public Button btnPickPvi1 = null!;
@@ -89,14 +111,18 @@ namespace MyFirstProject.Civil_Tool
             lblTitle = new WinFormsLabel();
 
             grpObjects = new GroupBox();
-            lblProfile = new WinFormsLabel();
-            txtProfileName = new TextBox();
             lblProfileView = new WinFormsLabel();
             txtProfileViewName = new TextBox();
             btnPickProfileView = new Button();
 
+            lblProfile = new WinFormsLabel();
+            cboProfile = new ComboBox();
+            btnPickProfile = new Button();
+
             grpPVI = new GroupBox();
             btnPickSegment = new Button();
+            rdoFixPvi1 = new RadioButton();
+            rdoFixPvi2 = new RadioButton();
             lblPvi1 = new WinFormsLabel();
             txtPvi1Info = new TextBox();
             btnPickPvi1 = new Button();
@@ -121,7 +147,7 @@ namespace MyFirstProject.Civil_Tool
 
             // Form properties
             this.Text = "Điều Chỉnh Đường Đỏ (PVI)";
-            this.Size = new Size(540, 580);
+            this.Size = new Size(540, 600);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -163,35 +189,53 @@ namespace MyFirstProject.Civil_Tool
             lblProfile.Location = new WinFormsPoint(15, 58);
             lblProfile.Size = new Size(70, 23);
 
-            txtProfileName.Location = new WinFormsPoint(90, 56);
-            txtProfileName.Size = new Size(390, 24);
-            txtProfileName.ReadOnly = true;
-            txtProfileName.Font = standardFont;
-            txtProfileName.Text = "(Chưa chọn Profile)";
+            cboProfile.Location = new WinFormsPoint(90, 56);
+            cboProfile.Size = new Size(250, 24);
+            cboProfile.DropDownStyle = ComboBoxStyle.DropDownList;
+            cboProfile.Font = standardFont;
+
+            btnPickProfile.Text = "🎯 Chọn Profile";
+            btnPickProfile.Font = standardFont;
+            btnPickProfile.Location = new WinFormsPoint(350, 55);
+            btnPickProfile.Size = new Size(130, 27);
 
             grpObjects.Controls.AddRange(new Control[] {
                 lblProfileView, txtProfileViewName, btnPickProfileView,
-                lblProfile, txtProfileName
+                lblProfile, cboProfile, btnPickProfile
             });
 
             // Group 2: PVI
             grpPVI.Text = "2. Chọn các đỉnh PVI";
             grpPVI.Font = boldFont;
             grpPVI.Location = new WinFormsPoint(15, 145);
-            grpPVI.Size = new Size(495, 132);
+            grpPVI.Size = new Size(495, 155);
 
             btnPickSegment.Text = "🎯 Pick 1 điểm trên đoạn Profile (Tự động lấy 2 PVI)";
             btnPickSegment.Font = boldFont;
             btnPickSegment.ForeColor = Color.DarkGreen;
             btnPickSegment.Location = new WinFormsPoint(15, 24);
-            btnPickSegment.Size = new Size(465, 30);
+            btnPickSegment.Size = new Size(465, 28);
+
+            // Radio Buttons chọn chế độ cố định PVI 1 hay PVI 2
+            rdoFixPvi1.Text = "Cố định PVI 1 (Sửa PVI 2)";
+            rdoFixPvi1.Font = boldFont;
+            rdoFixPvi1.Location = new WinFormsPoint(15, 56);
+            rdoFixPvi1.Size = new Size(220, 24);
+            rdoFixPvi1.Checked = true;
+            rdoFixPvi1.CheckedChanged += FixMode_CheckedChanged;
+
+            rdoFixPvi2.Text = "Cố định PVI 2 (Sửa PVI 1)";
+            rdoFixPvi2.Font = boldFont;
+            rdoFixPvi2.Location = new WinFormsPoint(245, 56);
+            rdoFixPvi2.Size = new Size(235, 24);
+            rdoFixPvi2.CheckedChanged += FixMode_CheckedChanged;
 
             lblPvi1.Text = "PVI 1 (Đầu):";
             lblPvi1.Font = standardFont;
-            lblPvi1.Location = new WinFormsPoint(15, 62);
+            lblPvi1.Location = new WinFormsPoint(15, 87);
             lblPvi1.Size = new Size(85, 23);
 
-            txtPvi1Info.Location = new WinFormsPoint(105, 60);
+            txtPvi1Info.Location = new WinFormsPoint(105, 85);
             txtPvi1Info.Size = new Size(265, 24);
             txtPvi1Info.ReadOnly = true;
             txtPvi1Info.Font = standardFont;
@@ -199,15 +243,15 @@ namespace MyFirstProject.Civil_Tool
 
             btnPickPvi1.Text = "📍 Pick PVI 1";
             btnPickPvi1.Font = standardFont;
-            btnPickPvi1.Location = new WinFormsPoint(380, 59);
+            btnPickPvi1.Location = new WinFormsPoint(380, 84);
             btnPickPvi1.Size = new Size(100, 27);
 
             lblPvi2.Text = "PVI 2 (Sau):";
             lblPvi2.Font = standardFont;
-            lblPvi2.Location = new WinFormsPoint(15, 95);
+            lblPvi2.Location = new WinFormsPoint(15, 118);
             lblPvi2.Size = new Size(85, 23);
 
-            txtPvi2Info.Location = new WinFormsPoint(105, 93);
+            txtPvi2Info.Location = new WinFormsPoint(105, 116);
             txtPvi2Info.Size = new Size(265, 24);
             txtPvi2Info.ReadOnly = true;
             txtPvi2Info.Font = standardFont;
@@ -215,11 +259,12 @@ namespace MyFirstProject.Civil_Tool
 
             btnPickPvi2.Text = "📍 Pick PVI 2";
             btnPickPvi2.Font = standardFont;
-            btnPickPvi2.Location = new WinFormsPoint(380, 92);
+            btnPickPvi2.Location = new WinFormsPoint(380, 115);
             btnPickPvi2.Size = new Size(100, 27);
 
             grpPVI.Controls.AddRange(new Control[] {
                 btnPickSegment,
+                rdoFixPvi1, rdoFixPvi2,
                 lblPvi1, txtPvi1Info, btnPickPvi1,
                 lblPvi2, txtPvi2Info, btnPickPvi2
             });
@@ -227,7 +272,7 @@ namespace MyFirstProject.Civil_Tool
             // Group 3: Thông số điều chỉnh
             grpParams.Text = "3. Thông số điều chỉnh";
             grpParams.Font = boldFont;
-            grpParams.Location = new WinFormsPoint(15, 283);
+            grpParams.Location = new WinFormsPoint(15, 306);
             grpParams.Size = new Size(495, 195);
 
             // Slope i (%)
@@ -280,13 +325,13 @@ namespace MyFirstProject.Civil_Tool
             // Action Buttons
             btnOK.Text = "Thực hiện";
             btnOK.Font = boldFont;
-            btnOK.Location = new WinFormsPoint(280, 492);
+            btnOK.Location = new WinFormsPoint(280, 508);
             btnOK.Size = new Size(110, 34);
             btnOK.Click += BtnOK_Click;
 
             btnCancel.Text = "Đóng";
             btnCancel.Font = standardFont;
-            btnCancel.Location = new WinFormsPoint(400, 492);
+            btnCancel.Location = new WinFormsPoint(400, 508);
             btnCancel.Size = new Size(110, 34);
             btnCancel.Click += BtnCancel_Click;
 
@@ -303,6 +348,22 @@ namespace MyFirstProject.Civil_Tool
             this.ResumeLayout(false);
         }
 
+        private void FixMode_CheckedChanged(object? sender, EventArgs e)
+        {
+            if (rdoFixPvi1.Checked)
+            {
+                btnPickPoint2.Text = "🎯 Pick điểm thứ 2 (Tính L & i)";
+                chkShiftSubsequent.Text = "Tịnh tiến các PVI phía sau PVI 2 theo ΔS (Station offset)";
+            }
+            else
+            {
+                btnPickPoint2.Text = "🎯 Pick điểm thứ 1 (Tính L & i)";
+                chkShiftSubsequent.Text = "Tịnh tiến các PVI phía trước PVI 1 theo ΔS (Station offset)";
+            }
+            UpdatePvi1Display();
+            UpdatePvi2Display();
+        }
+
         private void RestoreLastUsedValues()
         {
             try
@@ -310,6 +371,8 @@ namespace MyFirstProject.Civil_Tool
                 numSlope.Value = (decimal)_lastSlope;
                 numDistance.Value = (decimal)_lastDistance;
                 chkShiftSubsequent.Checked = _lastShiftSubsequent;
+                if (_lastIsFixPvi1) rdoFixPvi1.Checked = true;
+                else rdoFixPvi2.Checked = true;
             }
             catch { }
         }
@@ -319,17 +382,19 @@ namespace MyFirstProject.Civil_Tool
             _lastSlope = (double)numSlope.Value;
             _lastDistance = (double)numDistance.Value;
             _lastShiftSubsequent = chkShiftSubsequent.Checked;
+            _lastIsFixPvi1 = rdoFixPvi1.Checked;
         }
 
         public void UpdatePvi1Display()
         {
             if (Pvi1Index >= 0)
             {
-                txtPvi1Info.Text = $"[PVI #{Pvi1Index}] Sta: {Pvi1Station:F2}m | Elev: {Pvi1Elevation:F3}m";
+                string role = IsFixPvi1 ? "Cố định" : "Thay đổi";
+                txtPvi1Info.Text = $"[PVI #{Pvi1Index}] Sta: {Pvi1Station:F2}m | Elev: {Pvi1Elevation:F3}m ({role})";
             }
             else
             {
-                txtPvi1Info.Text = "(Chưa chọn PVI 1 cố định)";
+                txtPvi1Info.Text = IsFixPvi1 ? "(Chưa chọn PVI 1 cố định)" : "(Chưa chọn PVI 1 thay đổi)";
             }
         }
 
@@ -337,11 +402,61 @@ namespace MyFirstProject.Civil_Tool
         {
             if (Pvi2Index >= 0)
             {
-                txtPvi2Info.Text = $"[PVI #{Pvi2Index}] Sta: {Pvi2Station:F2}m | Elev: {Pvi2Elevation:F3}m";
+                string role = IsFixPvi1 ? "Thay đổi" : "Cố định";
+                txtPvi2Info.Text = $"[PVI #{Pvi2Index}] Sta: {Pvi2Station:F2}m | Elev: {Pvi2Elevation:F3}m ({role})";
             }
             else
             {
-                txtPvi2Info.Text = "(Chưa chọn PVI 2 thay đổi)";
+                txtPvi2Info.Text = IsFixPvi1 ? "(Chưa chọn PVI 2 thay đổi)" : "(Chưa chọn PVI 2 cố định)";
+            }
+        }
+
+        public void PopulateProfiles(System.Collections.Generic.List<DieuChinhProfileItem> profiles, ObjectId selectedId)
+        {
+            cboProfile.SelectedIndexChanged -= CboProfile_SelectedIndexChanged;
+            cboProfile.Items.Clear();
+
+            DieuChinhProfileItem? toSelect = null;
+            foreach (var item in profiles)
+            {
+                cboProfile.Items.Add(item);
+                if (item.Id == selectedId)
+                {
+                    toSelect = item;
+                }
+            }
+
+            if (toSelect != null)
+            {
+                cboProfile.SelectedItem = toSelect;
+                ProfileId = toSelect.Id;
+            }
+            else if (cboProfile.Items.Count > 0)
+            {
+                cboProfile.SelectedIndex = 0;
+                ProfileId = ((DieuChinhProfileItem)cboProfile.Items[0]).Id;
+            }
+            else
+            {
+                ProfileId = ObjectId.Null;
+            }
+
+            cboProfile.SelectedIndexChanged += CboProfile_SelectedIndexChanged;
+        }
+
+        private void CboProfile_SelectedIndexChanged(object? sender, EventArgs e)
+        {
+            if (cboProfile.SelectedItem is DieuChinhProfileItem item)
+            {
+                if (ProfileId != item.Id)
+                {
+                    ProfileId = item.Id;
+                    // Reset PVI selections when profile changes
+                    Pvi1Index = -1;
+                    Pvi2Index = -1;
+                    UpdatePvi1Display();
+                    UpdatePvi2Display();
+                }
             }
         }
 

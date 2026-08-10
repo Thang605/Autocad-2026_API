@@ -68,11 +68,13 @@ namespace MyFirstProject.Menu_form
             // 
             // cbbStandard
             // 
+            this.cbbStandard.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
             this.cbbStandard.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cbbStandard.FormattingEnabled = true;
             this.cbbStandard.Location = new System.Drawing.Point(80, 12);
             this.cbbStandard.Name = "cbbStandard";
-            this.cbbStandard.Size = new System.Drawing.Size(259, 21);
+            this.cbbStandard.Size = new System.Drawing.Size(425, 21);
             this.cbbStandard.TabIndex = 14;
             this.cbbStandard.SelectedIndexChanged += new System.EventHandler(this.cbbStandard_SelectedIndexChanged);
             // 
@@ -87,16 +89,19 @@ namespace MyFirstProject.Menu_form
             // 
             // cbbAlignments
             // 
+            this.cbbAlignments.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
             this.cbbAlignments.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cbbAlignments.FormattingEnabled = true;
             this.cbbAlignments.Location = new System.Drawing.Point(77, 42);
             this.cbbAlignments.Name = "cbbAlignments";
-            this.cbbAlignments.Size = new System.Drawing.Size(262, 21);
+            this.cbbAlignments.Size = new System.Drawing.Size(387, 21);
             this.cbbAlignments.TabIndex = 1;
             // 
             // btnPickAlignment
             // 
-            this.btnPickAlignment.Location = new System.Drawing.Point(345, 40);
+            this.btnPickAlignment.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnPickAlignment.Location = new System.Drawing.Point(470, 40);
             this.btnPickAlignment.Name = "btnPickAlignment";
             this.btnPickAlignment.Size = new System.Drawing.Size(35, 23);
             this.btnPickAlignment.TabIndex = 2;
@@ -143,6 +148,8 @@ namespace MyFirstProject.Menu_form
             // 
             // groupBox1
             // 
+            this.groupBox1.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
             this.groupBox1.Controls.Add(this.chkTransitionLength);
             this.groupBox1.Controls.Add(this.chkStraightBetweenCurves);
             this.groupBox1.Controls.Add(this.chkMaxStraightLength);
@@ -151,7 +158,7 @@ namespace MyFirstProject.Menu_form
             this.groupBox1.Controls.Add(this.chkCheckSuperelevation);
             this.groupBox1.Location = new System.Drawing.Point(15, 108);
             this.groupBox1.Name = "groupBox1";
-            this.groupBox1.Size = new System.Drawing.Size(365, 180);
+            this.groupBox1.Size = new System.Drawing.Size(490, 155);
             this.groupBox1.TabIndex = 5;
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "Tuỳ chọn kiểm tra";
@@ -242,6 +249,9 @@ namespace MyFirstProject.Menu_form
             // 
             this.dgvResults.AllowUserToAddRows = false;
             this.dgvResults.AllowUserToDeleteRows = false;
+            this.dgvResults.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
             this.dgvResults.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
             this.dgvResults.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.dgvResults.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
@@ -295,6 +305,7 @@ namespace MyFirstProject.Menu_form
             // 
             // btnClose
             // 
+            this.btnClose.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnClose.Location = new System.Drawing.Point(430, 476);
             this.btnClose.Name = "btnClose";
             this.btnClose.Size = new System.Drawing.Size(75, 23);
@@ -332,6 +343,7 @@ namespace MyFirstProject.Menu_form
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(517, 511);
+            this.MinimumSize = new System.Drawing.Size(533, 450);
             this.Controls.Add(this.cbbStandard);
             this.Controls.Add(this.label3);
             this.Controls.Add(this.btnViewTable);
@@ -347,8 +359,9 @@ namespace MyFirstProject.Menu_form
             this.Controls.Add(this.btnPickAlignment);
             this.Controls.Add(this.cbbAlignments);
             this.Controls.Add(this.label1);
-            this.MaximizeBox = false;
-            this.MinimizeBox = false;
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.Sizable;
+            this.MaximizeBox = true;
+            this.MinimizeBox = true;
             this.Name = "KiemTraTimTuyenForm";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Kiểm Tra Tim Tuyến";
