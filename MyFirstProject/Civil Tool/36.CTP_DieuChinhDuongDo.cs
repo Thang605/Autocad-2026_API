@@ -24,6 +24,7 @@ namespace Civil3DCsharp
         private static ObjectId _lastProfileId = ObjectId.Null;
         private static int _lastPvi1Index = -1;
         private static int _lastPvi2Index = -1;
+        private static int _lastPviCenterIndex = -1;
 
         [CommandMethod("CTP_DieuChinhDuongDo")]
         public void CTP_DieuChinhDuongDo()
@@ -104,6 +105,7 @@ namespace Civil3DCsharp
                                     // Reset PVI selections
                                     form.Pvi1Index = -1;
                                     form.Pvi2Index = -1;
+                                    form.PviCenterIndex = -1;
                                     form.UpdatePvi1Display();
                                     form.UpdatePvi2Display();
                                 }
@@ -167,6 +169,7 @@ namespace Civil3DCsharp
                                         // Reset PVI selections
                                         form.Pvi1Index = -1;
                                         form.Pvi2Index = -1;
+                                        form.PviCenterIndex = -1;
                                         form.UpdatePvi1Display();
                                         form.UpdatePvi2Display();
                                     }
@@ -180,7 +183,7 @@ namespace Civil3DCsharp
                     }
                 };
 
-                // Nút pick 1 điểm trên đoạn Profile để lấy 2 điểm PVI (PVI đầu & PVI sau)
+                // Nút pick 1 điểm trên đoạn Profile để lấy 2 điểm PVI (PVI đầu & PVI sau) - TAB 1
                 form.btnPickSegment.Click += (s, e) =>
                 {
                     if (form.ProfileId.IsNull || !form.ProfileId.IsValid)
@@ -239,7 +242,7 @@ namespace Civil3DCsharp
                     }
                 };
 
-                // Wire up Pick PVI 1
+                // Wire up Pick PVI 1 - TAB 1
                 form.btnPickPvi1.Click += (s, e) =>
                 {
                     if (form.ProfileId.IsNull || !form.ProfileId.IsValid)
@@ -292,7 +295,7 @@ namespace Civil3DCsharp
                     }
                 };
 
-                // Wire up Pick PVI 2
+                // Wire up Pick PVI 2 - TAB 1
                 form.btnPickPvi2.Click += (s, e) =>
                 {
                     if (form.ProfileId.IsNull || !form.ProfileId.IsValid)
@@ -345,7 +348,7 @@ namespace Civil3DCsharp
                     }
                 };
 
-                // Nút Pick điểm để tính cả Khoảng cách L và Dốc i
+                // Nút Pick điểm để tính cả Khoảng cách L và Dốc i - TAB 1
                 form.btnPickPoint2.Click += (s, e) =>
                 {
                     if (form.ProfileId.IsNull || !form.ProfileId.IsValid)
@@ -426,6 +429,91 @@ namespace Civil3DCsharp
                     }
                 };
 
+                // Wire up Pick PVI trung tâm (tự động lấy PVI trước & sau) - TAB 2
+                form.btnPickCenterPvi.Click += (s, e) =>
+                {
+                    if (form.ProfileId.IsNull || !form.ProfileId.IsValid)
+                    {
+                        MessageBox.Show("Vui lòng chọn Trắc dọc / Profile trước!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
+                    try
+                    {
+                        using (var interaction = ed.StartUserInteraction(form))
+                        {
+                            PromptPointOptions ppo = new PromptPointOptions("\nPick vị trí đỉnh PVI (đỉnh trung tâm) trên trắc dọc: ");
+                            PromptPointResult ppr = ed.GetPoint(ppo);
+                            interaction.End();
+
+                            if (ppr.Status == PromptStatus.OK)
+                            {
+                                int centerIdx = FindNearestPviIndex(db, form.ProfileId, form.ProfileViewId, ppr.Value, out double sta, out double elev);
+                                if (centerIdx >= 0)
+                                {
+                                    using (Transaction tr = db.TransactionManager.StartTransaction())
+                                    {
+                                        Profile profile = tr.GetObject(form.ProfileId, OpenMode.ForRead) as Profile;
+                                        if (profile != null)
+                                        {
+                                            int totalPvis = profile.PVIs.Count;
+                                            if (totalPvis < 3)
+                                            {
+                                                MessageBox.Show("Profile phải có ít nhất 3 PVI mới có thể điều chỉnh PVI với PVI trước và PVI sau giữ nguyên.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                                return;
+                                            }
+                                            if (centerIdx == 0)
+                                            {
+                                                MessageBox.Show($"Đỉnh PVI được chọn là điểm đầu tuyến (#0), không có PVI trước. Vui lòng chọn PVI từ #1 đến #{totalPvis - 2}.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                                return;
+                                            }
+                                            if (centerIdx == totalPvis - 1)
+                                            {
+                                                MessageBox.Show($"Đỉnh PVI được chọn là điểm cuối tuyến (#{totalPvis - 1}), không có PVI sau. Vui lòng chọn PVI từ #1 đến #{totalPvis - 2}.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                                return;
+                                            }
+
+                                            int prevIdx = centerIdx - 1;
+                                            int nextIdx = centerIdx + 1;
+
+                                            ProfilePVI pPrev = profile.PVIs[prevIdx];
+                                            ProfilePVI pCenter = profile.PVIs[centerIdx];
+                                            ProfilePVI pNext = profile.PVIs[nextIdx];
+
+                                            double sPrev = pPrev.RawStation;
+                                            double ePrev = pPrev.Elevation;
+                                            double sCenter = pCenter.RawStation;
+                                            double eCenter = pCenter.Elevation;
+                                            double sNext = pNext.RawStation;
+                                            double eNext = pNext.Elevation;
+
+                                            double slopeBefore = (Math.Abs(sCenter - sPrev) > 0.0001) ? ((eCenter - ePrev) / (sCenter - sPrev)) * 100.0 : 0.0;
+                                            double slopeAfter = (Math.Abs(sNext - sCenter) > 0.0001) ? ((eNext - eCenter) / (sNext - sCenter)) * 100.0 : 0.0;
+
+                                            form.SetCenterPviData(
+                                                centerIdx, sCenter, eCenter,
+                                                prevIdx, sPrev, ePrev,
+                                                nextIdx, sNext, eNext,
+                                                slopeBefore, slopeAfter
+                                            );
+
+                                            ed.WriteMessage($"\n✅ Đã chọn PVI trung tâm #{centerIdx} (Sta {sCenter:F2}m). PVI trước #{prevIdx} (Sta {sPrev:F2}m), PVI sau #{nextIdx} (Sta {sNext:F2}m)");
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    ed.WriteMessage("\n⚠️ Không tìm thấy PVI tương ứng.");
+                                }
+                            }
+                        }
+                    }
+                    catch (System.Exception ex)
+                    {
+                        ed.WriteMessage($"\nLỗi khi pick PVI trung tâm: {ex.Message}");
+                    }
+                };
+
                 // Hiển thị Dialog
                 DialogResult dr = Application.ShowModalDialog(form);
 
@@ -436,8 +524,16 @@ namespace Civil3DCsharp
                     _lastProfileId = form.ProfileId;
                     _lastPvi1Index = form.Pvi1Index;
                     _lastPvi2Index = form.Pvi2Index;
+                    _lastPviCenterIndex = form.PviCenterIndex;
 
-                    ExecuteDieuChinhDuongDo(ed, db, form);
+                    if (form.SelectedTabMode == 1)
+                    {
+                        ExecuteDieuChinh1Pvi(ed, db, form);
+                    }
+                    else
+                    {
+                        ExecuteDieuChinhDuongDo(ed, db, form);
+                    }
                 }
             }
             catch (System.Exception ex)
@@ -497,6 +593,26 @@ namespace Civil3DCsharp
                             form.Pvi2Station = p2.RawStation;
                             form.Pvi2Elevation = p2.Elevation;
                             form.UpdatePvi2Display();
+                        }
+
+                        if (_lastPviCenterIndex > 0 && _lastPviCenterIndex < profile.PVIs.Count - 1)
+                        {
+                            int cIdx = _lastPviCenterIndex;
+                            int pIdx = cIdx - 1;
+                            int nIdx = cIdx + 1;
+
+                            ProfilePVI pP = profile.PVIs[pIdx];
+                            ProfilePVI pC = profile.PVIs[cIdx];
+                            ProfilePVI pN = profile.PVIs[nIdx];
+
+                            double sP = pP.RawStation; double eP = pP.Elevation;
+                            double sC = pC.RawStation; double eC = pC.Elevation;
+                            double sN = pN.RawStation; double eN = pN.Elevation;
+
+                            double sBefore = (Math.Abs(sC - sP) > 0.0001) ? ((eC - eP) / (sC - sP)) * 100.0 : 0.0;
+                            double sAfter = (Math.Abs(sN - sC) > 0.0001) ? ((eN - eC) / (sN - sC)) * 100.0 : 0.0;
+
+                            form.SetCenterPviData(cIdx, sC, eC, pIdx, sP, eP, nIdx, sN, eN, sBefore, sAfter);
                         }
                     }
                 }
@@ -662,6 +778,94 @@ namespace Civil3DCsharp
                 }
 
                 return bestIdx;
+            }
+        }
+
+        private void ExecuteDieuChinh1Pvi(Editor ed, Database db, DieuChinhDuongDoForm form)
+        {
+            using (Transaction tr = db.TransactionManager.StartTransaction())
+            {
+                Profile profile = tr.GetObject(form.ProfileId, OpenMode.ForWrite) as Profile;
+                if (profile == null)
+                {
+                    ed.WriteMessage("\n❌ Lỗi: Không thể tìm thấy đối tượng Profile.");
+                    return;
+                }
+
+                int k = form.PviCenterIndex;
+                int kPrev = form.PviPrevIndex;
+                int kNext = form.PviNextIndex;
+
+                if (k <= 0 || k >= profile.PVIs.Count - 1 || kPrev != k - 1 || kNext != k + 1)
+                {
+                    ed.WriteMessage("\n❌ Lỗi: Chỉ số PVI không hợp lệ trong Profile.");
+                    return;
+                }
+
+                ProfilePVI pviPrev = profile.PVIs[kPrev];
+                ProfilePVI pviCenter = profile.PVIs[k];
+                ProfilePVI pviNext = profile.PVIs[kNext];
+
+                double sPrev = pviPrev.RawStation;
+                double ePrev = pviPrev.Elevation;
+                double sNext = pviNext.RawStation;
+                double eNext = pviNext.Elevation;
+
+                double oldSta = pviCenter.RawStation;
+                double oldElev = pviCenter.Elevation;
+
+                double i1 = form.SlopeBefore;
+                double i2 = form.SlopeAfter;
+
+                double newSta = oldSta;
+                double newElev = oldElev;
+
+                if (form.CenterCalcMode == 0) // Giao điểm 2 dốc
+                {
+                    if (Math.Abs(i1 - i2) < 0.00001)
+                    {
+                        ed.WriteMessage("\n❌ Lỗi: Dốc cánh trước và sau bằng nhau (song song), không thể tính giao điểm PVI.");
+                        return;
+                    }
+                    newSta = (100.0 * (eNext - ePrev) - i2 * sNext + i1 * sPrev) / (i1 - i2);
+                    newElev = ePrev + (i1 / 100.0) * (newSta - sPrev);
+                }
+                else if (form.CenterCalcMode == 1) // Cố định lý trình theo dốc trước
+                {
+                    newSta = oldSta;
+                    newElev = ePrev + (i1 / 100.0) * (newSta - sPrev);
+                }
+                else if (form.CenterCalcMode == 2) // Cố định lý trình theo dốc sau
+                {
+                    newSta = oldSta;
+                    newElev = eNext - (i2 / 100.0) * (sNext - newSta);
+                }
+
+                try
+                {
+                    pviCenter.RawStation = newSta;
+                    pviCenter.Elevation = newElev;
+                }
+                catch
+                {
+                    profile.PVIs.RemoveAt(k);
+                    profile.PVIs.AddPVI(newSta, newElev);
+                }
+
+                tr.Commit();
+
+                double finalSlopeBefore = (Math.Abs(newSta - sPrev) > 0.0001) ? ((newElev - ePrev) / (newSta - sPrev)) * 100.0 : 0.0;
+                double finalSlopeAfter = (Math.Abs(sNext - newSta) > 0.0001) ? ((eNext - newElev) / (sNext - newSta)) * 100.0 : 0.0;
+
+                ed.WriteMessage("\n==========================================");
+                ed.WriteMessage($"\n🎉 ĐÃ ĐIỀU CHỈNH 1 PVI TRUNG TÂM: {profile.Name}");
+                ed.WriteMessage($"\n - PVI trước giữ nguyên (#{kPrev}): Sta = {sPrev:F2}m | Elev = {ePrev:F3}m");
+                ed.WriteMessage($"\n - PVI sau giữ nguyên (#{kNext}): Sta = {sNext:F2}m | Elev = {eNext:F3}m");
+                ed.WriteMessage($"\n - PVI chọn trước điều chỉnh (#{k}): Sta = {oldSta:F2}m | Elev = {oldElev:F3}m");
+                ed.WriteMessage($"\n - PVI chọn sau điều chỉnh (#{k}): Sta = {newSta:F2}m | Elev = {newElev:F3}m (ΔS = {newSta - oldSta:+0.00;-0.00;0.00}m, ΔZ = {newElev - oldElev:+0.000;-0.000;0.000}m)");
+                ed.WriteMessage($"\n - Dốc cánh trước mới (PVI {kPrev} -> {k}): {finalSlopeBefore:F4}%");
+                ed.WriteMessage($"\n - Dốc cánh sau mới (PVI {k} -> {kNext}): {finalSlopeAfter:F4}%");
+                ed.WriteMessage("\n==========================================");
             }
         }
 

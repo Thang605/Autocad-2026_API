@@ -2,13 +2,15 @@
 ;;; AutoLISP Script để tự động load file Civil3D2026.dll (hoặc Civil3D_Tools.dll)
 ;;; Cách sử dụng: Kéo thả file này vào AutoCAD/Civil 3D, hoặc dùng lệnh APPLOAD chọn file này.
 
-(defun C:LOADC3D ()
+(defun C:LOADC3D (/ oldCmdEcho dllPath localPath)
+  (setq oldCmdEcho (getvar "CMDECHO"))
+  (setvar "CMDECHO" 0)
   (setq dllPath "Y:\\5.SOFT T27\\1. FOR WORK\\1. THIET KE DUONG\\2.CIVIL 3D\\2026\\AutoCAD Civil 3D 2026 Win x64\\x64\\c3d\\Civil3D2026.dll")
   (if (findfile dllPath)
     (progn
-      (princ "\n[C3D] Đang nạp Civil3D2026.dll từ ổ Y:...")
+      (princ "\n[C3D] Đang nạp Civil3D tool:...")
       (command "._NETLOAD" dllPath)
-      (princ "\n[C3D] Nạp thành công Civil3D2026.dll!")
+      (princ "\n[C3D] Nạp thành công Civil3D tool")
     )
     (progn
       (setq localPath "C:\\Dropbox\\0.AI AGENT\\6.C#\\Autocad 2026_API\\MyFirstProject\\bin\\Release\\Civil3D_Tools.dll")
@@ -22,6 +24,7 @@
       )
     )
   )
+  (setvar "CMDECHO" oldCmdEcho)
   (princ)
 )
 
@@ -31,7 +34,4 @@
 )
 
 (C:LOADC3D)
-
-(princ "\n*** Đã nạp script LoadCivil3D2026.lsp ***")
-(princ "\n*** Gõ LOADC3D để nạp thủ công file DLL ***")
 (princ)
